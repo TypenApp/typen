@@ -24,7 +24,3 @@ site/node_modules/
 site/.next/
 site/out/
 
-# Published beta binaries are large (~65 MB). Keep them out of plain git history;
-# host them with Git LFS or a release bucket and let the build script publish them.
-site/public/downloads/*.exe
-site/public/downloads/*.zip
