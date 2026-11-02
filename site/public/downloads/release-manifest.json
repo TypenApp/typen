@@ -1,10 +1,10 @@
-﻿{
+{
     "product":  "AutoCorrect Desktop",
     "version":  "1.2.0",
     "channel":  "beta.2",
     "full_version":  "1.2.0-beta.2",
     "platform":  "win64",
-    "built_at":  "2026-11-02T00:51:23Z",
+    "built_at":  "2026-11-02T01:09:13Z",
     "code_signed":  false,
     "resources":  {
                       "bundle_version":  "1.0.9",
@@ -15,14 +15,14 @@
                       {
                           "kind":  "portable",
                           "file":  "AutoCorrect-Desktop-1.2.0-beta.2-win64-portable.zip",
-                          "size_bytes":  38770929,
-                          "sha256":  "b24a5f7714d284e46933312b45cfad475db3113e2fb2559e4b8fa85fd91e1922"
+                          "size_bytes":  38773906,
+                          "sha256":  "4b62a3e5eb42a928e108f2be74776d52cc905f6f30f4dd2200fe24b352b35db1"
                       },
                       {
                           "kind":  "installer",
                           "file":  "AutoCorrect-Desktop-1.2.0-beta.2-win64-setup.exe",
-                          "size_bytes":  29107307,
-                          "sha256":  "707fde065dd00d445a256f366c263947b11abb69a09bb4a87e81612d2c0c9232"
+                          "size_bytes":  29104196,
+                          "sha256":  "2128d8dfd0ddb1122ff86f53ff055f8f7c751421109c666d9ab16fb758e0b0d0"
                       }
                   ],
     "packs":  [

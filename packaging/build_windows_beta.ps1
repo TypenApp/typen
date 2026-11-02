@@ -123,7 +123,13 @@ foreach ($p in Get-ChildItem (Join-Path $Root "resources\en_base\packs") -Filter
     $sumsLines += "$hash  packs/$($p.Name)"
 }
 $sumsLines | Set-Content -Path (Join-Path $OutDir "SHA256SUMS.txt") -Encoding ascii
-$manifest | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $OutDir "release-manifest.json") -Encoding utf8
+# UTF-8 WITHOUT a BOM: Windows PowerShell's `-Encoding utf8` prepends one, which
+# makes the public manifest invalid for strict JSON parsers.
+[IO.File]::WriteAllText(
+    (Join-Path $OutDir "release-manifest.json"),
+    (($manifest | ConvertTo-Json -Depth 4) + "`n"),
+    (New-Object System.Text.UTF8Encoding($false))
+)
 
 Write-Host ""
 Write-Host "==> Artifacts" -ForegroundColor Green

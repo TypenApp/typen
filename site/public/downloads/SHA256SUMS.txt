@@ -1,5 +1,5 @@
-b24a5f7714d284e46933312b45cfad475db3113e2fb2559e4b8fa85fd91e1922  AutoCorrect-Desktop-1.2.0-beta.2-win64-portable.zip
-707fde065dd00d445a256f366c263947b11abb69a09bb4a87e81612d2c0c9232  AutoCorrect-Desktop-1.2.0-beta.2-win64-setup.exe
+4b62a3e5eb42a928e108f2be74776d52cc905f6f30f4dd2200fe24b352b35db1  AutoCorrect-Desktop-1.2.0-beta.2-win64-portable.zip
+2128d8dfd0ddb1122ff86f53ff055f8f7c751421109c666d9ab16fb758e0b0d0  AutoCorrect-Desktop-1.2.0-beta.2-win64-setup.exe
 5663105689c38b5f211d32efc6738fd9d8f531a72faab71fc5d645579f23adaa  packs/academic.pack.json
 d8d9a4dc54279a2f27b9536cef0bfdea2ff4993e7d29902d02202fbbafc12f59  packs/business.pack.json
 98f2a2f4cbdd6f86c53bbf8db0e97b4093d70d57e883de2276a9a001d17d7eb1  packs/finance.pack.json
