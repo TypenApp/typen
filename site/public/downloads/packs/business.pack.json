@@ -1,0 +1,41 @@
+{
+  "pack_id": "business",
+  "version": "1.0.1",
+  "released_at": "2026-11-02T00:00:00Z",
+  "words": {
+    "deliverables": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "stakeholder": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "stakeholders": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "onboarding": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "monetisation": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "monetization": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    }
+  },
+  "direct_typos": {
+    "stakholder": "stakeholder",
+    "deliverbles": "deliverables"
+  }
+}

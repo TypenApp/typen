@@ -1,0 +1,36 @@
+{
+  "pack_id": "academic",
+  "version": "1.0.1",
+  "released_at": "2026-11-02T00:00:00Z",
+  "words": {
+    "epistemological": {
+      "log_freq": -6.4,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "historiography": {
+      "log_freq": -6.4,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "methodology": {
+      "log_freq": -5.9,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "empirical": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "peer-reviewed": {
+      "log_freq": -6.1,
+      "casing_flag": 0,
+      "exact_casing": null
+    }
+  },
+  "direct_typos": {
+    "methodolgy": "methodology",
+    "emperical": "empirical"
+  }
+}

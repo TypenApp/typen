@@ -1,0 +1,67 @@
+{
+  "pack_id": "programming",
+  "version": "1.0.3",
+  "released_at": "2026-11-02T00:00:00Z",
+  "words": {
+    "kubernetes": {
+      "log_freq": -6.0,
+      "casing_flag": 1,
+      "exact_casing": "Kubernetes"
+    },
+    "pytorch": {
+      "log_freq": -6.0,
+      "casing_flag": 4,
+      "exact_casing": "PyTorch"
+    },
+    "fastapi": {
+      "log_freq": -6.0,
+      "casing_flag": 4,
+      "exact_casing": "FastAPI"
+    },
+    "numpy": {
+      "log_freq": -6.0,
+      "casing_flag": 4,
+      "exact_casing": "NumPy"
+    },
+    "graphql": {
+      "log_freq": -6.0,
+      "casing_flag": 4,
+      "exact_casing": "GraphQL"
+    },
+    "idempotency": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "idempotent": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "microservice": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "microservices": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "serialization": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "deserialization": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    }
+  },
+  "direct_typos": {
+    "kubernets": "Kubernetes",
+    "idempotant": "idempotent",
+    "asyncronous": "asynchronous"
+  }
+}

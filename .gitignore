@@ -1,0 +1,30 @@
+# Local secrets / per-machine configuration
+.env
+.env.*
+!.env.example
+site/.env*
+!site/.env.example
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# External corpus cache (re-downloaded by pipeline/external_sources.py)
+pipeline/data/external/
+
+# Packaging intermediates (packaging/build_windows_beta.ps1)
+dist/
+packaging/autocorrect.ico
+
+# Site
+site/node_modules/
+site/.next/
+site/out/
+
+# Published beta binaries are large (~65 MB). Keep them out of plain git history;
+# host them with Git LFS or a release bucket and let the build script publish them.
+site/public/downloads/*.exe
+site/public/downloads/*.zip

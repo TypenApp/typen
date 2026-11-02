@@ -1,0 +1,35 @@
+# UTF-8
+# PyInstaller Windows VERSIONINFO resource for AutoCorrectDesktop.exe (Beta channel).
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 2, 0, 1),
+    prodvers=(1, 2, 0, 1),
+    mask=0x3f,
+    flags=0x2,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          '040904B0',
+          [
+            StringStruct('CompanyName', 'AutoCorrect Engineering'),
+            StringStruct('FileDescription', 'AutoCorrect Desktop (Beta) — system-wide offline autocorrect'),
+            StringStruct('FileVersion', '1.2.0-beta.1'),
+            StringStruct('InternalName', 'AutoCorrectDesktop'),
+            StringStruct('LegalCopyright', '© AutoCorrect Engineering. Proprietary. Qt components (if present) under LGPLv3.'),
+            StringStruct('OriginalFilename', 'AutoCorrectDesktop.exe'),
+            StringStruct('ProductName', 'AutoCorrect Desktop'),
+            StringStruct('ProductVersion', '1.2.0-beta.1'),
+            StringStruct('Comments', 'Pre-release build. Not for production use.')
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)

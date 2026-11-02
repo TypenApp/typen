@@ -1,0 +1,6 @@
+site/public/downloads/*.zip filter=lfs diff=lfs merge=lfs -text
+site/public/downloads/*.exe filter=lfs diff=lfs merge=lfs -text
+site/public/downloads/*.dmg filter=lfs diff=lfs merge=lfs -text
+site/public/downloads/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+site/public/downloads/*.AppImage filter=lfs diff=lfs merge=lfs -text
+site/public/downloads/*.deb filter=lfs diff=lfs merge=lfs -text
