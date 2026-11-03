@@ -159,7 +159,9 @@ exit 0
 EOF
   chmod 755 "$PKG/DEBIAN/postinst"
   chmod -R a+rX "$PKG/opt" "$PKG/usr"
-  DEB="$OUT/autocorrect-desktop_${VERSION}~${CHANNEL}_${DEB_ARCH}.deb"
+  # The package Version keeps the Debian "~" pre-release ordering, but the *file name* must not:
+  # GitHub rewrites "~" to "." in release asset names, which would break every download link.
+  DEB="$OUT/autocorrect-desktop_${VERSION}-${CHANNEL}_${DEB_ARCH}.deb"
   dpkg-deb --build --root-owner-group "$PKG" "$DEB" >/dev/null
   echo "    built $(basename "$DEB")"
 else

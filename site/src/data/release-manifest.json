@@ -135,7 +135,7 @@
         },
         {
           "kind": "deb",
-          "file": "autocorrect-desktop_1.2.0~beta.3_amd64.deb",
+          "file": "autocorrect-desktop_1.2.0-beta.3_amd64.deb",
           "size_bytes": 54243824,
           "sha256": "1615087c304565653f4126747fb7f62b5b3e83f954a3f50d47496e4d177839c1"
         }
