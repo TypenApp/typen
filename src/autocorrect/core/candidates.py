@@ -13,7 +13,6 @@ from autocorrect.core.models import CorrectionCandidate, EvaluationContext
 from autocorrect.core.punctuation import lookup_contraction_restoration
 from autocorrect.core.scorer import compute_composite_score, weighted_error_channel_log_prob
 from autocorrect.intelligence.resource_manager import ResourceBundle
-from autocorrect.intelligence.schema import RegionFlag
 
 
 class PreferenceLookupPort(Protocol):
@@ -154,9 +153,9 @@ class CandidateGenerator:
                 default=-99.0,
             )
             if max_dist >= 2 and best_d1 < -11.0:
-                symspell_wids = bundle.symspell.query_candidate_ids(
-                    word_lower, max_distance=max_dist
-                ) - d1_wids
+                symspell_wids = (
+                    bundle.symspell.query_candidate_ids(word_lower, max_distance=max_dist) - d1_wids
+                )
                 for wid in symspell_wids:
                     meta = bundle.lexicon.get_meta(wid)
                     if not meta.can_suggest or not meta.matches_region(context.active_region):

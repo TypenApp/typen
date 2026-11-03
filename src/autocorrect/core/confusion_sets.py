@@ -25,9 +25,7 @@ DEFAULT_CONFUSION_GROUPS: Final[dict[int, tuple[str, ...]]] = {
 
 # Reverse lookup from lowercase word -> confusion_set_id
 WORD_TO_CONFUSION_GROUP: Final[dict[str, int]] = {
-    word: group_id
-    for group_id, words in DEFAULT_CONFUSION_GROUPS.items()
-    for word in words
+    word: group_id for group_id, words in DEFAULT_CONFUSION_GROUPS.items() for word in words
 }
 
 # Curated grammatical trigger sets for deterministic high-precision contextual disambiguation
@@ -153,7 +151,6 @@ COPULA_PREDICATES: Final[frozenset[str]] = frozenset(
         "late",
         "early",
         "invited",
-        "welcome",
         "done",
         "finished",
         "awesome",
@@ -224,6 +221,45 @@ POSSESSIVE_HEAD_NOUNS: Final[frozenset[str]] = frozenset(
         "color",
         "colour",
         "size",
+    }
+)
+
+
+# Words that, when they immediately follow a 'quantifier + singular noun' pair,
+# confirm the noun is the clause/phrase head (so it should be pluralised) rather
+# than a noun adjunct modifying a following noun. Modals, coordinators and a few
+# ultra-common finite verbs; agreement verbs and prepositions are added at the
+# call site.
+_NOUN_HEAD_CONFIRMING_FOLLOWERS: Final[frozenset[str]] = frozenset(
+    {
+        "and",
+        "or",
+        "nor",
+        "but",
+        "will",
+        "would",
+        "can",
+        "could",
+        "shall",
+        "should",
+        "may",
+        "might",
+        "must",
+        "do",
+        "does",
+        "did",
+        "don't",
+        "doesn't",
+        "didn't",
+        "here",
+        "there",
+        "then",
+        "too",
+        "also",
+        "now",
+        "today",
+        "yesterday",
+        "tomorrow",
     }
 )
 
@@ -316,7 +352,11 @@ def score_confusion_context(
 
     # Group 6: were / where / we're
     if candidate_lower in ("were", "where", "we're"):
-        if p1 in ("you", "they", "we", "there", "who", "what", "which", "that", "places", "people", "things"):
+        # Subject pronouns and clearly plural nouns select 'were' ('they were',
+        # 'people were'). Relative pronouns (that/which/who/what) are deliberately
+        # excluded: 'that we're happy' and 'that were happy' are both valid, so
+        # they do not disambiguate 'were' vs "we're".
+        if p1 in ("you", "they", "we", "there", "places", "people", "things"):
             if candidate_lower == "were":
                 return 5.5
             if candidate_lower == "we're":
@@ -329,15 +369,86 @@ def score_confusion_context(
 # routinely follow the contraction "it's" ("it's still", "it's time", "it's been").
 ITS_CONTRACTION_FOLLOWERS: frozenset[str] = frozenset(
     {
-        "a", "an", "the", "not", "been", "going", "very", "so", "too", "always", "never",
-        "okay", "ok", "fine", "great", "important", "possible", "impossible", "clear",
-        "obvious", "true", "false", "still", "just", "already", "really", "now", "time",
-        "here", "there", "what", "because", "like", "hard", "easy", "good", "bad",
-        "better", "worse", "best", "gone", "done", "over", "almost", "probably",
-        "definitely", "actually", "only", "all", "about", "getting", "coming", "raining",
-        "late", "early", "me", "you", "him", "her", "them", "us", "my", "your", "our",
-        "no", "nothing", "something", "hardly", "simply", "quite", "pretty", "kind",
-        "sort", "worth", "up", "down", "on", "off", "in", "out",
+        "a",
+        "an",
+        "the",
+        "not",
+        "been",
+        "going",
+        "very",
+        "so",
+        "too",
+        "always",
+        "never",
+        "okay",
+        "ok",
+        "fine",
+        "great",
+        "important",
+        "possible",
+        "impossible",
+        "clear",
+        "obvious",
+        "true",
+        "false",
+        "still",
+        "just",
+        "already",
+        "really",
+        "now",
+        "time",
+        "here",
+        "there",
+        "what",
+        "because",
+        "like",
+        "hard",
+        "easy",
+        "good",
+        "bad",
+        "better",
+        "worse",
+        "best",
+        "gone",
+        "done",
+        "over",
+        "almost",
+        "probably",
+        "definitely",
+        "actually",
+        "only",
+        "all",
+        "about",
+        "getting",
+        "coming",
+        "raining",
+        "late",
+        "early",
+        "me",
+        "you",
+        "him",
+        "her",
+        "them",
+        "us",
+        "my",
+        "your",
+        "our",
+        "no",
+        "nothing",
+        "something",
+        "hardly",
+        "simply",
+        "quite",
+        "pretty",
+        "kind",
+        "sort",
+        "worth",
+        "up",
+        "down",
+        "on",
+        "off",
+        "in",
+        "out",
     }
 )
 
@@ -355,9 +466,12 @@ def evaluate_retroactive_two_word_confusion(
     Returns the corrected `prev_word` (preserving lowercase) or None.
     """
     from autocorrect.core.grammar import (
+        AGREEMENT_VERBS,
         COUNTABLE_PLURAL_TO_SINGULAR,
+        COUNTABLE_SINGULAR_TO_PLURAL,
         IRREGULAR_PLURAL_NOUNS,
         PLURAL_QUANTIFIERS_AND_NUMERALS,
+        PREPOSITIONS_AND_PARTITIVES,
         requires_indefinite_a,
         requires_indefinite_an,
     )
@@ -365,6 +479,22 @@ def evaluate_retroactive_two_word_confusion(
     p_low = prev_word.lower()
     c_low = current_word.lower()
     p2_low = prev2_word.lower() if prev2_word else ""
+
+    # Quantifier + singular countable noun, pluralised retroactively once the
+    # following word confirms the noun is the phrase head rather than an adjunct.
+    # 'many video calls' keeps 'video' (next word is a noun); 'These book are' and
+    # 'two egg and' pluralise because the next word is a verb or conjunction.
+    if (
+        p2_low in PLURAL_QUANTIFIERS_AND_NUMERALS
+        and p2_low != "between"
+        and p_low in COUNTABLE_SINGULAR_TO_PLURAL
+        and (
+            c_low in _NOUN_HEAD_CONFIRMING_FOLLOWERS
+            or c_low in AGREEMENT_VERBS
+            or c_low in PREPOSITIONS_AND_PARTITIVES
+        )
+    ):
+        return COUNTABLE_SINGULAR_TO_PLURAL[p_low]
 
     # Indefinite article agreement ('a egg' -> 'an egg', 'an user' -> 'a user')
     if p_low == "a" and requires_indefinite_an(current_word):
@@ -392,7 +522,22 @@ def evaluate_retroactive_two_word_confusion(
         if p_low == "were" and c_low in ("a", "an", "one", "nobody", "nothing"):
             return "was"
 
-    if p_low == "your" and c_low in ("welcome", "right", "wrong", "invited", "going", "coming", "doing", "not", "a", "an", "the", "very", "so", "too"):
+    if p_low == "your" and c_low in (
+        "welcome",
+        "right",
+        "wrong",
+        "invited",
+        "going",
+        "coming",
+        "doing",
+        "not",
+        "a",
+        "an",
+        "the",
+        "very",
+        "so",
+        "too",
+    ):
         return "you're"
 
     if p_low == "you're" and c_low in POSSESSIVE_HEAD_NOUNS:
@@ -401,7 +546,21 @@ def evaluate_retroactive_two_word_confusion(
     if p_low == "its" and c_low in ITS_CONTRACTION_FOLLOWERS:
         return "it's"
 
-    if p_low == "it's" and c_low in ("own", "name", "color", "colour", "size", "value", "place", "way", "head", "tail", "wings", "eyes", "doors"):
+    if p_low == "it's" and c_low in (
+        "own",
+        "name",
+        "color",
+        "colour",
+        "size",
+        "value",
+        "place",
+        "way",
+        "head",
+        "tail",
+        "wings",
+        "eyes",
+        "doors",
+    ):
         return "its"
 
     if p_low in ("their", "they're") and c_low in EXISTENTIAL_VERBS_AFTER_THERE:
@@ -410,10 +569,36 @@ def evaluate_retroactive_two_word_confusion(
     if p_low in ("there", "they're") and c_low in POSSESSIVE_HEAD_NOUNS:
         return "their"
 
-    if p_low in ("their", "there") and c_low in ("going", "coming", "doing", "working", "trying", "making", "getting", "waiting", "ready", "not", "always", "never", "still", "already"):
+    if p_low in ("their", "there") and c_low in (
+        "going",
+        "coming",
+        "doing",
+        "working",
+        "trying",
+        "making",
+        "getting",
+        "waiting",
+        "ready",
+        "not",
+        "always",
+        "never",
+        "still",
+        "already",
+    ):
         return "they're"
 
-    if p_low == "were" and c_low in ("going", "here", "ready", "done", "excited", "happy", "glad", "looking", "working", "trying"):
+    if p_low == "were" and c_low in (
+        "going",
+        "here",
+        "ready",
+        "done",
+        "excited",
+        "happy",
+        "glad",
+        "looking",
+        "working",
+        "trying",
+    ):
         # Note: "we were going" vs "Initial: Were going to the store" -> only if sentence-initial
         pass
 

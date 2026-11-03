@@ -68,10 +68,7 @@ class ActiveWordBuffer:
 
     def check_idle_expiry(self, now_ms: float) -> None:
         """Flush the buffer if the user paused typing for >15 seconds."""
-        if (
-            self._last_key_time_ms > 0.0
-            and (now_ms - self._last_key_time_ms) > IDLE_BUFFER_TIMEOUT_MS
-        ):
+        if self._last_key_time_ms > 0.0 and (now_ms - self._last_key_time_ms) > IDLE_BUFFER_TIMEOUT_MS:
             self.clear_clean()
         self._last_key_time_ms = now_ms
 

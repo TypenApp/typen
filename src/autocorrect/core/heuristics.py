@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 from typing import Final
 
-#Prefixes that indicate CLI flags, paths, mentions, hashtags, or variables
-PROTECTED_PREFIXES: Final[ tuple[str, ...]] = (
+# Prefixes that indicate CLI flags, paths, mentions, hashtags, or variables
+PROTECTED_PREFIXES: Final[tuple[str, ...]] = (
     "--",
     "-",
     "/",
@@ -113,6 +113,19 @@ def should_skip_token(token: str, leading_prefix: str = "") -> bool:
     # 2. Protected leading prefixes (CLI flags, paths, mentions, hashtags, env vars)
     if leading_prefix and any(leading_prefix.endswith(p) for p in PROTECTED_PREFIXES):
         return True
+
+    # 2a. Trailing possessive apostrophe on a plural/sibilant noun ("dogs'", "James'",
+    #     "programs'"): leave the word verbatim rather than treating the bare stem as OOV.
+    if len(token) > 2 and token[-1] in ("'", "\u2019") and token[:-1].isalpha():
+        return True
+
+    # 2b. Internal hyphenated compound with alphabetic parts on both sides
+    #     ("world-wide", "state-of-the-art", "non-profit", "re-evaluated"): intentional
+    #     user formatting, never collapse it into a single word.
+    if "-" in token.strip("-"):
+        parts = token.split("-")
+        if len(parts) >= 2 and all(p.isalpha() for p in parts if p):
+            return True
 
     # 3. Any token containing digits (v2, covid19, mp4, 3d, sha256, passwords)
     if any(ch.isdigit() for ch in token):

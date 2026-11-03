@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from enum import IntFlag
 from typing import Final
 
-from autocorrect.version import BINARY_SCHEMA_VERSION
+# Re-exported: the mmap readers import the schema version from here.
+from autocorrect.version import BINARY_SCHEMA_VERSION as BINARY_SCHEMA_VERSION
 
 # Magic headers for binary artifacts (4 bytes each)
 MAGIC_LEXICON: Final[bytes] = b"ACLX"

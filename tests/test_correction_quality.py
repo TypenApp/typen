@@ -26,14 +26,14 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pipeline.external_sources import _parse_esdb, _split_forms
+from tests.test_core_standard import _type_string
 
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.core.models import CorrectionReason, EvaluationContext
 from autocorrect.core.scorer import weighted_edit_path_cost, weighted_error_channel_log_prob
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
-from pipeline.external_sources import _parse_esdb, _split_forms
-from tests.test_core_standard import _type_string
 
 
 @pytest.fixture(scope="module")
@@ -91,15 +91,28 @@ def test_esdb_parser_handles_dialect_segments_and_alternative_groups(tmp_path: P
                 "35 [12dicts]: - <v>: (spun | @: span), spinning, spins",
                 "35 [12dicts]: wake <v>: -, waking, wakes",
                 "35 [12dicts]: - <v>: (woke | ?: waked), (waked | ~: woke | ~: woken), -, -",
-                "35 [12dicts]: A B C=: OK <n>: OKs # fixme: pos_class originally \"upper\"",
-                "35 [12dicts]: OK <aj> {:1} # fixme: lemma_rank originally \"-\"",
+                '35 [12dicts]: A B C=: OK <n>: OKs # fixme: pos_class originally "upper"',
+                '35 [12dicts]: OK <aj> {:1} # fixme: lemma_rank originally "-"',
                 "85 [stale]: aal <n>: aals",
             ]
         ),
         encoding="utf-8",
     )
     words = _parse_esdb(sample, max_level=70)
-    for expected in ("vendor", "vendors", "fjord", "color", "colour", "spin", "spun", "spinning", "wake", "woke", "woken", "ok"):
+    for expected in (
+        "vendor",
+        "vendors",
+        "fjord",
+        "color",
+        "colour",
+        "spin",
+        "spun",
+        "spinning",
+        "wake",
+        "woke",
+        "woken",
+        "ok",
+    ):
         assert expected in words, expected
     # archaic / questionable alternatives and obscure levels are excluded
     for rejected in ("span", "aal", "aals"):

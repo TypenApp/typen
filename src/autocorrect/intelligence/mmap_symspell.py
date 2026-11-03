@@ -63,9 +63,7 @@ class MmapSymSpellIndex:
         self._mmap = mmap.mmap(self._file.fileno(), 0, access=mmap.ACCESS_READ)
         self._view = memoryview(self._mmap)
 
-        magic, schema_ver, _, bucket_count, csr_byte_offset = HEADER_STRUCT.unpack_from(
-            self._view, 0
-        )
+        magic, schema_ver, _, bucket_count, csr_byte_offset = HEADER_STRUCT.unpack_from(self._view, 0)
         if magic != MAGIC_SYMSPELL or schema_ver != BINARY_SCHEMA_VERSION:
             self.close()
             raise ValueError("Invalid SymSpell binary header")

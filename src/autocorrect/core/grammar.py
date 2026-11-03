@@ -145,9 +145,8 @@ FIRST_PERSON_SINGULAR_VERB: Final[dict[str, str]] = {
     "hasn't": "haven't",
 }
 
-AGREEMENT_VERBS: Final[frozenset[str]] = (
-    frozenset(SINGULAR_TO_PLURAL_VERB.keys())
-    | frozenset(PLURAL_TO_SINGULAR_VERB.keys())
+AGREEMENT_VERBS: Final[frozenset[str]] = frozenset(SINGULAR_TO_PLURAL_VERB.keys()) | frozenset(
+    PLURAL_TO_SINGULAR_VERB.keys()
 )
 
 # Clause boundary tokens that start a fresh subject domain
@@ -922,8 +921,7 @@ def is_gerund_or_non_nominal_clause_starter(first_word_lower: str, lexicon: Mmap
             return True
         stem = first_word_lower[:-3]
         if len(stem) >= 3 and (
-            lexicon.find_word_id(stem) is not None
-            or lexicon.find_word_id(stem + "e") is not None
+            lexicon.find_word_id(stem) is not None or lexicon.find_word_id(stem + "e") is not None
         ):
             return True
 
@@ -982,9 +980,21 @@ def evaluate_contextual_grammar(
         return "did"
 
     # 4. Determiner / Quantifier / Numeral + Noun Number Agreement
-    if p1 in PLURAL_QUANTIFIERS_AND_NUMERALS and p2 != "between":
-        if token_lower in COUNTABLE_SINGULAR_TO_PLURAL:
-            return COUNTABLE_SINGULAR_TO_PLURAL[token_lower]
+    #    A singular countable noun right after a plural quantifier is usually an
+    #    error ('two egg' -> 'two eggs'), but mid-phrase it can be a noun adjunct
+    #    modifying a following noun ('many video calls', 'two data points'). When a
+    #    following word exists (trailing delimiter is a space) the adjunct case is
+    #    resolved retroactively once that word is known (see
+    #    `evaluate_retroactive_number_agreement`); only correct forward here when the
+    #    noun is the clause/phrase head (followed by punctuation or sentence end).
+    noun_is_phrase_head = ctx.trailing_delimiter not in (" ", "", "\t")
+    if (
+        p1 in PLURAL_QUANTIFIERS_AND_NUMERALS
+        and p2 != "between"
+        and noun_is_phrase_head
+        and token_lower in COUNTABLE_SINGULAR_TO_PLURAL
+    ):
+        return COUNTABLE_SINGULAR_TO_PLURAL[token_lower]
 
     if p1 in EXPLICIT_SINGULAR_DETERMINERS and p2 != "of":
         if token_lower in COUNTABLE_PLURAL_TO_SINGULAR:
@@ -995,6 +1005,12 @@ def evaluate_contextual_grammar(
         clause = _extract_active_clause_tokens(ctx)
         if not clause:
             return None
+
+        # A lexical-noun subject cannot be identified reliably from a single
+        # preceding word: 'the box in the rooms is' and 'the rooms are' share the
+        # same prev1. Only trust noun-phrase subject detection when the caller
+        # supplies real sentence tokenisation; pronoun subjects stay reliable.
+        has_clause_context = bool(ctx.clause_tokens)
 
         # Check subjunctive ('if I were', 'if he were', 'if it were', 'wish she were')
         is_subjunctive_ctx = any(t in SUBJUNCTIVE_TRIGGERS for t in clause)
@@ -1021,11 +1037,14 @@ def evaluate_contextual_grammar(
 
         # 5A. Coordinated subject ('you and I is/am' -> 'you and I are', 'Tom and Jerry is' -> 'are')
         if (
-            len(subj_tokens) >= 3
+            has_clause_context
+            and len(subj_tokens) >= 3
             and subj_tokens[-2] == "and"
             and "between" not in subj_tokens
             and not is_gerund_or_non_nominal_clause_starter(
-                subj_tokens[0] if subj_tokens[0] not in CLAUSE_BOUNDARY_TOKENS else (subj_tokens[1] if len(subj_tokens) > 1 else ""),
+                subj_tokens[0]
+                if subj_tokens[0] not in CLAUSE_BOUNDARY_TOKENS
+                else (subj_tokens[1] if len(subj_tokens) > 1 else ""),
                 lexicon,
             )
         ):
@@ -1055,7 +1074,11 @@ def evaluate_contextual_grammar(
 
         # 5D. Second-person 'you' (when not object of preposition/verb)
         if subj_head == "you" and prev_before_subj not in PREPOSITIONS_AND_PARTITIVES:
-            if len(subj_tokens) == 1 or prev_before_subj in CLAUSE_BOUNDARY_TOKENS or prev_before_subj in ("and", "but", "or"):
+            if (
+                len(subj_tokens) == 1
+                or prev_before_subj in CLAUSE_BOUNDARY_TOKENS
+                or prev_before_subj in ("and", "but", "or")
+            ):
                 if token_lower == "am":
                     return "are"
                 if token_lower in SINGULAR_TO_PLURAL_VERB:
@@ -1071,7 +1094,11 @@ def evaluate_contextual_grammar(
             return None
 
         if subj_head in ("it", "this", "that") and prev_before_subj not in PREPOSITIONS_AND_PARTITIVES:
-            if len(subj_tokens) == 1 or prev_before_subj in CLAUSE_BOUNDARY_TOKENS or prev_before_subj in ("and", "but", "or"):
+            if (
+                len(subj_tokens) == 1
+                or prev_before_subj in CLAUSE_BOUNDARY_TOKENS
+                or prev_before_subj in ("and", "but", "or")
+            ):
                 if token_lower == "were" and is_subjunctive_ctx:
                     return None
                 if token_lower in PLURAL_TO_SINGULAR_VERB:
@@ -1079,11 +1106,14 @@ def evaluate_contextual_grammar(
                 return None
 
         # 5F. Lexical Noun Phrase Subjects ('Raw eggs is best.' -> 'Raw eggs are best.')
+        # Requires real clause context to locate the subject head and rule out
+        # prepositional-phrase subjects ('one of the eggs is').
+        if not has_clause_context:
+            return None
+
         # Strip leading clause subordinator ('because', 'that', 'when', etc.) if present
         np_tokens = (
-            subj_tokens[1:]
-            if subj_tokens and subj_tokens[0] in CLAUSE_BOUNDARY_TOKENS
-            else subj_tokens
+            subj_tokens[1:] if subj_tokens and subj_tokens[0] in CLAUSE_BOUNDARY_TOKENS else subj_tokens
         )
         if not np_tokens:
             return None

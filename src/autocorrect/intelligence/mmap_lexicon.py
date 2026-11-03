@@ -50,9 +50,7 @@ class MmapLexicon:
             raise ValueError(f"Invalid lexicon magic header: {magic!r}")
         if schema_ver != BINARY_SCHEMA_VERSION:
             self.close()
-            raise ValueError(
-                f"Incompatible lexicon schema version {schema_ver} != {BINARY_SCHEMA_VERSION}"
-            )
+            raise ValueError(f"Incompatible lexicon schema version {schema_ver} != {BINARY_SCHEMA_VERSION}")
 
         self._count: int = count
         self._index_base: int = HEADER_STRUCT.size

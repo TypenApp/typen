@@ -15,7 +15,6 @@ from autocorrect.core.confusion_sets import WORD_TO_CONFUSION_GROUP
 from autocorrect.core.grammar import evaluate_contextual_grammar
 from autocorrect.core.heuristics import is_initial_double_cap_typo, should_skip_token
 from autocorrect.core.models import (
-    CorrectionCandidate,
     CorrectionDecision,
     CorrectionReason,
     EvaluationContext,
@@ -114,10 +113,7 @@ class AutocorrectEngine:
             and not ctx.leading_prefix
         ):
             capitalised = token.upper()
-            if not (
-                self._preferences
-                and self._preferences.is_rejected_pair(token, capitalised)
-            ):
+            if not (self._preferences and self._preferences.is_rejected_pair(token, capitalised)):
                 return CorrectionDecision(
                     original_token=token,
                     replacement_token=capitalised,
@@ -170,21 +166,13 @@ class AutocorrectEngine:
         if ctx.enable_punctuation_assist and not ctx.is_code_or_terminal_app:
             contraction = lookup_contraction_restoration(token_lower)
             if contraction is not None:
-                gram_contraction = evaluate_contextual_grammar(
-                    contraction.lower(), bundle.lexicon, ctx
-                )
+                gram_contraction = evaluate_contextual_grammar(contraction.lower(), bundle.lexicon, ctx)
                 target_contraction = gram_contraction or contraction
                 if not (
                     self._preferences
-                    and self._preferences.is_rejected_pair(
-                        token_lower, target_contraction.lower()
-                    )
+                    and self._preferences.is_rejected_pair(token_lower, target_contraction.lower())
                 ):
-                    c_flag = (
-                        CasingFlag.TITLE_ONLY
-                        if target_contraction[0].isupper()
-                        else CasingFlag.LOWER
-                    )
+                    c_flag = CasingFlag.TITLE_ONLY if target_contraction[0].isupper() else CasingFlag.LOWER
                     formatted = apply_casing_transfer(
                         original=token,
                         target_lower=target_contraction.lower(),
@@ -210,17 +198,12 @@ class AutocorrectEngine:
         # 'alot' -> 'a lot'). Only fused tokens with a single natural reading.
         if not ctx.is_code_or_terminal_app and token_lower in MISSING_SPACE_CORRECTIONS:
             phrase = MISSING_SPACE_CORRECTIONS[token_lower]
-            if not (
-                self._preferences
-                and self._preferences.is_rejected_pair(token_lower, phrase)
-            ):
+            if not (self._preferences and self._preferences.is_rejected_pair(token_lower, phrase)):
                 first, _, rest = phrase.partition(" ")
                 formatted_first = apply_casing_transfer(
                     original=token,
                     target_lower=first,
-                    force_sentence_start=(
-                        ctx.is_sentence_start and ctx.enable_auto_capitalise
-                    ),
+                    force_sentence_start=(ctx.is_sentence_start and ctx.enable_auto_capitalise),
                 )
                 if token.isupper() and len(token) > 1:
                     formatted = phrase.upper()
@@ -255,16 +238,20 @@ class AutocorrectEngine:
 
         # Make sure a curated direct typo (like 'teh' if ever present) is not treated as valid
         direct_typo_hit = bundle.direct_typos.lookup(token_lower)
-        if not ctx.is_code_or_terminal_app and (
-            (is_valid_in_region and direct_typo_hit is None) or "'" in token_lower
+        # A Title-case token mid-sentence ('Windows', 'States', 'Books') is almost
+        # always a proper noun; never run noun-number / agreement grammar on it.
+        is_probable_proper_noun = (
+            len(token) > 1 and token[0].isupper() and token[1:].islower() and not ctx.is_sentence_start
+        )
+        if (
+            not ctx.is_code_or_terminal_app
+            and not is_probable_proper_noun
+            and ((is_valid_in_region and direct_typo_hit is None) or "'" in token_lower)
         ):
-            grammar_target = evaluate_contextual_grammar(
-                token_lower, bundle.lexicon, ctx
-            )
+            grammar_target = evaluate_contextual_grammar(token_lower, bundle.lexicon, ctx)
             if grammar_target is not None and grammar_target != token_lower:
                 if not (
-                    self._preferences
-                    and self._preferences.is_rejected_pair(token_lower, grammar_target)
+                    self._preferences and self._preferences.is_rejected_pair(token_lower, grammar_target)
                 ):
                     formatted_gram = apply_casing_transfer(
                         original=token,
@@ -290,10 +277,7 @@ class AutocorrectEngine:
         if is_valid_in_region and direct_typo_hit is None:
             assert meta is not None
             # 6a. Check if this valid word belongs to a Contextual Confusion Set
-            if (
-                token_lower in WORD_TO_CONFUSION_GROUP
-                and not ctx.is_code_or_terminal_app
-            ):
+            if token_lower in WORD_TO_CONFUSION_GROUP and not ctx.is_code_or_terminal_app:
                 conf_decision = self._evaluate_confusion_set(token, token_lower, bundle, ctx)
                 if conf_decision is not None:
                     return conf_decision
@@ -343,11 +327,27 @@ class AutocorrectEngine:
                     candidates=tuple(ranked[:5]),
                 )
 
+        # 7-pre. Very short OOV tokens (<= 3 letters: 'src', 'ipc', 'lic', 'sig')
+        # are overwhelmingly acronyms, identifiers or abbreviations rather than
+        # misspellings. A single edit from such a token to a real word ('src' ->
+        # 'sec') is low-confidence noise, so require a curated direct-typo match
+        # (which bypasses this guard) before touching them.
+        if not best.is_direct_typo and len(token) <= 3:
+            return CorrectionDecision(
+                original_token=token,
+                replacement_token=token,
+                original_delimiter=ctx.trailing_delimiter,
+                replacement_delimiter=ctx.trailing_delimiter,
+                should_replace=False,
+                reason=CorrectionReason.INSUFFICIENT_CONFIDENCE,
+                confidence=best.composite_score,
+                margin=margin,
+                candidates=tuple(ranked[:5]),
+            )
+
         best_meta = bundle.lexicon.get_meta(best.word_id) if best.word_id > 0 else None
         best_casing = best_meta.casing_flags if best_meta is not None else CasingFlag.LOWER
-        best_exact = (
-            bundle.lexicon.get_exact_casing(best.word_id) if best.word_id > 0 else None
-        )
+        best_exact = bundle.lexicon.get_exact_casing(best.word_id) if best.word_id > 0 else None
 
         # 7a. Probable proper noun guard. A Title-case token the lexicon does not
         # know ('Priya', 'Okafor', 'Tomas') is usually a name, not a typo.
@@ -356,15 +356,10 @@ class AutocorrectEngine:
         #  - at sentence start (where capitalisation carries no signal) still
         #    demand a single-edit candidate: 'Recieved' -> 'Received' corrects,
         #    'Priya' -> 'Pray' (two edits) does not.
-        if (
-            not best.is_direct_typo
-            and len(token) > 1
-            and token[0].isupper()
-            and token[1:].islower()
-        ):
-            target_is_named = bool(
-                best_casing & (CasingFlag.TITLE_ONLY | CasingFlag.EXACT_MIXED)
-            ) or best_exact is not None
+        if not best.is_direct_typo and len(token) > 1 and token[0].isupper() and token[1:].islower():
+            target_is_named = (
+                bool(best_casing & (CasingFlag.TITLE_ONLY | CasingFlag.EXACT_MIXED)) or best_exact is not None
+            )
             allowed = best.edit_distance <= 1 and (ctx.is_sentence_start or target_is_named)
             if not allowed:
                 return CorrectionDecision(
@@ -385,17 +380,11 @@ class AutocorrectEngine:
             casing_flag=best_casing,
             exact_mixed=best_exact,
             force_sentence_start=(
-                ctx.is_sentence_start
-                and ctx.enable_auto_capitalise
-                and not ctx.is_code_or_terminal_app
+                ctx.is_sentence_start and ctx.enable_auto_capitalise and not ctx.is_code_or_terminal_app
             ),
         )
 
-        reason = (
-            CorrectionReason.DIRECT_TYPO
-            if best.is_direct_typo
-            else CorrectionReason.SPELLING_OOV
-        )
+        reason = CorrectionReason.DIRECT_TYPO if best.is_direct_typo else CorrectionReason.SPELLING_OOV
 
         return CorrectionDecision(
             original_token=token,
@@ -446,9 +435,7 @@ class AutocorrectEngine:
             original=token,
             target_lower=best.word,
             force_sentence_start=(
-                ctx.is_sentence_start
-                and ctx.enable_auto_capitalise
-                and not ctx.is_code_or_terminal_app
+                ctx.is_sentence_start and ctx.enable_auto_capitalise and not ctx.is_code_or_terminal_app
             ),
         )
         if formatted == token:
@@ -507,9 +494,7 @@ class AutocorrectEngine:
                 )
 
         if (casing_flag & CasingFlag.EXACT_MIXED) and exact_mixed and token.islower():
-            if not (
-                self._preferences and self._preferences.is_rejected_pair(token, exact_mixed)
-            ):
+            if not (self._preferences and self._preferences.is_rejected_pair(token, exact_mixed)):
                 return CorrectionDecision(
                     original_token=token,
                     replacement_token=exact_mixed,

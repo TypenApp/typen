@@ -15,16 +15,17 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from tests.test_core_standard import _press_backspace, _type_string
 
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.core.models import EvaluationContext
 from autocorrect.input.ports import KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
+from autocorrect.intelligence.schema import RegionFlag
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
 from autocorrect.sandbox import SANDBOX_HTML
 from autocorrect.ui.settings_main import SettingsController
-from tests.test_core_standard import _press_backspace, _type_string
 
 
 @pytest.fixture(scope="module")
@@ -41,9 +42,7 @@ def session(engine: AutocorrectEngine) -> InputSessionManager:
 
 def test_user_reported_sentence_end_to_end(session: InputSessionManager) -> None:
     """The exact reported sentence must come out clean, with no merged tokens."""
-    result = _type_string(
-        session, "i receive montly subs becos i am a beast ofa man. "
-    )
+    result = _type_string(session, "i receive montly subs becos i am a beast ofa man. ")
     assert result == "I receive monthly subs because I am a beast of a man. "
     # No conjoined-twin residue anywhere.
     for residue in ("iI", "rReceive", "toTo", "becos", "montly", "ofa man", " ."):
@@ -134,9 +133,7 @@ def test_backspace_type_backspace_does_not_revert(
         ("writting", "writing"),
     ],
 )
-def test_common_typos_correct(
-    engine: AutocorrectEngine, typo: str, expected: str
-) -> None:
+def test_common_typos_correct(engine: AutocorrectEngine, typo: str, expected: str) -> None:
     decision = engine.evaluate_token(typo)
     assert decision.should_replace, typo
     assert decision.replacement_token == expected, typo
@@ -146,9 +143,7 @@ def test_common_typos_correct(
     ("fused", "expected"),
     [("ofa", "of a"), ("alot", "a lot"), ("aswell", "as well"), ("thankyou", "thank you")],
 )
-def test_missing_space_corrections(
-    engine: AutocorrectEngine, fused: str, expected: str
-) -> None:
+def test_missing_space_corrections(engine: AutocorrectEngine, fused: str, expected: str) -> None:
     decision = engine.evaluate_token(fused)
     assert decision.should_replace
     assert decision.replacement_token == expected
@@ -157,17 +152,50 @@ def test_missing_space_corrections(
 @pytest.mark.parametrize(
     "valid",
     [
-        "monthly", "subscriptions", "subscription", "subs", "beast", "because",
-        "separately", "misspelled", "receive", "received", "man", "the",
-        "hello", "world", "colour", "organise", "computer", "python",
-        "code", "coding", "json", "browser", "settings",
-        "useState", "getElementById", "config.json", "hello_world",
+        "monthly",
+        "subscriptions",
+        "subscription",
+        "subs",
+        "beast",
+        "because",
+        "separately",
+        "misspelled",
+        "receive",
+        "received",
+        "man",
+        "the",
+        "hello",
+        "world",
+        "colour",
+        "organise",
+        "computer",
+        "python",
+        "code",
+        "coding",
+        "json",
+        "browser",
+        "settings",
+        "useState",
+        "getElementById",
+        "config.json",
+        "hello_world",
         # Comprehensive external lexicon (ESDB/SCOWL) coverage: real English
         # words that a hand-typed list would inevitably miss.
-        "aardvark", "photosynthesis", "serendipity", "unprecedented",
-        "entrepreneur", "questionnaire", "chrysanthemum", "rhythm",
-        "conscience", "miscellaneous", "fluorescent", "kaleidoscope",
-        "floccinaucinihilipilification", "pneumonia", "silhouette",
+        "aardvark",
+        "photosynthesis",
+        "serendipity",
+        "unprecedented",
+        "entrepreneur",
+        "questionnaire",
+        "chrysanthemum",
+        "rhythm",
+        "conscience",
+        "miscellaneous",
+        "fluorescent",
+        "kaleidoscope",
+        "floccinaucinihilipilification",
+        "pneumonia",
+        "silhouette",
     ],
 )
 def test_valid_words_are_never_rewritten(engine: AutocorrectEngine, valid: str) -> None:
@@ -214,9 +242,7 @@ def test_comprehensive_data_driven_lexicon() -> None:
     misspellings never validated."""
     import json
 
-    manifest = json.loads(
-        (DEFAULT_BUNDLED_DIR / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((DEFAULT_BUNDLED_DIR / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["word_count"] > 100_000
 
     from pipeline.external_sources import load_external_lexicon
@@ -282,11 +308,47 @@ def test_standard_tier_grammar_subject_verb_and_plurals(
         "If he were here he would know. ",
     ],
 )
-def test_grammar_false_positive_guards(
-    session: InputSessionManager, valid_sentence: str
-) -> None:
+def test_grammar_false_positive_guards(session: InputSessionManager, valid_sentence: str) -> None:
     session.reset_all_state()
     assert _type_string(session, valid_sentence) == valid_sentence
+
+
+@pytest.mark.parametrize(
+    ("raw_text", "expected_text"),
+    [
+        # A singular noun before a following noun is an adjunct, not a plural error.
+        ("we had many video calls today. ", "We had many video calls today. "),
+        ("the two data points agree. ", "The two data points agree. "),
+        # Relative pronouns do not disambiguate 'we're' vs 'were'.
+        ("i know that we're ready. ", "I know that we're ready. "),
+        # 'id' is a standalone noun, never silently expanded to "I'd".
+        ("the id column is unique. ", "The id column is unique. "),
+    ],
+)
+def test_precision_pass_does_not_damage_valid_text(
+    session: InputSessionManager, raw_text: str, expected_text: str
+) -> None:
+    session.reset_all_state()
+    assert _type_string(session, raw_text) == expected_text
+
+
+def test_short_and_formatted_tokens_are_left_alone(engine: AutocorrectEngine) -> None:
+    us = EvaluationContext(active_region=RegionFlag.EN_US)
+    # Very short OOV tokens are acronyms/identifiers, not misspellings.
+    for ident in ("src", "ipc", "lic", "sig", "dto"):
+        assert not engine.evaluate_token(ident, us).should_replace
+    # Hyphenated compounds and possessive apostrophes are intentional formatting.
+    for formatted in ("world-wide", "re-evaluated", "dogs'", "James'"):
+        assert not engine.evaluate_token(formatted, us).should_replace
+
+
+def test_transposition_never_corrects_into_an_unrelated_word(
+    engine: AutocorrectEngine,
+) -> None:
+    # A clean adjacent swap ('wnat') must never become a keyboard-adjacent but
+    # unrelated word ('what'); either it resolves to 'want' or it is left alone.
+    dec = engine.evaluate_token("wnat", EvaluationContext(active_region=RegionFlag.EN_US))
+    assert dec.replacement_token.lower() != "what"
 
 
 def test_interrupted_double_backspace_and_space_space_backspace_never_revert(
@@ -385,4 +447,3 @@ def test_revert_notes_suggested_dictionary_word_without_auto_pardoning(
         assert _type_string(session, "I recieved ") == "I recieved "
     finally:
         rm.close()
-

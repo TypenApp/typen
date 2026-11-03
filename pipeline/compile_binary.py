@@ -45,9 +45,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Sort words strictly by UTF-8 byte order so binary search in MmapLexicon is exact
-    sorted_entries = sorted(
-        dataset.words.values(), key=lambda e: e.word.encode("utf-8")
-    )
+    sorted_entries = sorted(dataset.words.values(), key=lambda e: e.word.encode("utf-8"))
 
     # Reserve word_id = 0 for <unk>
     word_to_id: dict[str, int] = {}
@@ -89,11 +87,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     # 1. Write lexicon.bin
     lex_path = output_dir / "lexicon.bin"
     with open(lex_path, "wb") as f:
-        f.write(
-            HEADER_STRUCT.pack(
-                MAGIC_LEXICON, BINARY_SCHEMA_VERSION, 0, total_lex_count, blob_offset
-            )
-        )
+        f.write(HEADER_STRUCT.pack(MAGIC_LEXICON, BINARY_SCHEMA_VERSION, 0, total_lex_count, blob_offset))
         for chunk in index_Chunks:
             f.write(chunk)
         f.write(utf8_blob)
@@ -101,16 +95,12 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     # 2. Write lexicon_meta.bin
     meta_path = output_dir / "lexicon_meta.bin"
     with open(meta_path, "wb") as f:
-        f.write(
-            HEADER_STRUCT.pack(MAGIC_META, BINARY_SCHEMA_VERSION, 0, total_lex_count, 0)
-        )
+        f.write(HEADER_STRUCT.pack(MAGIC_META, BINARY_SCHEMA_VERSION, 0, total_lex_count, 0))
         for m_chunk in meta_chunks:
             f.write(m_chunk)
 
     # 3. Write exact_casing.json & confusion_sets.json
-    (output_dir / "exact_casing.json").write_text(
-        json.dumps(exact_casing_map, indent=2), encoding="utf-8"
-    )
+    (output_dir / "exact_casing.json").write_text(json.dumps(exact_casing_map, indent=2), encoding="utf-8")
     (output_dir / "confusion_sets.json").write_text(
         json.dumps(dataset.confusion_sets, indent=2), encoding="utf-8"
     )
@@ -147,11 +137,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
 
     symspell_path = output_dir / "symspell_idx.bin"
     with open(symspell_path, "wb") as f:
-        f.write(
-            HEADER_STRUCT.pack(
-                MAGIC_SYMSPELL, BINARY_SCHEMA_VERSION, 0, bucket_count, csr_byte_offset
-            )
-        )
+        f.write(HEADER_STRUCT.pack(MAGIC_SYMSPELL, BINARY_SCHEMA_VERSION, 0, bucket_count, csr_byte_offset))
         for rec in bucket_records:
             f.write(rec)
         if csr_ids:
@@ -170,11 +156,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     typo_rows.sort(key=lambda r: r[0])
     direct_path = output_dir / "direct_typos.bin"
     with open(direct_path, "wb") as f:
-        f.write(
-            HEADER_STRUCT.pack(
-                MAGIC_DIRECT_TYPO, BINARY_SCHEMA_VERSION, 0, len(typo_rows), 0
-            )
-        )
+        f.write(HEADER_STRUCT.pack(MAGIC_DIRECT_TYPO, BINARY_SCHEMA_VERSION, 0, len(typo_rows), 0))
         for t_hash, target_wid, conf_q in typo_rows:
             f.write(DIRECT_TYPO_STRUCT.pack(t_hash, target_wid, conf_q, 0))
 
@@ -198,11 +180,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     sorted_ngrams = sorted(ngram_rows.items(), key=lambda kv: kv[0])
     ngram_path = output_dir / "context_ngram.bin"
     with open(ngram_path, "wb") as f:
-        f.write(
-            HEADER_STRUCT.pack(
-                MAGIC_NGRAM, BINARY_SCHEMA_VERSION, 0, len(sorted_ngrams), 0
-            )
-        )
+        f.write(HEADER_STRUCT.pack(MAGIC_NGRAM, BINARY_SCHEMA_VERSION, 0, len(sorted_ngrams), 0))
         for nh, (lp_c, bo_c) in sorted_ngrams:
             f.write(NGRAM_ENTRY_STRUCT.pack(nh, lp_c, bo_c, 0))
 
@@ -238,9 +216,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     packs_dir = output_dir / "packs"
     packs_dir.mkdir(parents=True, exist_ok=True)
     for pack_id, pack_payload in dataset.domain_packs.items():
-        (packs_dir / f"{pack_id}.pack.json").write_text(
-            json.dumps(pack_payload, indent=2), encoding="utf-8"
-        )
+        (packs_dir / f"{pack_id}.pack.json").write_text(json.dumps(pack_payload, indent=2), encoding="utf-8")
 
     # 9. Compute SHA-256 digests and write manifest.json
     artifact_files = [

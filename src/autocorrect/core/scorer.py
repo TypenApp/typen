@@ -88,7 +88,12 @@ def damerau_levenshtein_distance(s1: str, s2: str, score_cutoff: int = 2) -> int
 
 INSERT_DELETE_COST: Final[float] = 0.85
 DOUBLE_LETTER_COST: Final[float] = 0.50
-TRANSPOSITION_COST: Final[float] = 0.55
+# Adjacent transpositions ('wnat' -> 'want', 'teh' -> 'the') are one of the most
+# common motor-typing errors, so an OOV token that is a clean swap of a real word
+# is almost always that word. Price it below the cheapest single substitution
+# (0.50) so a transposition beats a same-distance keyboard-adjacent substitution
+# into an unrelated higher-frequency word ('wnat' -> 'what').
+TRANSPOSITION_COST: Final[float] = 0.42
 
 
 def weighted_edit_path_cost(typo: str, candidate: str) -> float:
@@ -145,9 +150,11 @@ def weighted_error_channel_log_prob(typo: str, candidate: str) -> tuple[int, flo
 
     lev_dist = int(Levenshtein.distance(typo, candidate, score_cutoff=4))
 
-    # Pure adjacent transposition (e.g. 'teh' -> 'the', 'recieve' -> 'receive', 'adn' -> 'and')
+    # Pure adjacent transposition (e.g. 'teh' -> 'the', 'recieve' -> 'receive', 'adn' -> 'and').
+    # Cheaper than any single substitution so a swap into a real word wins over a
+    # keyboard-adjacent substitution into an unrelated word ('wnat' -> 'want' beats 'what').
     if dl_dist == 1 and lev_dist == 2 and len(typo) == len(candidate):
-        return 1, -0.55
+        return 1, -0.35
 
     # Single substitution: weight by physical keyboard adjacency
     if dl_dist == 1 and len(typo) == len(candidate):
@@ -163,8 +170,7 @@ def weighted_error_channel_log_prob(typo: str, candidate: str) -> tuple[int, flo
         # Guard against stripping a regular plural '-s' or past-tense '-d' from a valid stem
         # (e.g. never "correct" plural 'computers' into singular 'computer')
         if len(candidate) >= 4 and (
-            typo == candidate + "s"
-            or (candidate.endswith("e") and typo == candidate + "d")
+            typo == candidate + "s" or (candidate.endswith("e") and typo == candidate + "d")
         ):
             return 1, -5.5
 

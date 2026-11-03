@@ -65,15 +65,11 @@ def validate_and_sanitize_dataset(
     for typo_key, (target_word, _) in list(dataset.direct_typos.items()):
         target_low = target_word.lower()
         if target_low not in dataset.words:
-            errors.append(
-                f"Direct typo {typo_key!r} points to missing lexicon target {target_low!r}"
-            )
+            errors.append(f"Direct typo {typo_key!r} points to missing lexicon target {target_low!r}")
             continue
         target_entry = dataset.words[target_low]
         if target_entry.morph_mask & MorphFlag.DO_NOT_SUGGEST:
-            errors.append(
-                f"Direct typo {typo_key!r} points to DO_NOT_SUGGEST word {target_low!r}"
-            )
+            errors.append(f"Direct typo {typo_key!r} points to DO_NOT_SUGGEST word {target_low!r}")
 
     return ValidationReport(
         passed=(len(errors) == 0),

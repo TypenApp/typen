@@ -11,14 +11,14 @@ import json
 import sys
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
 from autocorrect.intelligence.mmap_lexicon import MmapAbbreviationSet, MmapLexicon
 from autocorrect.intelligence.mmap_ngram import MmapNGramModel
 from autocorrect.intelligence.mmap_symspell import MmapDirectTypoTable, MmapSymSpellIndex
-from autocorrect.intelligence.schema import BINARY_SCHEMA_VERSION, CasingFlag, MorphFlag, RegionFlag
+from autocorrect.intelligence.schema import BINARY_SCHEMA_VERSION, CasingFlag
 
 
 def _resolve_bundled_resources_dir() -> Path:
@@ -38,9 +38,7 @@ def _resolve_bundled_resources_dir() -> Path:
         exe_dir = Path(sys.executable).resolve().parent
         candidates.append(exe_dir / "resources" / "en_base")
         candidates.append(exe_dir / "_internal" / "resources" / "en_base")
-    candidates.append(
-        Path(__file__).resolve().parent.parent.parent.parent / "resources" / "en_base"
-    )
+    candidates.append(Path(__file__).resolve().parent.parent.parent.parent / "resources" / "en_base")
     for candidate in candidates:
         if (candidate / "manifest.json").exists():
             return candidate
@@ -78,9 +76,7 @@ class ResourceBundle:
     domain_packs: dict[str, DomainPackOverlay] = field(default_factory=dict)
 
     def get_released_datetime(self) -> datetime:
-        return datetime.fromisoformat(self.released_at.replace("Z", "+00:00")).astimezone(
-            timezone.utc
-        )
+        return datetime.fromisoformat(self.released_at.replace("Z", "+00:00")).astimezone(UTC)
 
     def close(self) -> None:
         """Close all underlying memory-mapped files."""
@@ -133,14 +129,10 @@ class ResourceManager:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         schema_ver = int(manifest.get("schema_version", 0))
         if schema_ver != BINARY_SCHEMA_VERSION:
-            raise ValueError(
-                f"Resource schema_version {schema_ver} != required {BINARY_SCHEMA_VERSION}"
-            )
+            raise ValueError(f"Resource schema_version {schema_ver} != required {BINARY_SCHEMA_VERSION}")
 
         released_at_str = str(manifest.get("released_at", "2026-11-01T00:00:00Z"))
-        released_dt = datetime.fromisoformat(released_at_str.replace("Z", "+00:00")).astimezone(
-            timezone.utc
-        )
+        released_dt = datetime.fromisoformat(released_at_str.replace("Z", "+00:00")).astimezone(UTC)
         if max_entitled_date is not None and released_dt > max_entitled_date:
             raise PermissionError(
                 f"Resource release {released_at_str} exceeds licence update entitlement {max_entitled_date.isoformat()}"
@@ -215,9 +207,7 @@ class ResourceManager:
             self._enabled_packs = set(pack_ids)
             if self._active_bundle is not None:
                 self._active_bundle.domain_packs.clear()
-                self._load_enabled_domain_packs(
-                    self._active_bundle, self._active_bundle.bundle_dir
-                )
+                self._load_enabled_domain_packs(self._active_bundle, self._active_bundle.bundle_dir)
 
     def load_best_available(self, max_entitled_date: datetime | None = None) -> ResourceBundle:
         """
@@ -246,9 +236,7 @@ class ResourceManager:
             try:
                 # Bundled baseline is always entitled regardless of update window
                 entitled_check = None if candidate_dir == self._bundled_dir else max_entitled_date
-                new_bundle = self.load_bundle_from_dir(
-                    candidate_dir, max_entitled_date=entitled_check
-                )
+                new_bundle = self.load_bundle_from_dir(candidate_dir, max_entitled_date=entitled_check)
                 self.atomic_swap(new_bundle)
                 return new_bundle
             except Exception as exc:

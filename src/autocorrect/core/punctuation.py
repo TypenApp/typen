@@ -37,7 +37,9 @@ UNAMBIGUOUS_CONTRACTIONS: Final[dict[str, str]] = {
     "neednt": "needn't",
     "im": "I'm",
     "ive": "I've",
-    "id": "I'd",
+    # Note: 'id' is intentionally omitted — it is a common standalone noun
+    # (an ID, the Freudian id, an 'id' column) and is NOT an unambiguous
+    # contraction of "I'd".
     "youve": "you've",
     "youd": "you'd",
     "youll": "you'll",

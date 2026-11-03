@@ -11,15 +11,14 @@ Acceptance Tests for Core Standard Edition:
 
 from __future__ import annotations
 
-from pathlib import Path
+from pipeline.regression_runner import run_golden_corpus_regression
 
 from autocorrect.core.engine import AutocorrectEngine
-from autocorrect.core.models import CorrectionReason, EvaluationContext
+from autocorrect.core.models import EvaluationContext
 from autocorrect.input.ports import KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 from autocorrect.intelligence.schema import RegionFlag
-from pipeline.regression_runner import run_golden_corpus_regression
 
 
 def _type_string(session: InputSessionManager, text: str, base_ts: float = 1000.0) -> str:
@@ -36,10 +35,7 @@ def _type_string(session: InputSessionManager, text: str, base_ts: float = 1000.
         outcome = session.handle_key_event(evt, suppress_delimiter_on_replace=True)
         if outcome.action == KeyAction.PASS_THROUGH:
             field_chars.append(ch)
-        elif (
-            outcome.action == KeyAction.SUPPRESS_AND_INJECT
-            and outcome.replacement_plan is not None
-        ):
+        elif outcome.action == KeyAction.SUPPRESS_AND_INJECT and outcome.replacement_plan is not None:
             plan = outcome.replacement_plan
             for _ in range(plan.backspaces_to_send):
                 if field_chars:
@@ -67,9 +63,7 @@ def test_capitalisation_and_brand_preservation() -> None:
     try:
         assert engine.evaluate_token("recieved").replacement_token == "received"
         assert (
-            engine.evaluate_token(
-                "Recieved", EvaluationContext(is_sentence_start=True)
-            ).replacement_token
+            engine.evaluate_token("Recieved", EvaluationContext(is_sentence_start=True)).replacement_token
             == "Received"
         )
         assert engine.evaluate_token("RECIEVED").replacement_token == "RECEIVED"

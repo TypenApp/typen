@@ -39,9 +39,7 @@ from functools import lru_cache
 from pathlib import Path
 
 # ESDB source text database (wordlist database, v2 branch of en-wl/wordlist).
-ESDB_SCOWL_PRE_URL = (
-    "https://raw.githubusercontent.com/en-wl/wordlist/v2/data/scowl-pre.txt"
-)
+ESDB_SCOWL_PRE_URL = "https://raw.githubusercontent.com/en-wl/wordlist/v2/data/scowl-pre.txt"
 ESDB_FILENAME = "scowl-pre.txt"
 
 EXTERNAL_DATA_DIR = Path(__file__).resolve().parent / "data" / "external"

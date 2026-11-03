@@ -162,11 +162,7 @@ class TransactionLedger:
         # Note single-token reverts in the suggested 'Add to Dictionary' list
         orig_clean = tx.original_token.strip()
         corr_clean = tx.corrected_token.strip()
-        if (
-            orig_clean
-            and " " not in orig_clean
-            and orig_clean.lower() != corr_clean.lower()
-        ):
+        if orig_clean and " " not in orig_clean and orig_clean.lower() != corr_clean.lower():
             low = orig_clean.lower()
             prev = self._suggested_words.get(low)
             prev_count = int(prev["revert_count"]) if prev is not None else 0
@@ -177,9 +173,7 @@ class TransactionLedger:
             }
 
         current_in_field = (
-            f"{tx.corrected_token}{tx.delimiter}"
-            if backspace_was_suppressed
-            else tx.corrected_token
+            f"{tx.corrected_token}{tx.delimiter}" if backspace_was_suppressed else tx.corrected_token
         )
         target_restored = tx.original_token
 
@@ -210,7 +204,4 @@ class TransactionLedger:
         if self._one_shot_suppression is None:
             return False
         pending_original, pending_corrected = self._one_shot_suppression
-        return (
-            original.lower() == pending_original
-            and candidate.lower() == pending_corrected
-        )
+        return original.lower() == pending_original and candidate.lower() == pending_corrected
