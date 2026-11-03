@@ -11,26 +11,22 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
-import threading
-import time
 import webbrowser
-from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from autocorrect import __version__
-from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.daemon.app import AutoCorrectDaemon
-from autocorrect.input.ports import KeyAction, KeyEvent
-from autocorrect.input.session_state import InputSessionManager
+from autocorrect.demo_host import DemoSession, EngineHost, SessionPool, normalise_route
 from autocorrect.licensing.activation_manager import (
     compute_local_device_id_hash,
     get_os_native_machine_uuid,
 )
-from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
+
+# Backwards-compatible name for the per-visitor session record.
+SandboxSession = DemoSession
 
 SANDBOX_HTML = """<!DOCTYPE html>
 <html lang="en">
@@ -137,6 +133,9 @@ SANDBOX_HTML = """<!DOCTYPE html>
 <script>
 const editor = document.getElementById('editor');
 const logBox = document.getElementById('event-log');
+// Every visitor (even locally) gets an isolated engine session.
+const SESSION_ID = 'local-' + Math.random().toString(36).slice(2, 14) + Date.now().toString(36);
+const HEADERS = {'Content-Type': 'application/json', 'X-Session-Id': SESSION_ID};
 
 function addLog(msg) {
   const d = document.createElement('div');
@@ -148,7 +147,7 @@ function addLog(msg) {
 async function sendKeyToEngine(keyName, charStr) {
   const res = await fetch('/api/key', {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: HEADERS,
     body: JSON.stringify({key_name: keyName, char: charStr})
   });
   return await res.json();
@@ -223,7 +222,7 @@ async function processKey(keyName, charStr) {
 editor.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.altKey || e.metaKey) {
     enqueueKey(async () => {
-      const res = await fetch('/api/caret', {method: 'POST'});
+      const res = await fetch('/api/caret', {method: 'POST', headers: HEADERS});
       updateTelemetry(await res.json());
     });
     return; // let the browser perform the shortcut itself
@@ -236,7 +235,7 @@ editor.addEventListener('keydown', (e) => {
   else if (e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown') {
     // Navigation: let the browser move the caret, but invalidate the engine buffer in-order.
     enqueueKey(async () => {
-      const res = await fetch('/api/caret', {method: 'POST'});
+      const res = await fetch('/api/caret', {method: 'POST', headers: HEADERS});
       updateTelemetry(await res.json());
     });
     return;
@@ -256,14 +255,14 @@ editor.addEventListener('keydown', (e) => {
 editor.addEventListener('mousedown', () => {
   enqueueKey(async () => {
     const url = editor.value === '' ? '/api/reset' : '/api/caret';
-    const res = await fetch(url, {method: 'POST'});
+    const res = await fetch(url, {method: 'POST', headers: HEADERS});
     updateTelemetry(await res.json());
   });
 });
 
 async function resetSession() {
   editor.value = '';
-  const res = await fetch('/api/reset', {method: 'POST'});
+  const res = await fetch('/api/reset', {method: 'POST', headers: HEADERS});
   updateTelemetry(await res.json());
   editor.focus();
 }
@@ -281,7 +280,7 @@ async function insertSample(sampleText) {
 
 // --- Custom dictionary management -------------------------------------------
 async function loadDictionary() {
-  const res = await fetch('/api/dictionary');
+  const res = await fetch('/api/dictionary', {headers: HEADERS});
   const data = await res.json();
   const list = document.getElementById('dict-list');
   const empty = document.getElementById('dict-empty');
@@ -298,7 +297,7 @@ async function loadDictionary() {
     del.title = 'Remove "' + word + '" from my dictionary';
     del.style.cssText = 'background:none;border:none;color:#f87171;cursor:pointer;font-size:12px;padding:0 0 0 6px;';
     del.onclick = async () => {
-      await fetch('/api/dictionary/delete', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({word})});
+      await fetch('/api/dictionary/delete', {method: 'POST', headers: HEADERS, body: JSON.stringify({word})});
       addLog(`[DICTIONARY] Removed "${word}" — it will be corrected again.`);
       loadDictionary();
     };
@@ -324,7 +323,7 @@ async function loadDictionary() {
     addBtn.title = 'Add "' + word + '" to my custom dictionary';
     addBtn.style.cssText = 'background:none;border:none;color:#10b981;cursor:pointer;font-size:12px;font-weight:600;padding:0 0 0 6px;';
     addBtn.onclick = async () => {
-      await fetch('/api/dictionary/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({word})});
+      await fetch('/api/dictionary/add', {method: 'POST', headers: HEADERS, body: JSON.stringify({word})});
       addLog(`[DICTIONARY] Promoted "${word}" from suggestions into custom dictionary.`);
       loadDictionary();
     };
@@ -333,7 +332,7 @@ async function loadDictionary() {
     disBtn.title = 'Dismiss suggestion';
     disBtn.style.cssText = 'background:none;border:none;color:#94a3b8;cursor:pointer;font-size:12px;padding:0 0 0 4px;';
     disBtn.onclick = async () => {
-      await fetch('/api/dictionary/dismiss', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({word})});
+      await fetch('/api/dictionary/dismiss', {method: 'POST', headers: HEADERS, body: JSON.stringify({word})});
       loadDictionary();
     };
     chip.appendChild(label);
@@ -347,7 +346,7 @@ async function addDictionaryWord() {
   const input = document.getElementById('dict-input');
   const word = input.value.trim();
   if (!word) return;
-  await fetch('/api/dictionary/add', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({word})});
+  await fetch('/api/dictionary/add', {method: 'POST', headers: HEADERS, body: JSON.stringify({word})});
   addLog(`[DICTIONARY] Added "${word}" — it will now be accepted as typed.`);
   input.value = '';
   loadDictionary();
@@ -358,7 +357,7 @@ document.getElementById('dict-input').addEventListener('keydown', (e) => {
   e.stopPropagation();
 });
 
-fetch('/api/reset', {method: 'POST'}).then(r => r.json()).then(updateTelemetry);
+fetch('/api/reset', {method: 'POST', headers: HEADERS}).then(r => r.json()).then(updateTelemetry);
 loadDictionary();
 </script>
 </body>
@@ -367,6 +366,7 @@ loadDictionary();
 
 
 def create_sandbox_daemon(data_dir: Path) -> AutoCorrectDaemon:
+    """The full daemon with OS hooks dry-run: exercises licensing, packs and snippets too."""
     daemon = AutoCorrectDaemon(data_dir=data_dir, dry_run_hooks=True)
     daemon.start()
     daemon.resource_manager.set_enabled_domain_packs(
@@ -376,30 +376,8 @@ def create_sandbox_daemon(data_dir: Path) -> AutoCorrectDaemon:
     return daemon
 
 
-_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
-
-
-@dataclass
-class SandboxSession:
-    """One isolated typing session: its own preferences, engine and state machine."""
-
-    session_id: str
-    preference_store: SQLitePreferenceStore
-    engine: AutocorrectEngine
-    session: InputSessionManager
-    db_path: Path
-    last_seen: float = field(default_factory=time.monotonic)
-
-
-class SandboxSessionPool:
-    """
-    Per-visitor sessions for the website demo. The mmap language resources
-    and snippet engine are shared (read-only); everything stateful - the
-    custom dictionary, reverted-word suggestions, word buffer, sentence
-    capitaliser and undo ledger - is isolated per `session_id`, so two
-    people typing at once never see each other's corrections.
-    Idle sessions are evicted (LRU + TTL) and their SQLite file deleted.
-    """
+class SandboxSessionPool(SessionPool):
+    """Per-visitor sessions built from a running daemon's shared components."""
 
     def __init__(
         self,
@@ -408,80 +386,18 @@ class SandboxSessionPool:
         max_sessions: int = 64,
         idle_ttl_s: float = 30 * 60,
     ) -> None:
-        self._daemon = daemon
-        self._dir = data_dir / "web_sessions"
-        self._dir.mkdir(parents=True, exist_ok=True)
-        self._max = max_sessions
-        self._ttl = idle_ttl_s
-        self._sessions: dict[str, SandboxSession] = {}
-        self._lock = threading.Lock()
-
-    @staticmethod
-    def is_valid_id(session_id: str) -> bool:
-        return bool(_SESSION_ID_RE.fullmatch(session_id))
-
-    def get(self, session_id: str) -> SandboxSession:
-        with self._lock:
-            existing = self._sessions.get(session_id)
-            if existing is not None:
-                existing.last_seen = time.monotonic()
-                return existing
-            self._evict_locked()
-            db_path = self._dir / f"{session_id}.sqlite3"
-            store = SQLitePreferenceStore(db_path)
-            engine = AutocorrectEngine(
-                resource_manager=self._daemon.resource_manager,
-                preferences=store.overlay,
-            )
-            session = InputSessionManager(
-                engine=engine,
-                injector=None,
-                snippet_matcher=self._daemon.snippet_engine,
-                entitlement_gate=self._daemon.entitlement_manager,
-                active_region=store.overlay.active_region,
-            )
-            created = SandboxSession(
-                session_id=session_id,
-                preference_store=store,
-                engine=engine,
-                session=session,
-                db_path=db_path,
-            )
-            self._sessions[session_id] = created
-            return created
-
-    def _evict_locked(self) -> None:
-        now = time.monotonic()
-        stale = [sid for sid, s in self._sessions.items() if now - s.last_seen > self._ttl]
-        for sid in stale:
-            self._drop_locked(sid)
-        while len(self._sessions) >= self._max:
-            oldest = min(self._sessions.values(), key=lambda s: s.last_seen)
-            self._drop_locked(oldest.session_id)
-
-    def _drop_locked(self, session_id: str) -> None:
-        dropped = self._sessions.pop(session_id, None)
-        if dropped is None:
-            return
-        for suffix in ("", "-wal", "-shm"):
-            try:
-                Path(str(dropped.db_path) + suffix).unlink(missing_ok=True)
-            except OSError:
-                pass
-
-    def close(self) -> None:
-        with self._lock:
-            for sid in list(self._sessions):
-                self._drop_locked(sid)
-
-    def __len__(self) -> int:
-        return len(self._sessions)
+        super().__init__(
+            daemon.resource_manager,
+            daemon.snippet_engine,
+            daemon.entitlement_manager,
+            data_dir,
+            max_sessions=max_sessions,
+            idle_ttl_s=idle_ttl_s,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        description="Run the AutoCorrect Controlled Local Browser Sandbox"
-    )
+    parser = argparse.ArgumentParser(description="Run the AutoCorrect Controlled Local Browser Sandbox")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
@@ -493,68 +409,30 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     daemon = create_sandbox_daemon(args.data_dir)
-    pool = SandboxSessionPool(daemon, args.data_dir)
+    host = EngineHost(
+        work_dir=args.data_dir,
+        resource_manager=daemon.resource_manager,
+        snippet_engine=daemon.snippet_engine,
+        entitlement_gate=daemon.entitlement_manager,
+    )
     os_id_raw = get_os_native_machine_uuid()
-    os_id_prefix = os_id_raw.split("-")[0] + "-" + os_id_raw.split("-")[1]
+    os_id_prefix = "-".join(os_id_raw.split("-")[:2])
     dev_hash = compute_local_device_id_hash()
-    bundle_version = daemon.resource_manager.active_bundle.version
-    engine_lock = threading.Lock()  # the key-event state machines are not thread-safe
+    device_telemetry = {"os_id_type": os_id_prefix, "device_id_hash": dev_hash}
 
     class SandboxHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *log_args: object) -> None:
             return
 
-        # --- session resolution --------------------------------------------
-        def _resolve(
-            self, payload: dict[str, object] | None = None
-        ) -> tuple[InputSessionManager, SQLitePreferenceStore]:
-            """
-            Pick the isolated per-visitor session when a session id is supplied
-            (header `X-Session-Id`, query `?session=` or JSON `session_id`);
-            otherwise fall back to the daemon's single built-in session used by
-            the bundled sandbox page.
-            """
+        def _session_id(self, payload: dict[str, Any]) -> str:
             sid = self.headers.get("X-Session-Id", "")
             if not sid:
                 sid = parse_qs(urlsplit(self.path).query).get("session", [""])[0]
-            if not sid and payload:
+            if not sid:
                 sid = str(payload.get("session_id", ""))
-            if sid and SandboxSessionPool.is_valid_id(sid):
-                s = pool.get(sid)
-                return s.session, s.preference_store
-            return daemon.session, daemon.preference_store
+            return sid
 
-        def _build_telemetry(
-            self,
-            session: InputSessionManager,
-            action: str = "PASS_THROUGH",
-            plan_dict: dict[str, object] | None = None,
-            reason: str | None = None,
-            reverted: str | None = None,
-            latency_ms: float = 0.0,
-        ) -> dict[str, object]:
-            tx = session.transaction_ledger.active_transaction
-            undo_str = (
-                f'"{tx.corrected_token}" -> "{tx.original_token}"'
-                if tx is not None
-                else None
-            )
-            return {
-                "action": action,
-                "plan": plan_dict,
-                "reason": reason,
-                "reverted_word": reverted,
-                "latency_ms": latency_ms,
-                "current_word": session.word_buffer.current_word,
-                "buffer_state": session.word_buffer.state.value,
-                "sentence_state": session.capitaliser.state.value,
-                "active_undo": undo_str,
-                "word_count": daemon.resource_manager.active_bundle.lexicon.word_count,
-                "os_id_type": os_id_prefix,
-                "device_id_hash": dev_hash,
-            }
-
-        def _send_json(self, payload: dict[str, object], status: HTTPStatus = HTTPStatus.OK) -> None:
+        def _send_json(self, payload: dict[str, Any], status: int = HTTPStatus.OK) -> None:
             body = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
@@ -562,6 +440,13 @@ def main(argv: list[str] | None = None) -> int:
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
+
+        def _dispatch(self, payload: dict[str, Any]) -> None:
+            route = normalise_route(self.path)
+            status, body = host.handle(self.command, route, payload, self._session_id(payload))
+            if "action" in body:
+                body.update(device_telemetry)
+            self._send_json(body, status)
 
         def do_GET(self) -> None:
             route = urlsplit(self.path).path
@@ -573,31 +458,9 @@ def main(argv: list[str] | None = None) -> int:
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if route == "/api/health":
-                self._send_json(
-                    {
-                        "ok": True,
-                        "engine": "autocorrect",
-                        "version": __version__,
-                        "lexicon_version": bundle_version,
-                        "word_count": daemon.resource_manager.active_bundle.lexicon.word_count,
-                        "sessions": len(pool),
-                    }
-                )
-                return
-            if route == "/api/dictionary":
-                _, store = self._resolve()
-                self._send_json(
-                    {
-                        "words": store.list_custom_words(),
-                        "suggested": store.list_suggested_words(),
-                    }
-                )
-                return
-            self.send_error(HTTPStatus.NOT_FOUND)
+            self._dispatch({})
 
         def do_POST(self) -> None:
-            route = urlsplit(self.path).path
             length = int(self.headers.get("Content-Length", "0"))
             raw = self.rfile.read(length) if length > 0 else b"{}"
             try:
@@ -605,75 +468,7 @@ def main(argv: list[str] | None = None) -> int:
             except json.JSONDecodeError:
                 self._send_json({"error": "invalid JSON"}, HTTPStatus.BAD_REQUEST)
                 return
-            if not isinstance(payload, dict):
-                payload = {}
-            session, store = self._resolve(payload)
-
-            if route == "/api/reset":
-                with engine_lock:
-                    session.reset_all_state()
-                    self._send_json(self._build_telemetry(session))
-                return
-
-            if route == "/api/caret":
-                with engine_lock:
-                    session.on_mouse_click_or_caret_move()
-                    self._send_json(self._build_telemetry(session))
-                return
-
-            if route in (
-                "/api/dictionary/add",
-                "/api/dictionary/delete",
-                "/api/dictionary/dismiss",
-            ):
-                word = str(payload.get("word", "")).strip()
-                if word and len(word) <= 64:
-                    if route.endswith("/add"):
-                        store.add_custom_word(word)
-                    elif route.endswith("/delete"):
-                        store.remove_custom_word(word)
-                    elif route.endswith("/dismiss"):
-                        store.dismiss_suggested_word(word)
-                self._send_json(
-                    {
-                        "words": store.list_custom_words(),
-                        "suggested": store.list_suggested_words(),
-                    }
-                )
-                return
-
-            if route == "/api/key":
-                char = str(payload.get("char", ""))[:1]
-                key_name = str(payload.get("key_name", ""))[:32]
-                with engine_lock:
-                    t0 = time.perf_counter()
-                    evt = KeyEvent(key_name=key_name, char=char, timestamp_ms=t0 * 1000.0)
-                    outcome = session.handle_key_event(evt, suppress_delimiter_on_replace=True)
-                    elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-                    plan_dict: dict[str, object] | None = None
-                    if outcome.replacement_plan is not None:
-                        p = outcome.replacement_plan
-                        plan_dict = {
-                            "backspaces_to_send": p.backspaces_to_send,
-                            "text_to_inject": p.text_to_inject,
-                            "original_full": p.original_full,
-                            "target_full": p.target_full,
-                        }
-                    reason = outcome.decision.reason.value if outcome.decision else None
-                    self._send_json(
-                        self._build_telemetry(
-                            session,
-                            action=outcome.action.value,
-                            plan_dict=plan_dict,
-                            reason=reason,
-                            reverted=outcome.reverted_word,
-                            latency_ms=elapsed_ms,
-                        )
-                    )
-                return
-
-            self.send_error(HTTPStatus.NOT_FOUND)
+            self._dispatch(payload if isinstance(payload, dict) else {})
 
     url = f"http://{args.host}:{args.port}"
     server = ThreadingHTTPServer((args.host, args.port), SandboxHandler)
@@ -689,7 +484,7 @@ def main(argv: list[str] | None = None) -> int:
         print("\nShutting down sandbox server...")
     finally:
         server.server_close()
-        pool.close()
+        host.close()
         daemon.stop()
     return 0
 

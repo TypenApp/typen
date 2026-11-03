@@ -1,7 +1,4 @@
-# Vercel CLI upload rules for the site (deployed from this directory).
-# public/downloads/*.exe|*.zip are deliberately NOT ignored here: they are
-# git-ignored (too large for plain git history) but must be uploaded with a
-# CLI deploy so the download links work.
+# Vercel CLI upload rules (Git deploys use .gitignore).
 .next
 node_modules
 .env

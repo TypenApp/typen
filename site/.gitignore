@@ -1,2 +1,5 @@
 .vercel
 .env*
+# engine + resources copied in by scripts/vendor-engine.mjs at install time
+api/_vendor/
+__pycache__/

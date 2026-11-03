@@ -25,11 +25,9 @@ from autocorrect.input.word_buffer import ActiveWordBuffer, ContextRingBuffer
 from autocorrect.intelligence.schema import RegionFlag
 
 WORD_BOUNDARY_PUNCTUATION: Final[frozenset[str]] = frozenset(
-    {".", ",", "!", "?", ";", ":", ")", "]", "}", "\"", "\n"}
+    {".", ",", "!", "?", ";", ":", ")", "]", "}", '"', "\n"}
 )
-PREFIX_SYMBOLS: Final[frozenset[str]] = frozenset(
-    {"-", "/", "\\", "@", "#", "$", "~", ".", ";"}
-)
+PREFIX_SYMBOLS: Final[frozenset[str]] = frozenset({"-", "/", "\\", "@", "#", "$", "~", ".", ";"})
 NAVIGATION_KEYS: Final[frozenset[str]] = frozenset(
     {
         "Left",
@@ -117,6 +115,10 @@ class InputSessionManager:
         self._double_space_eligible: bool = False
         self._just_deleted_trailing_space: bool = False
         self._current_sentence_tokens: list[str] = []
+        # While True, `prime_from_text` is replaying text that is already in the
+        # field: the state machine advances (context ring, sentence state, last
+        # word) but nothing is ever corrected, expanded or injected.
+        self._priming: bool = False
 
     @property
     def word_buffer(self) -> ActiveWordBuffer:
@@ -189,6 +191,41 @@ class InputSessionManager:
         self._just_deleted_trailing_space = False
         self._current_sentence_tokens.clear()
 
+    def prime_from_text(self, text: str) -> None:
+        """
+        Rebuild the session state from text that is already in the field, as if
+        it had been typed, without correcting any of it.
+
+        Used when a session has to be reconstructed on a different process (the
+        website demo runs on serverless instances that come and go) and when a
+        field already contains text when it gains focus. Afterwards the context
+        ring, sentence-start state and last completed word reflect `text`, so the
+        next keystroke is evaluated with the right context; no replacement plan
+        is produced and the undo ledger stays empty.
+        """
+        self.reset_all_state()
+        if not text:
+            return
+        self._priming = True
+        try:
+            ts = 0.0
+            for ch in text:
+                ts += 250.0  # slow enough that no timing shortcut can arm
+                if ch == "\n":
+                    key_name = "Return"
+                elif ch == " ":
+                    key_name = "Space"
+                elif ch in ("\t", "\r"):
+                    continue
+                else:
+                    key_name = ch
+                self.handle_key_event(KeyEvent(key_name=key_name, char=ch, timestamp_ms=ts))
+        finally:
+            self._priming = False
+        # The field's existing text is not something the visitor can revert.
+        self._tx_ledger.clear_active()
+        self._tx_ledger.clear_suppression()
+
     def handle_key_event(
         self,
         event: KeyEvent,
@@ -202,18 +239,11 @@ class InputSessionManager:
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # 2. Check commercial entitlement gate (e.g. expired 14-day trial)
-        if (
-            self._entitlement_gate is not None
-            and not self._entitlement_gate.is_typing_assistance_enabled()
-        ):
+        if self._entitlement_gate is not None and not self._entitlement_gate.is_typing_assistance_enabled():
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # 3. Check pause state, password/secure fields, and excluded applications
-        if (
-            self._paused
-            or self._focus_context.is_password_or_secure
-            or self._focus_context.is_excluded_app
-        ):
+        if self._paused or self._focus_context.is_password_or_secure or self._focus_context.is_excluded_app:
             self._word_buffer.clear_clean()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
@@ -239,9 +269,7 @@ class InputSessionManager:
         if event.key_name == "Backspace":
             self._double_space_eligible = False
             if self._tx_ledger.register_backspace(event.timestamp_ms):
-                reversal = self._tx_ledger.consume_for_reversal(
-                    backspace_was_suppressed=False
-                )
+                reversal = self._tx_ledger.consume_for_reversal(backspace_was_suppressed=False)
                 if reversal is not None:
                     tx, plan = reversal
                     # Quietly note single-word reverts as 'Add to Dictionary' suggestions
@@ -259,9 +287,7 @@ class InputSessionManager:
                         self._word_buffer.append_char(ch, event.timestamp_ms)
                     self._preceded_by_space = False
                     if self._injector is not None and not plan.is_noop:
-                        self._injector.execute_replacement(
-                            plan.backspaces_to_send, plan.text_to_inject
-                        )
+                        self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
                     return SessionEventOutcome(
                         action=(
                             KeyAction.SUPPRESS_AND_INJECT
@@ -307,6 +333,7 @@ class InputSessionManager:
                 and self._double_space_eligible
                 and self._enable_punctuation_assist
                 and self._enable_double_space_period
+                and not self._priming
             ):
                 inter_ms = event.timestamp_ms - self._last_space_timestamp_ms
                 adj = evaluate_double_space_period(
@@ -336,9 +363,7 @@ class InputSessionManager:
                     self._preceded_by_space = False
                     self._double_space_eligible = False
                     if self._injector is not None:
-                        self._injector.execute_replacement(
-                            plan.backspaces_to_send, plan.text_to_inject
-                        )
+                        self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
                     return SessionEventOutcome(
                         action=(
                             KeyAction.SUPPRESS_AND_INJECT
@@ -355,6 +380,7 @@ class InputSessionManager:
                 and curr in (",", ".", "!", "?")
                 and self._preceded_by_space
                 and self._enable_punctuation_assist
+                and not self._priming
             ):
                 adj = evaluate_space_before_punctuation(
                     prev_token=self._last_completed_word,
@@ -379,9 +405,7 @@ class InputSessionManager:
                     if adj.triggers_sentence_start:
                         self._capitaliser.reset_to_sentence_start()
                     if self._injector is not None:
-                        self._injector.execute_replacement(
-                            plan.backspaces_to_send, plan.text_to_inject
-                        )
+                        self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
                     return SessionEventOutcome(
                         action=(
                             KeyAction.SUPPRESS_AND_INJECT
@@ -439,10 +463,7 @@ class InputSessionManager:
         if event.char:
             self._just_deleted_trailing_space = False
             self._tx_ledger.on_subsequent_char_typed()
-            if (
-                not self._word_buffer.current_word
-                and event.char in PREFIX_SYMBOLS
-            ):
+            if not self._word_buffer.current_word and event.char in PREFIX_SYMBOLS:
                 self._word_buffer.append_prefix_symbol(event.char, event.timestamp_ms)
             else:
                 self._word_buffer.append_char(event.char, event.timestamp_ms)
@@ -475,10 +496,19 @@ class InputSessionManager:
         leading_prefix = self._word_buffer.leading_prefix
         self._word_buffer.clear_clean()
 
+        if self._priming:
+            # Replaying existing text: advance context exactly as an accepted,
+            # uncorrected word would, and never evaluate, expand or inject.
+            self._context_ring.push(self._engine.resolve_word_id(token), token.lower())
+            self._capitaliser.on_word_completed(token, delimiter)
+            self._last_completed_word = token
+            self._current_sentence_tokens.append(token)
+            if delimiter in (".", "!", "?", "\n"):
+                self._current_sentence_tokens.clear()
+            return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
         # Check Pro Snippet Expansion first (e.g. ';sig', '@@email')
-        pro_active = (
-            self._entitlement_gate is None or self._entitlement_gate.is_pro_enabled()
-        )
+        pro_active = self._entitlement_gate is None or self._entitlement_gate.is_pro_enabled()
         if pro_active and self._snippet_matcher is not None:
             full_trigger = f"{leading_prefix}{token}" if leading_prefix else token
             expanded = self._snippet_matcher.match_snippet(full_trigger)
@@ -498,15 +528,9 @@ class InputSessionManager:
                     timestamp_ms=timestamp_ms,
                 )
                 if self._injector is not None and not plan.is_noop:
-                    self._injector.execute_replacement(
-                        plan.backspaces_to_send, plan.text_to_inject
-                    )
+                    self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
                 return SessionEventOutcome(
-                    action=(
-                        KeyAction.SUPPRESS_AND_INJECT
-                        if suppress_delimiter
-                        else KeyAction.PASS_THROUGH
-                    ),
+                    action=(KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH),
                     replacement_plan=plan,
                 )
 
@@ -553,11 +577,7 @@ class InputSessionManager:
         # 'a egg' -> 'an egg', 'a eggs' -> 'an egg', 'there is many' -> 'there are many')
         retro_plan: ReplacementPlan | None = None
         final_word = decision.replacement_token if decision.should_replace else token
-        if (
-            not self._focus_context.is_terminal_or_code
-            and self._last_completed_word
-            and p1 is not None
-        ):
+        if not self._focus_context.is_terminal_or_code and self._last_completed_word and p1 is not None:
             retro_prev = evaluate_retroactive_two_word_confusion(
                 self._last_completed_word,
                 final_word,
@@ -571,9 +591,7 @@ class InputSessionManager:
                     original=self._last_completed_word,
                     target_lower=retro_prev,
                 )
-                if not self._tx_ledger.is_suppressed_in_session(
-                    self._last_completed_word, formatted_prev
-                ):
+                if not self._tx_ledger.is_suppressed_in_session(self._last_completed_word, formatted_prev):
                     orig_two = f"{self._last_completed_word} {token}{delimiter}"
                     target_two = f"{formatted_prev} {final_word}{delimiter}"
                     retro_plan = SuffixDiffPlanner.plan(
@@ -610,15 +628,9 @@ class InputSessionManager:
 
         if retro_plan is not None and not retro_plan.is_noop:
             if self._injector is not None:
-                self._injector.execute_replacement(
-                    retro_plan.backspaces_to_send, retro_plan.text_to_inject
-                )
+                self._injector.execute_replacement(retro_plan.backspaces_to_send, retro_plan.text_to_inject)
             return SessionEventOutcome(
-                action=(
-                    KeyAction.SUPPRESS_AND_INJECT
-                    if suppress_delimiter
-                    else KeyAction.PASS_THROUGH
-                ),
+                action=(KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH),
                 replacement_plan=retro_plan,
                 decision=decision,
                 sentence_completed_text=sentence_completed,
@@ -638,15 +650,9 @@ class InputSessionManager:
                 timestamp_ms=timestamp_ms,
             )
             if self._injector is not None and not plan.is_noop:
-                self._injector.execute_replacement(
-                    plan.backspaces_to_send, plan.text_to_inject
-                )
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
             return SessionEventOutcome(
-                action=(
-                    KeyAction.SUPPRESS_AND_INJECT
-                    if suppress_delimiter
-                    else KeyAction.PASS_THROUGH
-                ),
+                action=(KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH),
                 replacement_plan=plan,
                 decision=decision,
                 sentence_completed_text=sentence_completed,
