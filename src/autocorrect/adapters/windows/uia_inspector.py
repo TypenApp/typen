@@ -80,9 +80,7 @@ class Win32FocusInspector:
     """
 
     def __init__(self, extra_excluded_processes: set[str] | None = None) -> None:
-        self._user_excluded: set[str] = {
-            p.lower() for p in (extra_excluded_processes or set())
-        }
+        self._user_excluded: set[str] = {p.lower() for p in (extra_excluded_processes or set())}
 
     def add_excluded_process(self, process_name: str) -> None:
         self._user_excluded.add(process_name.lower())
@@ -106,13 +104,18 @@ class Win32FocusInspector:
         is_password = bool(window_style & ES_PASSWORD)
         if any(
             kw in title_low
-            for kw in ("password", "passphrase", "1password", "bitwarden", "keepass", "sign in - security key")
+            for kw in (
+                "password",
+                "passphrase",
+                "1password",
+                "bitwarden",
+                "keepass",
+                "sign in - security key",
+            )
         ):
             is_password = True
 
-        is_excluded = (
-            proc_low in DEFAULT_EXCLUDED_PROCESSES or proc_low in self._user_excluded
-        )
+        is_excluded = proc_low in DEFAULT_EXCLUDED_PROCESSES or proc_low in self._user_excluded
         is_terminal = proc_low in DEFAULT_TERMINAL_PROCESSES
 
         return FocusContext(
@@ -150,16 +153,12 @@ class Win32FocusInspector:
             thread_id = user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
             proc_name = ""
             if pid.value:
-                hproc = kernel32.OpenProcess(
-                    PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value
-                )
+                hproc = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
                 if hproc:
                     try:
                         img_buf = ctypes.create_unicode_buffer(512)
                         size = ctypes.c_ulong(512)
-                        if kernel32.QueryFullProcessImageNameW(
-                            hproc, 0, img_buf, ctypes.byref(size)
-                        ):
+                        if kernel32.QueryFullProcessImageNameW(hproc, 0, img_buf, ctypes.byref(size)):
                             proc_name = Path(img_buf.value).name.lower()
                     finally:
                         kernel32.CloseHandle(hproc)

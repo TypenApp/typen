@@ -26,7 +26,10 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
     "mypy>=1.8.0",
+    "ruff>=0.5.0",
+    "pyinstaller>=6.6.0",
 ]
 # Language-resource pipeline only (never a runtime dependency): corpus
 # frequency rankings used to tier the ESDB/SCOWL dictionary at build time.
@@ -34,11 +37,20 @@ pipeline-data = [
     "wordfreq>=3.1.0",
 ]
 macos = [
+    "pyobjc-core>=10.0; sys_platform == 'darwin'",
+    "pyobjc-framework-Cocoa>=10.0; sys_platform == 'darwin'",
     "pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'",
     "pyobjc-framework-ApplicationServices>=10.0; sys_platform == 'darwin'",
 ]
 linux = [
     "python-xlib>=0.33; sys_platform == 'linux'",
+    # SecretService keyring backend (GNOME Keyring / KWallet via D-Bus)
+    "SecretStorage>=3.3.0; sys_platform == 'linux'",
+    "jeepney>=0.8.0; sys_platform == 'linux'",
+    # IBus engine for Wayland: PyGObject needs the system girepository/IBus typelib
+    # (Debian/Ubuntu: python3-gi gir1.2-ibus-1.0 — usually installed from the distro,
+    # not pip; listed here so a venv build host can bundle it).
+    "PyGObject>=3.46.0; sys_platform == 'linux'",
 ]
 local-ai = [
     "onnxruntime>=1.17.0",
@@ -55,6 +67,7 @@ autocorrect-daemon = "autocorrect.daemon.app:main"
 autocorrect-settings = "autocorrect.ui.settings_main:main"
 autocorrect-sandbox = "autocorrect.sandbox:main"
 autocorrect-pipeline = "pipeline.cli:main"
+autocorrect-issue-licence = "pipeline.issue_licence:main"
 
 [tool.setuptools.packages.find]
 where = ["src", "."]
@@ -70,3 +83,35 @@ python_version = "3.12"
 strict = true
 mypy_path = ["src", "."]
 ignore_missing_imports = true
+# Cross-platform adapters carry `# type: ignore[import-not-found]` for frameworks that only
+# exist on one OS; those ignores are legitimately unused on the other two.
+warn_unused_ignores = false
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "pipeline", "tests"]
+extend-exclude = ["site", "dist", "resources", "pipeline/data"]
+
+[tool.ruff.lint]
+# Correctness-focused gate (runs in CI). Pure style rules are deliberately left out
+# so the lint job fails on real problems, not on taste.
+select = ["E", "F", "W", "I", "B", "UP", "S"]
+ignore = [
+    "E501",   # long lines are allowed where a string literal needs it
+    "UP017",  # datetime.UTC alias: keep timezone.utc for 3.11 readability
+    "UP035",  # typing.Callable/Mapping imports are fine
+    "UP042",  # (str, Enum) mixins are intentional: values round-trip through JSON/IPC
+    "S101",   # asserts are fine (tests; invariants)
+    "S105", "S106",  # "token"/"PASS_THROUGH" are not passwords
+    "S110", "S112",  # try/except/pass is the documented degrade-gracefully pattern for OS adapters
+    "S603", "S607",  # subprocess with fixed argv (launchctl, ISCC, codesign)
+    "B008",
+    "B905",   # zip(strict=) churn
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S108", "S314", "B011"]
+"pipeline/*" = ["S"]
+"src/autocorrect/ui/settings_main.py" = ["B023"]  # tkinter closures created once per screen name
+"src/autocorrect/payments/bachs_adapter.py" = ["S104"]  # deny-list check, not a bind address

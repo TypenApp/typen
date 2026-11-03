@@ -34,9 +34,7 @@ class QuartzUnicodeInjector:
             # 1. Emit Backspace keydown/keyup events
             for _ in range(max(0, backspaces)):
                 for is_down in (True, False):
-                    ev = Quartz.CGEventCreateKeyboardEvent(
-                        source, MACOS_KEYCODE_DELETE, is_down
-                    )
+                    ev = Quartz.CGEventCreateKeyboardEvent(source, MACOS_KEYCODE_DELETE, is_down)
                     Quartz.CGEventSetIntegerValueField(
                         ev, Quartz.kCGEventSourceUserData, MACOS_EVENT_USER_DATA_TAG
                     )

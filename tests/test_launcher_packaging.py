@@ -57,7 +57,7 @@ def test_tray_controller_builds_menu_without_display() -> None:
     pytest.importorskip("pystray")
     calls: list[str] = []
     tray = SystemTrayController(
-        on_toggle_pause=lambda: (calls.append("toggle") or True),
+        on_toggle_pause=lambda: calls.append("toggle") or True,
         on_quit=lambda: calls.append("quit"),
         get_status_label=lambda: "AutoCorrect — Active",
         data_dir=Path("."),

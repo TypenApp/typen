@@ -26,10 +26,11 @@ from pathlib import Path
 from typing import Final
 
 from autocorrect import __version__
+from autocorrect.platform_paths import default_data_dir, resolve_data_dir
 
 APP_DISPLAY_NAME: Final[str] = "AutoCorrect Desktop"
 RELEASE_CHANNEL: Final[str] = "beta"
-DEFAULT_DATA_DIR: Final[Path] = Path.home() / ".autocorrect_desktop"
+DEFAULT_DATA_DIR: Final[Path] = default_data_dir()
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -40,8 +41,11 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=DEFAULT_DATA_DIR,
-        help="Directory for local SQLite preferences, licence, and resource cache",
+        default=None,
+        help=(
+            "Directory for local SQLite preferences, licence, and resource cache "
+            f"(default: {DEFAULT_DATA_DIR})"
+        ),
     )
     parser.add_argument(
         "--settings",
@@ -57,6 +61,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--headless-check",
         action="store_true",
         help="Initialise every subsystem, print a status line, and exit (CI smoke test)",
+    )
+    parser.add_argument(
+        "--ibus",
+        action="store_true",
+        help="Run as an IBus input-method engine (Linux/Wayland; normally spawned by ibus-daemon)",
+    )
+    parser.add_argument(
+        "--ibus-standalone",
+        action="store_true",
+        help="Run the IBus engine and register its component on the fly (developer testing)",
     )
     parser.add_argument(
         "--version", action="version", version=f"{APP_DISPLAY_NAME} {__version__}-{RELEASE_CHANNEL}"
@@ -105,6 +119,9 @@ def _run_daemon(data_dir: Path, with_tray: bool) -> int:
         snapshot = daemon.start()
 
         def status_label() -> str:
+            hook = daemon.hook_status
+            if not hook.is_active and hook.state.value in ("failed", "unsupported"):
+                return f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL}) — Not correcting: {hook.remediation or hook.detail}"
             prefix = "Paused" if daemon.session.is_paused else "Active"
             return f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL}) — {prefix} · {snapshot.status_message}"
 
@@ -114,7 +131,14 @@ def _run_daemon(data_dir: Path, with_tray: bool) -> int:
 
         if not with_tray:
             print(f"{APP_DISPLAY_NAME} {__version__}-{RELEASE_CHANNEL}: {snapshot.status_message}")
-            print("System-wide keyboard hooks active. Press Ctrl+C to stop.")
+            hook = daemon.hook_status
+            if hook.is_active:
+                print(f"System-wide keyboard hook active ({hook.backend}). Press Ctrl+C to stop.")
+            else:
+                print(f"WARNING: typing assistance is NOT running ({hook.state.value}): {hook.detail}")
+                if hook.remediation:
+                    print(f"  -> {hook.remediation}")
+                print("Press Ctrl+C to stop.")
             try:
                 while True:
                     time.sleep(0.5)
@@ -146,11 +170,19 @@ def _run_daemon(data_dir: Path, with_tray: bool) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+    data_dir = resolve_data_dir(args.data_dir)
     if args.settings:
-        return _run_settings(args.data_dir)
+        return _run_settings(data_dir)
     if args.headless_check:
-        return _run_headless_check(args.data_dir)
-    return _run_daemon(args.data_dir, with_tray=not args.no_tray)
+        return _run_headless_check(data_dir)
+    if args.ibus or args.ibus_standalone:
+        if not sys.platform.startswith("linux"):
+            print("--ibus is only available on Linux", file=sys.stderr)
+            return 2
+        from autocorrect.adapters.linux.ibus_main import main as ibus_main
+
+        return ibus_main(data_dir, standalone=args.ibus_standalone)
+    return _run_daemon(data_dir, with_tray=not args.no_tray)
 
 
 if __name__ == "__main__":

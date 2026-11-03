@@ -22,7 +22,7 @@ from autocorrect.adapters.windows.win32_injector import (
 )
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.input.diff_planner import SuffixDiffPlanner
-from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent
+from autocorrect.input.ports import KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.input.word_buffer import BufferState
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
@@ -64,9 +64,7 @@ def test_caret_invalidation_on_mouse_click_and_arrows() -> None:
             session.handle_key_event(KeyEvent(key_name=ch, char=ch, timestamp_ms=200.0))
 
         # Pressing Space resets the tainted buffer to CLEAN without modifying text
-        outcome = session.handle_key_event(
-            KeyEvent(key_name="Space", char=" ", timestamp_ms=300.0)
-        )
+        outcome = session.handle_key_event(KeyEvent(key_name="Space", char=" ", timestamp_ms=300.0))
         assert outcome.action == KeyAction.PASS_THROUGH
         assert session.word_buffer.state == BufferState.CLEAN
     finally:
@@ -100,13 +98,9 @@ def test_windows_macos_linux_password_and_app_exclusions() -> None:
 
     # 2. macOS AX Focus Inspector
     mac_insp = MacAXFocusInspector()
-    mac_pw = mac_insp.classify_macos_metadata(
-        "com.apple.Safari", "Safari", ax_subrole="AXSecureTextField"
-    )
+    mac_pw = mac_insp.classify_macos_metadata("com.apple.Safari", "Safari", ax_subrole="AXSecureTextField")
     assert mac_pw.is_password_or_secure
-    mac_sec = mac_insp.classify_macos_metadata(
-        "com.apple.Safari", "Safari", secure_event_input_enabled=True
-    )
+    mac_sec = mac_insp.classify_macos_metadata("com.apple.Safari", "Safari", secure_event_input_enabled=True)
     assert mac_sec.is_password_or_secure
 
     # 3. Linux X11 & Wayland IBus Adapter
@@ -134,9 +128,7 @@ def test_windows_macos_linux_password_and_app_exclusions() -> None:
         ibus.on_content_type_changed(IBUS_INPUT_PURPOSE_FREE_FORM)
         for ch in "teh":
             ibus.process_ibus_key_event(KeyEvent(key_name=ch, char=ch, timestamp_ms=200.0))
-        consumed_space = ibus.process_ibus_key_event(
-            KeyEvent(key_name="Space", char=" ", timestamp_ms=250.0)
-        )
+        consumed_space = ibus.process_ibus_key_event(KeyEvent(key_name="Space", char=" ", timestamp_ms=250.0))
         assert consumed_space
         assert ibus.committed_operations[-1] == (3, "The ")
     finally:

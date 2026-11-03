@@ -9,16 +9,36 @@
     <key>CFBundleIdentifier</key>
     <string>io.autocorrect.desktop</string>
     <key>CFBundleName</key>
-    <string>AutoCorrectDesktop</string>
+    <string>AutoCorrect Desktop</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
+    <key>CFBundleIconFile</key>
+    <string>autocorrect.icns</string>
     <key>CFBundleShortVersionString</key>
     <string>1.2.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.2.0</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <!-- Agent app: menu-bar/tray only, no Dock icon. -->
     <key>LSUIElement</key>
     <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <!-- TCC usage strings: required for the Input Monitoring and Accessibility prompts. -->
+    <key>NSInputMonitoringUsageDescription</key>
+    <string>AutoCorrect Desktop watches the keys you type so it can spot misspellings as you finish each word. Nothing is sent anywhere; everything runs on this Mac.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>AutoCorrect Desktop uses macOS Accessibility to detect misspellings as you type and replace them in place while excluding password fields.</string>
+    <string>AutoCorrect Desktop uses Accessibility to replace a misspelled word in place, and to recognise password fields so it never touches them.</string>
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AutoCorrect Desktop may ask the frontmost application for its name to apply your per-app correction profiles.</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>© AutoCorrect Engineering. Proprietary.</string>
 </dict>
 </plist>

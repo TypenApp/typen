@@ -34,6 +34,14 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
 CloseApplications=yes
 RestartApplications=no
+; Optional Authenticode signing of Setup.exe and the uninstaller from inside Inno.
+; build_windows_beta.ps1 signs Setup.exe itself after compilation, so this is only
+; used when compiling manually with a configured Inno "SignTool" (Tools -> Configure Sign Tools)
+; and passing /DSignTool=<name>.
+#ifdef SignTool
+SignTool={#SignTool} sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /d $q{#MyAppName}$q $f
+SignedUninstaller=yes
+#endif
 
 [Tasks]
 Name: "startup"; Description: "Start {#MyAppName} automatically when Windows starts"; GroupDescription: "Startup Options:"

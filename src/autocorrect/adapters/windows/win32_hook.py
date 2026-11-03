@@ -8,10 +8,12 @@ on mouse clicks, and translates virtual keys via `ToUnicodeEx`.
 from __future__ import annotations
 
 import ctypes
+import ctypes.wintypes  # noqa: F401 — needed so `ctypes.wintypes.MSG` resolves at runtime
 import sys
 import threading
 import time
-from typing import Callable, Final
+from collections.abc import Callable
+from typing import Final
 
 from autocorrect.adapters.windows.win32_injector import AUTOCORRECT_EXTRA_INFO_TAG
 from autocorrect.adapters.windows.win_keymap import (
@@ -101,9 +103,7 @@ class Win32KeyboardMouseHook:
         kernel32 = ctypes.windll.kernel32
         self._thread_id = kernel32.GetCurrentThreadId()
 
-        HOOKPROC = ctypes.WINFUNCTYPE(
-            ctypes.c_ssize_t, ctypes.c_int, ctypes.c_size_t, ctypes.c_void_p
-        )
+        HOOKPROC = ctypes.WINFUNCTYPE(ctypes.c_ssize_t, ctypes.c_int, ctypes.c_size_t, ctypes.c_void_p)
 
         def _kb_proc(n_code: int, w_param: int, l_param: int) -> int:
             if n_code == HC_ACTION and (w_param in (WM_KEYDOWN, WM_SYSKEYDOWN)):
@@ -119,8 +119,7 @@ class Win32KeyboardMouseHook:
                 alt = bool(user32.GetAsyncKeyState(VK_MENU) & 0x8000)
                 shift = bool(user32.GetAsyncKeyState(VK_SHIFT) & 0x8000)
                 win = bool(
-                    (user32.GetAsyncKeyState(VK_LWIN) & 0x8000)
-                    or (user32.GetAsyncKeyState(VK_RWIN) & 0x8000)
+                    (user32.GetAsyncKeyState(VK_LWIN) & 0x8000) or (user32.GetAsyncKeyState(VK_RWIN) & 0x8000)
                 )
 
                 key_name = VK_TO_KEY_NAME.get(vk, "")

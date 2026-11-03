@@ -15,13 +15,12 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import (
-    Ed25519PrivateKey,
-    Ed25519PublicKey,
-)
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from autocorrect.adapters import create_platform_focus_inspector, create_platform_injector
-from autocorrect.adapters.macos.quartz_tap import QuartzEventTapManager
+from autocorrect.adapters.linux.session_type import LinuxSessionType, detect_linux_session
+from autocorrect.adapters.linux.x11_hook import X11HookError, X11KeyboardMouseHook
+from autocorrect.adapters.macos.quartz_tap import QuartzEventTapManager, QuartzTapError
 from autocorrect.adapters.windows.win32_hook import Win32KeyboardMouseHook
 from autocorrect.ai.api_key_manager import ApiKeyManager
 from autocorrect.ai.local_model_manager import LocalModelManager
@@ -29,14 +28,18 @@ from autocorrect.ai.provider_manager import BYOKProviderManager
 from autocorrect.ai.spending_controls import SpendingController
 from autocorrect.ai.usage_tracker import UsageTracker
 from autocorrect.core.engine import AutocorrectEngine
-from autocorrect.input.ports import KeyAction, KeyEvent
+from autocorrect.daemon import hook_status
+from autocorrect.daemon.focus_monitor import FocusMonitor
+from autocorrect.daemon.hook_status import HookState, HookStatus
+from autocorrect.env_config import load_env_file
+from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 from autocorrect.ipc.server import LocalIPCServer
 from autocorrect.licensing.activation_manager import compute_local_device_id_hash
-from autocorrect.env_config import load_env_file
 from autocorrect.licensing.entitlement_manager import EntitlementManager, EntitlementSnapshot
 from autocorrect.licensing.licence_service import LicenceService
+from autocorrect.licensing.root_key import load_root_public_key
 from autocorrect.licensing.trial_manager import TrialManager
 from autocorrect.payments.pricing_config import PricingConfig
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
@@ -64,19 +67,16 @@ class AutoCorrectDaemon:
         self._data_dir = data_dir
         self._data_dir.mkdir(parents=True, exist_ok=True)
         self._dry_run_hooks = dry_run_hooks
-        # Optional `.env` (creator device hashes etc.); never overrides real env vars.
-        load_env_file(self._data_dir)
+        # Development-only `.env` (ignored in frozen builds); never overrides real env vars.
+        load_env_file()
         self._win_hook: Win32KeyboardMouseHook | None = None
         self._mac_tap: QuartzEventTapManager | None = None
+        self._x11_hook: X11KeyboardMouseHook | None = None
         self._hooks_active: bool = False
+        self.hook_status: HookStatus = hook_status.INACTIVE
 
-        # Default embedded Ed25519 verification key if none injected
-        if public_key is None:
-            default_priv = Ed25519PrivateKey.from_private_bytes(
-                b"AutoCorrect-Embedded-Root-Key-v1"
-            )
-            public_key = default_priv.public_key()
-        self._public_key = public_key
+        # Embedded Ed25519 *public* root key (private half never ships) unless injected.
+        self._public_key = public_key or load_root_public_key()
         self._device_id_hash = device_id_hash or compute_local_device_id_hash()
 
         # 1. Load zero-copy mmap language resources
@@ -157,7 +157,11 @@ class AutoCorrectDaemon:
             active_region=self.preference_store.overlay.active_region,
         )
 
-        # 9. Initialize Authenticated Local IPC Server for out-of-process Settings UI
+        # 9. Foreground-focus monitor: password fields, terminals, excluded apps, app profiles.
+        self.focus_monitor = FocusMonitor(inspector=self.focus_inspector, on_change=self._on_focus_changed)
+        self._user_domain_packs: set[str] = set()
+
+        # 10. Initialize Authenticated Local IPC Server for out-of-process Settings UI
         self.ipc_server = LocalIPCServer(daemon=self, data_dir=self._data_dir)
 
     @property
@@ -178,6 +182,10 @@ class AutoCorrectDaemon:
         """
         snapshot = self.licence_service.load_cached_licence_offline()
         self.local_ai.set_pro_entitled(snapshot.pro_features_enabled)
+        # Restore persisted correction preferences and (Pro) domain packs.
+        self.apply_global_correction_settings()
+        saved_packs = self.preference_store.get_setting("enabled_domain_packs", "")
+        self.set_user_domain_packs({p for p in saved_packs.split(",") if p.strip()})
         if start_ipc:
             self.ipc_server.start()
         if snapshot.typing_assistance_enabled:
@@ -200,36 +208,178 @@ class AutoCorrectDaemon:
         self._release_os_hooks()
         self.session.reset_all_state()
 
+    # ------------------------------------------------------------------ focus
+    def set_user_domain_packs(self, pack_ids: set[str]) -> None:
+        """Record the user's globally enabled packs and apply them (plus any app-profile packs)."""
+        self._user_domain_packs = {p.strip().lower() for p in pack_ids if p.strip()}
+        self._apply_effective_domain_packs(self.focus_monitor.last_focus)
+
+    def _apply_effective_domain_packs(self, focus: FocusContext | None) -> None:
+        packs = set(self._user_domain_packs)
+        if focus is not None and self.entitlement_manager.is_pro_enabled():
+            prof = self.app_profiles.get_profile(focus.process_name or focus.bundle_or_app_id)
+            if prof is not None and prof.enabled:
+                packs |= set(prof.active_domain_packs)
+        if not self.entitlement_manager.is_pro_enabled():
+            packs = set()  # Domain packs are a Pro feature.
+        if packs != set(self.resource_manager.active_bundle.domain_packs.keys()):
+            self.resource_manager.set_enabled_domain_packs(packs)
+
+    def _on_focus_changed(self, focus: FocusContext) -> None:
+        """
+        Called by `FocusMonitor` whenever the foreground app/control changes.
+        Flushes typing state, applies security flags, and (Pro) the matching
+        application profile's correction settings and domain packs.
+        """
+        effective = focus
+        prof = None
+        if self.entitlement_manager.is_pro_enabled():
+            prof = self.app_profiles.get_profile(focus.process_name or focus.bundle_or_app_id)
+        if prof is not None and not prof.enabled:
+            # A disabled profile means "never correct in this app".
+            effective = FocusContext(
+                process_name=focus.process_name,
+                window_title=focus.window_title,
+                bundle_or_app_id=focus.bundle_or_app_id,
+                is_password_or_secure=focus.is_password_or_secure,
+                is_terminal_or_code=focus.is_terminal_or_code,
+                is_excluded_app=True,
+            )
+        self.session.on_focus_changed(effective)
+
+        if prof is not None and prof.enabled:
+            self.session.configure_features(
+                enable_punctuation_assist=prof.enable_punctuation_assist,
+                enable_double_space_period=prof.enable_double_space_period,
+                enable_auto_capitalise=prof.enable_auto_capitalise,
+                aggressiveness=prof.aggressiveness,
+            )
+        else:
+            self.apply_global_correction_settings()
+        self._apply_effective_domain_packs(focus)
+
+    def apply_global_correction_settings(self) -> None:
+        """Push the user's global (non-profile) correction preferences into the session."""
+        prefs = self.preference_store
+        self.session.configure_features(
+            enable_punctuation_assist=prefs.get_setting("enable_punctuation_assist", "true") == "true",
+            enable_double_space_period=prefs.get_setting("enable_double_space_period", "true") == "true",
+            enable_auto_capitalise=prefs.get_setting("enable_auto_capitalise", "true") == "true",
+            aggressiveness=max(0.5, min(1.5, float(prefs.get_setting("aggressiveness", "1.0")))),
+        )
+
     def _attach_os_hooks(self) -> None:
         if self._hooks_active:
             return
         self._hooks_active = True
         if self._dry_run_hooks:
+            self.hook_status = HookStatus(HookState.DRY_RUN, backend="dry-run")
             return
+        self.focus_monitor.start()
+        try:
+            self.hook_status = self._install_platform_hook()
+        except Exception as exc:  # pragma: no cover - defensive: never take the daemon down
+            self.hook_status = HookStatus(
+                HookState.FAILED,
+                detail=f"{type(exc).__name__}: {exc}",
+                remediation="Restart AutoCorrect. If the problem persists, check the log and report it.",
+            )
+        if self.hook_status.state in (HookState.FAILED, HookState.UNSUPPORTED):
+            # Nothing is listening; keep the daemon (IPC, settings, licence) alive
+            # but do not pretend typing assistance is running.
+            self._hooks_active = False
+            self.focus_monitor.stop()
+
+    def _install_platform_hook(self) -> HookStatus:
+        """Install the right hook for this OS/session; return its status (never raises for known failures)."""
         if sys.platform == "win32":
             self._win_hook = Win32KeyboardMouseHook(
                 on_key_event=self._dispatch_os_key,
                 on_mouse_click=self.session.on_mouse_click_or_caret_move,
             )
             self._win_hook.start()
-        elif sys.platform == "darwin":
+            return HookStatus(HookState.ACTIVE, backend="win32-ll-hook")
+
+        if sys.platform == "darwin":
             self._mac_tap = QuartzEventTapManager(
                 on_key_event=self._dispatch_os_key,
                 on_mouse_click=self.session.on_mouse_click_or_caret_move,
             )
-            self._mac_tap.start()
+            try:
+                self._mac_tap.start()
+            except QuartzTapError as exc:
+                self._mac_tap = None
+                return HookStatus(
+                    HookState.FAILED,
+                    backend="quartz-event-tap",
+                    detail=str(exc),
+                    remediation=exc.remediation,
+                )
+            return HookStatus(HookState.ACTIVE, backend="quartz-event-tap")
+
+        if sys.platform.startswith("linux"):
+            session_type = detect_linux_session()
+            if session_type == LinuxSessionType.WAYLAND:
+                return HookStatus(
+                    HookState.UNSUPPORTED,
+                    backend="ibus",
+                    detail="Wayland session: compositors do not allow global key hooks.",
+                    remediation=(
+                        "Enable the AutoCorrect IBus input method "
+                        "(Settings → Keyboard → Input Sources → add 'English (AutoCorrect)') "
+                        "and select it as your active input source."
+                    ),
+                )
+            if session_type == LinuxSessionType.HEADLESS:
+                return HookStatus(
+                    HookState.UNSUPPORTED,
+                    detail="No DISPLAY/WAYLAND_DISPLAY in the environment.",
+                    remediation="Start AutoCorrect from inside a graphical desktop session.",
+                )
+            self._x11_hook = X11KeyboardMouseHook(
+                on_key_event=self._dispatch_os_key_passive,
+                on_mouse_click=self.session.on_mouse_click_or_caret_move,
+            )
+            try:
+                self._x11_hook.start()
+            except X11HookError as exc:
+                self._x11_hook = None
+                return HookStatus(
+                    HookState.FAILED,
+                    backend="x11-xrecord",
+                    detail=str(exc),
+                    remediation=exc.remediation,
+                )
+            return HookStatus(HookState.ACTIVE, backend="x11-xrecord")
+
+        return HookStatus(
+            HookState.UNSUPPORTED,
+            detail=f"No input hook for platform {sys.platform!r}.",
+            remediation="AutoCorrect supports Windows, macOS and Linux desktops.",
+        )
 
     def _release_os_hooks(self) -> None:
         self._hooks_active = False
+        self.hook_status = hook_status.INACTIVE
+        self.focus_monitor.stop()
         if self._win_hook is not None:
             self._win_hook.stop()
             self._win_hook = None
         if self._mac_tap is not None:
             self._mac_tap.stop()
             self._mac_tap = None
+        if self._x11_hook is not None:
+            self._x11_hook.stop()
+            self._x11_hook = None
 
     def _dispatch_os_key(self, event: KeyEvent) -> KeyAction:
+        """Blocking hooks (Win32 LL hook, Quartz tap) can swallow the delimiter keystroke."""
         outcome = self.session.handle_key_event(event)
+        return outcome.action
+
+    def _dispatch_os_key_passive(self, event: KeyEvent) -> KeyAction:
+        """Passive observers (XRecord) see keys after delivery; plans must re-inject the delimiter."""
+        outcome = self.session.handle_key_event(event, suppress_delimiter_on_replace=False)
         return outcome.action
 
 
@@ -237,13 +387,11 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
     import time
 
-    parser = argparse.ArgumentParser(
-        description="AutoCorrect System-Wide Desktop Background Daemon"
-    )
+    parser = argparse.ArgumentParser(description="AutoCorrect System-Wide Desktop Background Daemon")
     parser.add_argument(
         "--data-dir",
         type=Path,
-        default=Path.home() / ".autocorrect_desktop",
+        default=None,
         help="Directory for local SQLite preferences, licence, and resource cache",
     )
     parser.add_argument(
@@ -253,8 +401,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    from autocorrect.platform_paths import resolve_data_dir
+
     daemon = AutoCorrectDaemon(
-        data_dir=args.data_dir,
+        data_dir=resolve_data_dir(args.data_dir),
         dry_run_hooks=not args.live,
     )
     snap = daemon.start()

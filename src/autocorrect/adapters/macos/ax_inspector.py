@@ -40,9 +40,7 @@ class MacAXFocusInspector:
     """
 
     def __init__(self, extra_excluded_bundles: set[str] | None = None) -> None:
-        self._user_excluded: set[str] = {
-            b.lower() for b in (extra_excluded_bundles or set())
-        }
+        self._user_excluded: set[str] = {b.lower() for b in (extra_excluded_bundles or set())}
 
     @staticmethod
     def is_accessibility_trusted(prompt_user: bool = False) -> bool:
@@ -81,9 +79,7 @@ class MacAXFocusInspector:
         """Pure classification logic testable across all operating systems."""
         b_low = bundle_id.lower()
         is_password = (
-            secure_event_input_enabled
-            or ax_subrole == "AXSecureTextField"
-            or ax_role == "AXSecureTextField"
+            secure_event_input_enabled or ax_subrole == "AXSecureTextField" or ax_role == "AXSecureTextField"
         )
         is_excluded = b_low in MACOS_EXCLUDED_BUNDLES or b_low in self._user_excluded
         is_terminal = b_low in MACOS_TERMINAL_BUNDLES
@@ -97,17 +93,33 @@ class MacAXFocusInspector:
             is_excluded_app=is_excluded,
         )
 
+    @staticmethod
+    def is_secure_event_input_enabled() -> bool:
+        """
+        `IsSecureEventInputEnabled()` lives in Carbon/HIToolbox (not exposed by
+        pyobjc's Quartz bindings), so call it through ctypes. True whenever any
+        app — password fields in Safari/Chrome, Terminal with secure entry,
+        login windows — has asked macOS to block keyboard snooping.
+        """
+        if sys.platform != "darwin":
+            return False
+        try:
+            import ctypes
+
+            carbon = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+            carbon.IsSecureEventInputEnabled.restype = ctypes.c_ubyte
+            return bool(carbon.IsSecureEventInputEnabled())
+        except Exception:
+            return False
+
     def get_current_focus(self) -> FocusContext:
         if sys.platform != "darwin":
             return FocusContext()
         try:
             import ApplicationServices  # type: ignore[import-not-found]
-            import Quartz  # type: ignore[import-not-found]
             from AppKit import NSWorkspace  # type: ignore[import-not-found]
 
-            secure_input = bool(Quartz.CGEventSourceKeyState is not None and False)
-            if hasattr(Quartz, "IsSecureEventInputEnabled"):
-                secure_input = bool(Quartz.IsSecureEventInputEnabled())
+            secure_input = self.is_secure_event_input_enabled()
 
             front_app = NSWorkspace.sharedWorkspace().frontmostApplication()
             bundle_id = str(front_app.bundleIdentifier() or "") if front_app else ""
@@ -120,12 +132,8 @@ class MacAXFocusInspector:
             role = ""
             subrole = ""
             if err == 0 and focused_elem is not None:
-                _, r_val = ApplicationServices.AXUIElementCopyAttributeValue(
-                    focused_elem, "AXRole", None
-                )
-                _, sr_val = ApplicationServices.AXUIElementCopyAttributeValue(
-                    focused_elem, "AXSubrole", None
-                )
+                _, r_val = ApplicationServices.AXUIElementCopyAttributeValue(focused_elem, "AXRole", None)
+                _, sr_val = ApplicationServices.AXUIElementCopyAttributeValue(focused_elem, "AXSubrole", None)
                 role = str(r_val or "")
                 subrole = str(sr_val or "")
 
