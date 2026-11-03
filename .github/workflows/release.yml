@@ -141,8 +141,12 @@ jobs:
       - name: System packages (X11, GObject/IBus typelib for bundling, packaging tools)
         run: |
           sudo apt-get update
+          # PyGObject/pycairo build from source on pip: they need pkg-config plus the
+          # cairo and girepository (1.0 for <3.50, 2.0 for >=3.50) development headers.
           sudo apt-get install -y --no-install-recommends \
-            libx11-6 libxtst6 libgirepository1.0-dev gir1.2-ibus-1.0 python3-gi \
+            libx11-6 libxtst6 gir1.2-ibus-1.0 python3-gi \
+            pkg-config python3-dev libffi-dev libcairo2-dev \
+            libgirepository1.0-dev libgirepository-2.0-dev \
             dpkg-dev fuse libfuse2 minisign
           curl -fsSL -o /usr/local/bin/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
           sudo chmod +x /usr/local/bin/appimagetool

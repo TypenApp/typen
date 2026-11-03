@@ -56,8 +56,12 @@ jobs:
       - run: python -m pytest tests -q -p no:cacheprovider --cov=autocorrect --cov-report=term-missing:skip-covered
         env:
           PYTHONUTF8: "1"
+          # No X server on the runner: pystray's xorg backend connects to $DISPLAY at import.
+          PYSTRAY_BACKEND: ${{ runner.os == 'Linux' && 'dummy' || '' }}
       - name: Headless launcher smoke test
         run: python -m autocorrect.launcher --headless-check --data-dir "${{ runner.temp }}/ac-smoke"
+        env:
+          PYSTRAY_BACKEND: ${{ runner.os == 'Linux' && 'dummy' || '' }}
 
   freeze:
     name: PyInstaller smoke (${{ matrix.os }})
