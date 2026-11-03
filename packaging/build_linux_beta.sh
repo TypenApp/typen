@@ -103,6 +103,8 @@ HERE="$(dirname "$(readlink -f "$0")")"
 exec "$HERE/usr/bin/AutoCorrectDesktop" "$@"
 EOF
   chmod +x "$APPDIR/AppRun"
+  # mktemp creates the desktop file 0600 and cp preserves it; appimagetool refuses non-world-readable AppDirs.
+  chmod -R a+rX "$APPDIR"
   APPIMAGE="$OUT/AutoCorrect-Desktop-$FULL_VERSION-$PLATFORM.AppImage"
   ARCH="$ARCH" "$APPIMAGETOOL" "$APPDIR" "$APPIMAGE" >/dev/null
   echo "    built $(basename "$APPIMAGE")"
@@ -156,6 +158,7 @@ command -v ibus >/dev/null 2>&1 && (ibus write-cache --system >/dev/null 2>&1 ||
 exit 0
 EOF
   chmod 755 "$PKG/DEBIAN/postinst"
+  chmod -R a+rX "$PKG/opt" "$PKG/usr"
   DEB="$OUT/autocorrect-desktop_${VERSION}~${CHANNEL}_${DEB_ARCH}.deb"
   dpkg-deb --build --root-owner-group "$PKG" "$DEB" >/dev/null
   echo "    built $(basename "$DEB")"
