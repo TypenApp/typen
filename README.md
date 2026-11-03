@@ -102,6 +102,14 @@ commits the merged manifest to `master`. Vercel redeploys the site from that com
 every download link points into the release, so the site only ever lists platforms
 and files that were actually built.
 
+**This repository is private, so its Release assets are not publicly downloadable.**
+Either make it public, or publish to a public releases-only repository: create one
+(for example `litlEMPEROR/AutoCorrect-releases`, empty, public), then in this repo's
+Settings → Secrets and variables → Actions set the variable `RELEASES_REPO` to its
+`owner/name` and the secret `RELEASES_TOKEN` to a fine-grained PAT with
+*Contents: read and write* on that repository. The publish job records the
+hosting repository in the manifest (`download_repo`) and the site links there.
+
 ### Website live demo
 
 The demo on the home page is the real engine running as a Vercel Python function

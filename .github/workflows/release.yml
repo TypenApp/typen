@@ -179,6 +179,13 @@ jobs:
       contents: write
     env:
       FULL_VERSION: ${{ needs.prepare.outputs.full_version }}
+      # Where the public can download from. This source repository is private, so by
+      # default its Release assets 404 for visitors. Set the repository variable
+      # RELEASES_REPO (e.g. "litlEMPEROR/AutoCorrect-releases", a public repo with no
+      # source) and the secret RELEASES_TOKEN (a fine-grained PAT with "Contents: write"
+      # on that repo) to publish there instead. Leave both unset if this repo is public.
+      RELEASES_REPO: ${{ vars.RELEASES_REPO || github.repository }}
+      HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -193,7 +200,8 @@ jobs:
         run: |
           mkdir -p dist/installer
           find downloads-raw -type f -exec cp {} dist/installer/ \;
-          python -m pipeline.merge_release_manifests --downloads dist/installer --out site/src/data/release-manifest.json
+          python -m pipeline.merge_release_manifests --downloads dist/installer \
+            --out site/src/data/release-manifest.json --download-repo "$RELEASES_REPO"
           ls -la dist/installer
       - uses: actions/upload-artifact@v4
         with:
@@ -203,10 +211,15 @@ jobs:
         if: needs.prepare.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          repository: ${{ env.RELEASES_REPO }}
+          token: ${{ env.HAS_RELEASES_TOKEN == 'true' && secrets.RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
+          # When publishing to another repo the tag does not exist there; create it on its default branch.
+          target_commitish: ${{ env.RELEASES_REPO != github.repository && 'main' || github.sha }}
           name: AutoCorrect Desktop ${{ env.FULL_VERSION }}
           prerelease: true
-          generate_release_notes: true
+          generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
+          body: ${{ env.RELEASES_REPO != github.repository && format('AutoCorrect Desktop {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
           files: dist/installer/*
       - name: Commit merged manifest to master (deploys the site)
         if: needs.prepare.outputs.publish == 'true'

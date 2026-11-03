@@ -11,8 +11,16 @@
  */
 import manifest from "./release-manifest.json";
 
+/** The source repository. */
 export const GITHUB_REPO = "litlEMPEROR/AutoCorrect";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+/**
+ * The repository whose GitHub Release hosts the downloadable files. The publish
+ * job records it in the manifest (`--download-repo`), so a private source repo can
+ * publish to a public releases-only repo without touching the site.
+ */
+export const DOWNLOAD_REPO: string = (manifest as { download_repo?: string }).download_repo ?? GITHUB_REPO;
+export const DOWNLOAD_REPO_URL = `https://github.com/${DOWNLOAD_REPO}`;
 
 type ArtifactKind = "installer" | "portable" | "appimage" | "deb";
 
@@ -73,11 +81,11 @@ export const IS_PRERELEASE = RELEASE.channel.toLowerCase() !== "stable";
 export const BUILT_AT_ISO = RELEASE.built_at;
 /** Git tag of the GitHub Release that holds this version's files. */
 export const RELEASE_TAG = `v${FULL_VERSION}`;
-export const RELEASE_PAGE_URL = `${GITHUB_REPO_URL}/releases/tag/${RELEASE_TAG}`;
-export const RELEASES_URL = `${GITHUB_REPO_URL}/releases`;
+export const RELEASE_PAGE_URL = `${DOWNLOAD_REPO_URL}/releases/tag/${RELEASE_TAG}`;
+export const RELEASES_URL = `${DOWNLOAD_REPO_URL}/releases`;
 /** Direct download URL of a file attached to this version's GitHub Release. */
 export const releaseAssetUrl = (file: string) =>
-  `${GITHUB_REPO_URL}/releases/download/${RELEASE_TAG}/${encodeURIComponent(file)}`;
+  `${DOWNLOAD_REPO_URL}/releases/download/${RELEASE_TAG}/${encodeURIComponent(file)}`;
 export const SHA256SUMS_URL = releaseAssetUrl("SHA256SUMS.txt");
 /** Windows build signing state (legacy export; prefer `PlatformRelease.codeSigned`). */
 export const CODE_SIGNED = RELEASE.platforms.win64?.code_signed ?? RELEASE.code_signed;

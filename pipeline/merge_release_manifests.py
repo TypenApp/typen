@@ -78,7 +78,10 @@ def collect_platform_manifests(downloads: Path) -> dict[str, dict[str, Any]]:
 
 
 def merge(
-    manifests: dict[str, dict[str, Any]], resources_manifest: Path = RESOURCES_MANIFEST
+    manifests: dict[str, dict[str, Any]],
+    resources_manifest: Path = RESOURCES_MANIFEST,
+    *,
+    download_repo: str | None = None,
 ) -> dict[str, Any]:
     if not manifests:
         raise SystemExit("no release manifests found")
@@ -112,6 +115,10 @@ def merge(
         "packs": newest.get("packs", []),
         "platforms": {plat: _platform_entry(m) for plat, m in ordered},
     }
+    if download_repo:
+        # GitHub repository ("owner/name") whose Release v<full_version> holds the files.
+        # Lets the site link to a public releases-only repo when the source repo is private.
+        merged["download_repo"] = download_repo
     # Legacy top-level mirror (older site code and third-party scrapers read these).
     primary = manifests.get("win64") or ordered[0][1]
     merged["platform"] = primary["platform"]
@@ -149,10 +156,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--check", action="store_true", help="Exit 1 if --out is not up to date with --downloads"
     )
+    parser.add_argument(
+        "--download-repo",
+        default=None,
+        metavar="OWNER/NAME",
+        help="GitHub repository whose Release hosts the files (recorded in the manifest for the site)",
+    )
     args = parser.parse_args(argv)
 
     manifests = collect_platform_manifests(args.downloads)
-    merged = merge(manifests)
+    merged = merge(manifests, download_repo=args.download_repo)
     text = json.dumps(merged, indent=2) + "\n"
     if args.check:
         current = args.out.read_text(encoding="utf-8-sig") if args.out.exists() else ""
