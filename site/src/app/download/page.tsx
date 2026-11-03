@@ -1,197 +1,230 @@
 import React from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
+import { Check, Dash, PageHeader, Section } from "@/components/Page";
 import {
+  AVAILABLE_PLATFORMS,
   BASE_LANGUAGE_BUNDLE,
   BETA_INCLUDED,
   BETA_NOT_INCLUDED,
   BUILT_AT_ISO,
-  CODE_SIGNED,
   DOMAIN_PACK_RELEASES,
   ED25519_KEY_IS_DEV_KEY,
   ED25519_PUBLIC_KEY_HEX,
   FULL_VERSION,
-  PLATFORM_RELEASES,
-  WINDOWS_INSTALLER,
-  WINDOWS_PORTABLE,
-  WINDOWS_RELEASE,
+  RELEASE_PAGE_URL,
+  RELEASES_URL,
+  RELEASE_TAG,
+  SHA256SUMS_URL,
+  UPCOMING_PLATFORMS,
+  type DownloadArtifact,
+  type PlatformRelease,
 } from "@/data/releases";
 
+export const metadata: Metadata = {
+  title: "Download",
+  description: `AutoCorrect Desktop ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
+};
+
 function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function ArtifactCard({ artifact, primary }: { artifact: DownloadArtifact; primary: boolean }) {
+  return (
+    <div className="rounded-lg border border-line bg-ink p-5">
+      <p className="font-display text-lg text-paper">{artifact.label}</p>
+      <p className="mt-1 text-sm text-paper-muted">{artifact.description}</p>
+      <a href={artifact.url} className={`${primary ? "btn-primary" : "btn-secondary"} mt-4 w-full`}>
+        Download · {artifact.sizeFormatted}
+      </a>
+      <p className="mt-3 font-mono text-xs text-paper-muted">{artifact.filename}</p>
+      <p className="hash mt-1">sha256 {artifact.sha256}</p>
+      {artifact.signatureUrl && (
+        <p className="mt-1 text-xs">
+          <a href={artifact.signatureUrl} className="link">
+            minisign signature
+          </a>
+        </p>
+      )}
+    </div>
+  );
+}
+
+function PlatformBlock({ platform }: { platform: PlatformRelease }) {
+  return (
+    <section className="card scroll-mt-24 p-6 sm:p-8" id={platform.id}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="display text-2xl">{platform.osName}</h2>
+        <span className="text-sm text-paper-muted">{platform.architecture}</span>
+      </div>
+
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        {platform.artifacts.map((a, i) => (
+          <ArtifactCard key={a.filename} artifact={a} primary={i === 0} />
+        ))}
+      </div>
+
+      <ul className="mt-6 space-y-1.5">
+        {platform.requirements.map((r) => (
+          <Dash key={r}>{r}</Dash>
+        ))}
+      </ul>
+
+      <div className="rule mt-6 pt-5">
+        <p className="eyebrow">First run</p>
+        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-paper-muted">
+          {platform.firstRun.map((step) => (
+            <li key={step}>{step}</li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
 }
 
 export default function DownloadPage() {
+  const unsigned = AVAILABLE_PLATFORMS.filter((p) => !p.codeSigned).map((p) => p.osName);
+  const verifyLines = AVAILABLE_PLATFORMS.filter((p) => p.verifyCommand).map((p) => `# ${p.osName}\n${p.verifyCommand}`);
+  const nothingPublished = AVAILABLE_PLATFORMS.length === 0;
+
   return (
-    <div className="container-narrow pb-24 pt-16">
-      {/* Header */}
-      <p className="eyebrow">Download</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-50 sm:text-4xl">
-        AutoCorrect Desktop {FULL_VERSION}
-      </h1>
-      <p className="mt-3 max-w-2xl text-zinc-400">
-        Public beta for Windows, built {formatDate(BUILT_AT_ISO)}. Includes the
-        full offline engine and a 14-day trial of every feature.
-        {!CODE_SIGNED && " The build is not yet code-signed."}
-      </p>
-
-      {/* Windows */}
-      <section className="card mt-10 p-6 sm:p-8" id="windows">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-medium text-zinc-100">Windows</h2>
-          <span className="text-sm text-zinc-500">{WINDOWS_RELEASE.architecture}</span>
-        </div>
-
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {WINDOWS_INSTALLER && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-5">
-              <p className="text-sm font-medium text-zinc-100">Installer</p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Recommended. Start menu shortcuts, optional launch at login, uninstaller.
-              </p>
-              <a href={WINDOWS_INSTALLER.url} className="btn-primary mt-4 w-full" download>
-                Download .exe · {WINDOWS_INSTALLER.sizeFormatted}
+    <div className="pb-8">
+      <PageHeader
+        eyebrow={`Download · ${RELEASE_TAG}`}
+        title={<>AutoCorrect Desktop {FULL_VERSION}</>}
+        lede={
+          nothingPublished ? (
+            <p>
+              This version is being built by the release pipeline. When it finishes, the installers for
+              Windows, macOS and Linux appear here with their SHA-256 hashes, and on the{" "}
+              <a href={RELEASE_PAGE_URL} className="link" target="_blank" rel="noopener noreferrer">
+                GitHub release
               </a>
-              <p className="mt-3 font-mono text-xs text-zinc-500">{WINDOWS_INSTALLER.filename}</p>
-              <p className="hash mt-1">SHA-256 {WINDOWS_INSTALLER.sha256}</p>
-            </div>
-          )}
-          {WINDOWS_PORTABLE && (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-5">
-              <p className="text-sm font-medium text-zinc-100">Portable</p>
-              <p className="mt-1 text-sm text-zinc-500">
-                Unzip anywhere and run <span className="font-mono">AutoCorrectDesktop.exe</span>. No installer.
-              </p>
-              <a href={WINDOWS_PORTABLE.url} className="btn-secondary mt-4 w-full" download>
-                Download .zip · {WINDOWS_PORTABLE.sizeFormatted}
-              </a>
-              <p className="mt-3 font-mono text-xs text-zinc-500">{WINDOWS_PORTABLE.filename}</p>
-              <p className="hash mt-1">SHA-256 {WINDOWS_PORTABLE.sha256}</p>
-            </div>
-          )}
-        </div>
+              . Nothing is listed on this page that was not actually built.
+            </p>
+          ) : (
+            <p>
+              Public beta for {AVAILABLE_PLATFORMS.map((p) => p.osName).join(", ")}, built {formatDate(BUILT_AT_ISO)}.
+              Includes the full offline engine and a 14-day trial of every feature.
+              {unsigned.length > 0 &&
+                ` The ${unsigned.join(" and ")} build${unsigned.length > 1 ? "s are" : " is"} not yet code-signed.`}
+            </p>
+          )
+        }
+      >
+        <p className="mt-6 font-mono text-xs text-paper-faint">
+          Files are served from{" "}
+          <a href={RELEASE_PAGE_URL} className="link" target="_blank" rel="noopener noreferrer">
+            github.com/…/releases/{RELEASE_TAG}
+          </a>
+          {" · "}
+          <a href={RELEASES_URL} className="link" target="_blank" rel="noopener noreferrer">
+            all releases
+          </a>
+        </p>
+      </PageHeader>
 
-        <ul className="mt-6 space-y-1.5 text-sm text-zinc-400">
-          {WINDOWS_RELEASE.requirements.map((r) => (
-            <li key={r} className="flex gap-2">
-              <span className="text-zinc-600">—</span>
-              <span>{r}</span>
-            </li>
-          ))}
-        </ul>
-
-        <div className="mt-6 border-t border-zinc-800 pt-5 text-sm text-zinc-400">
-          <p className="font-medium text-zinc-200">First run</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-5">
-            <li>
-              If SmartScreen appears, choose <em>More info → Run anyway</em>. Compare the SHA-256 above first if you want to be sure.
-            </li>
-            <li>A tray icon appears. Start typing in any app — corrections apply when you press Space or punctuation.</li>
-            <li>Right-click the tray icon → <em>Open Settings…</em> to manage your dictionary, variant and profiles.</li>
-          </ol>
-        </div>
-      </section>
-
-      {/* Other platforms */}
-      <section className="mt-6 grid gap-4 sm:grid-cols-2">
-        {PLATFORM_RELEASES.filter((p) => p.status === "coming-soon").map((p) => (
-          <div key={p.id} id={p.id} className="card flex items-center justify-between p-5">
-            <div>
-              <p className="font-medium text-zinc-200">{p.osName}</p>
-              <p className="mt-0.5 text-sm text-zinc-500">{p.architecture}</p>
-            </div>
-            <span className="rounded border border-zinc-800 px-2 py-1 text-xs text-zinc-500">
-              Coming soon
-            </span>
-          </div>
+      <div className="container-site space-y-6">
+        {AVAILABLE_PLATFORMS.map((p) => (
+          <PlatformBlock key={p.id} platform={p} />
         ))}
-      </section>
 
-      {/* Scope */}
-      <section className="mt-16" id="scope">
-        <h2 className="text-lg font-medium text-zinc-100">What the beta includes</h2>
-        <div className="mt-5 grid gap-8 sm:grid-cols-2">
+        {UPCOMING_PLATFORMS.length > 0 && (
+          <section className="grid gap-4 sm:grid-cols-3">
+            {UPCOMING_PLATFORMS.map((p) => (
+              <div key={p.id} id={p.id} className="card scroll-mt-24 p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-display text-lg text-paper">{p.osName}</p>
+                  <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-paper-faint">
+                    {nothingPublished ? "building" : "not in this release"}
+                  </span>
+                </div>
+                <p className="mt-1 text-sm text-paper-muted">{p.architecture}</p>
+                <ul className="mt-4 space-y-1.5">
+                  {p.requirements.slice(0, 2).map((r) => (
+                    <Dash key={r}>{r}</Dash>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+
+      <Section id="scope" index="01" title="What the beta includes">
+        <div className="grid gap-10 sm:grid-cols-2">
           <div>
             <p className="eyebrow">Included</p>
-            <ul className="mt-3 space-y-2 text-sm text-zinc-300">
+            <ul className="mt-4 space-y-2.5">
               {BETA_INCLUDED.map((i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="mt-[3px] text-blue-400">✓</span>
-                  <span>{i}</span>
-                </li>
+                <Check key={i}>{i}</Check>
               ))}
             </ul>
           </div>
           <div>
             <p className="eyebrow">Not yet</p>
-            <ul className="mt-3 space-y-2 text-sm text-zinc-400">
+            <ul className="mt-4 space-y-2.5">
               {BETA_NOT_INCLUDED.map((i) => (
-                <li key={i} className="flex gap-2">
-                  <span className="mt-[3px] text-zinc-600">–</span>
-                  <span>{i}</span>
-                </li>
+                <Dash key={i}>{i}</Dash>
               ))}
             </ul>
           </div>
         </div>
-      </section>
+      </Section>
 
-      {/* Packs */}
-      <section className="mt-16" id="packs">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-medium text-zinc-100">Domain vocabulary packs</h2>
-          <span className="text-sm text-zinc-500">Bundled with the app · also downloadable</span>
-        </div>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-          Small seed vocabularies that protect field-specific terms from
-          correction and fix common typos in each field. Enable them per
-          variant or per application in Settings. They will grow with each
-          beta release.
+      <Section id="packs" index="02" title="Domain vocabulary packs" aside="Bundled with the app · Pro">
+        <p className="max-w-2xl text-sm leading-relaxed text-paper-muted">
+          Small seed vocabularies that protect field-specific terms from correction and fix the common typos of
+          each field. Enable them per variant or per application in Settings (Pro, or during the trial).
         </p>
-        <div className="card mt-5 divide-y divide-zinc-800">
-          {DOMAIN_PACK_RELEASES.map((pack) => (
-            <div key={pack.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
-              <div className="flex items-baseline gap-3">
-                <span className="font-medium text-zinc-200">{pack.name}</span>
-                <span className="text-zinc-500">
-                  v{pack.version} · {pack.wordCount} terms · {pack.directTypoCount} typo rules
-                </span>
+        {DOMAIN_PACK_RELEASES.length > 0 ? (
+          <div className="card mt-6 divide-y divide-line">
+            {DOMAIN_PACK_RELEASES.map((pack) => (
+              <div key={pack.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
+                <div className="flex flex-wrap items-baseline gap-x-3">
+                  <span className="text-paper">{pack.name}</span>
+                  <span className="text-paper-faint">
+                    v{pack.version} · {pack.wordCount} terms · {pack.directTypoCount} typo rules
+                  </span>
+                </div>
+                <a href={pack.downloadUrl} className="link font-mono text-xs">
+                  {pack.filename}
+                </a>
               </div>
-              <a href={pack.downloadUrl} className="font-mono text-xs text-blue-400 hover:text-blue-300" download>
-                {pack.filename}
-              </a>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-6 text-sm text-paper-faint">
+            Pack files are attached to the GitHub release alongside the installers once this version is built.
+          </p>
+        )}
+      </Section>
 
-      {/* Verify */}
-      <section className="mt-16" id="verify">
-        <h2 className="text-lg font-medium text-zinc-100">Verify a download</h2>
-        <p className="mt-2 max-w-2xl text-sm text-zinc-400">
-          Compare the file hash against the value shown next to each download.
+      <Section id="verify" index="03" title="Verify a download">
+        <p className="max-w-2xl text-sm leading-relaxed text-paper-muted">
+          Compare the file hash against the value shown next to each download. Every published hash is also in{" "}
+          <a href={SHA256SUMS_URL} className="link">
+            SHA256SUMS.txt
+          </a>{" "}
+          on the release.
         </p>
-        <pre className="card mt-4 overflow-x-auto p-4 text-xs text-zinc-300">
-{`# PowerShell
-${WINDOWS_RELEASE.verifyCommand ?? "Get-FileHash .\\<file> -Algorithm SHA256"}
-
-# All published hashes
-https://<your-host>/downloads/SHA256SUMS.txt`}
+        <pre className="card mt-5 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-paper-muted">
+          {verifyLines.length > 0
+            ? verifyLines.join("\n\n")
+            : "# Windows\nGet-FileHash .\\<file> -Algorithm SHA256\n\n# macOS\nshasum -a 256 <file>\n\n# Linux\nsha256sum <file>"}
         </pre>
 
         <details className="mt-6 text-sm">
-          <summary className="cursor-pointer text-zinc-300 hover:text-zinc-100">
+          <summary className="cursor-pointer text-paper-muted hover:text-paper">
             Bundled language resources ({BASE_LANGUAGE_BUNDLE.id} {BASE_LANGUAGE_BUNDLE.version})
           </summary>
-          <div className="card mt-3 divide-y divide-zinc-800">
+          <div className="card mt-3 divide-y divide-line">
             {BASE_LANGUAGE_BUNDLE.artifacts.map((a) => (
               <div key={a.name} className="grid gap-1 px-5 py-3 sm:grid-cols-[180px_1fr]">
-                <span className="font-mono text-xs text-zinc-200">{a.name}</span>
+                <span className="font-mono text-xs text-paper">{a.name}</span>
                 <div>
-                  <p className="text-zinc-400">{a.description}</p>
+                  <p className="text-paper-muted">{a.description}</p>
                   <p className="hash mt-0.5">{a.sha256}</p>
                 </div>
               </div>
@@ -200,29 +233,25 @@ https://<your-host>/downloads/SHA256SUMS.txt`}
         </details>
 
         <details className="mt-3 text-sm">
-          <summary className="cursor-pointer text-zinc-300 hover:text-zinc-100">
-            Licence and manifest signing key (Ed25519)
-          </summary>
+          <summary className="cursor-pointer text-paper-muted hover:text-paper">Licence signing key (Ed25519)</summary>
           <div className="card mt-3 p-5">
-            <p className="hash text-zinc-300">{ED25519_PUBLIC_KEY_HEX}</p>
+            <p className="hash text-paper-muted">{ED25519_PUBLIC_KEY_HEX}</p>
             {ED25519_KEY_IS_DEV_KEY && (
-              <p className="mt-2 text-zinc-500">
-                This is the development key embedded in the beta. It will be
-                rotated before the stable release; licences issued against it
-                will be reissued.
+              <p className="mt-2 text-paper-faint">
+                Development key embedded in the beta; it will be rotated before the stable release.
               </p>
             )}
           </div>
         </details>
-      </section>
 
-      <p className="mt-16 text-sm text-zinc-500">
-        Having trouble? Start with the{" "}
-        <Link href="/docs/getting-started" className="text-blue-400 hover:text-blue-300">
-          getting-started guide
-        </Link>
-        .
-      </p>
+        <p className="mt-10 text-sm text-paper-faint">
+          Having trouble? Start with the{" "}
+          <Link href="/docs/getting-started" className="link">
+            getting-started guide
+          </Link>
+          .
+        </p>
+      </Section>
     </div>
   );
 }

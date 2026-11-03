@@ -14,7 +14,7 @@ export default function DocsIndexPage() {
       doc.title.toLowerCase().includes(q) ||
       doc.summary.toLowerCase().includes(q) ||
       doc.sections.some(
-        (s) => s.heading.toLowerCase().includes(q) || s.paragraphs.some((p) => p.toLowerCase().includes(q))
+        (s) => s.heading.toLowerCase().includes(q) || s.paragraphs.some((p) => p.toLowerCase().includes(q)),
       )
     );
   });
@@ -22,33 +22,40 @@ export default function DocsIndexPage() {
   return (
     <div>
       <p className="eyebrow">Documentation</p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-50">Guides and reference</h1>
-      <p className="mt-3 max-w-2xl text-zinc-400">
-        How the background service and the Settings window work, how to
-        customise corrections, and how licensing and updates are handled.
+      <h1 className="display mt-4 text-4xl sm:text-5xl">Guides and reference</h1>
+      <p className="prose-site mt-5 max-w-2xl text-lg">
+        <span>
+          How the background service and the Settings window work, how to customise corrections, and how
+          licensing and updates are handled.
+        </span>
       </p>
       <input
-        type="text"
+        type="search"
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Filter guides…"
-        className="mt-6 w-full max-w-md rounded-lg border border-zinc-800 bg-zinc-950 px-3.5 py-2 text-sm text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none"
+        aria-label="Filter guides"
+        className="field mt-8 max-w-md"
       />
 
-      <ul className="mt-8 divide-y divide-zinc-800 border-y border-zinc-800">
-        {docs.map((doc) => (
+      <ol className="mt-10 divide-y divide-line border-y border-line">
+        {docs.map((doc, i) => (
           <li key={doc.slug}>
-            <Link href={`/docs/${doc.slug}`} className="group flex flex-col gap-1 py-5 sm:flex-row sm:items-baseline sm:gap-6">
-              <span className="w-40 shrink-0 text-xs text-zinc-500">{doc.category}</span>
+            <Link href={`/docs/${doc.slug}`} className="group grid gap-2 py-6 sm:grid-cols-[56px_160px_1fr] sm:gap-6">
+              <span className="eyebrow pt-1.5">{String(i + 1).padStart(2, "0")}</span>
+              <span className="pt-1 text-xs text-paper-faint">{doc.category}</span>
               <span className="min-w-0">
-                <span className="block font-medium text-zinc-100 group-hover:text-blue-400">{doc.title}</span>
-                <span className="mt-1 block text-sm text-zinc-400">{doc.summary}</span>
+                <span className="block font-display text-xl text-paper transition-colors group-hover:text-proof-strong">
+                  {doc.title}
+                </span>
+                <span className="mt-1.5 block text-sm leading-relaxed text-paper-muted">{doc.summary}</span>
+                <span className="mt-2 block font-mono text-[11px] text-paper-faint">{doc.readingTime}</span>
               </span>
             </Link>
           </li>
         ))}
-        {docs.length === 0 && <li className="py-8 text-sm text-zinc-500">No guides match “{filter}”.</li>}
-      </ul>
+        {docs.length === 0 && <li className="py-8 text-sm text-paper-faint">No guides match “{filter}”.</li>}
+      </ol>
     </div>
   );
 }

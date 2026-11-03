@@ -1,10 +1,18 @@
 import React from "react";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { Dash } from "@/components/Page";
 import { DOC_ARTICLES, getDocBySlug } from "@/data/docs";
 
 export function generateStaticParams() {
   return DOC_ARTICLES.map((doc) => ({ slug: doc.slug }));
+}
+
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const article = getDocBySlug(slug);
+  return article ? { title: article.shortTitle, description: article.summary } : {};
 }
 
 export default async function DocArticlePage({ params }: { params: Promise<{ slug: string }> }) {
@@ -21,47 +29,49 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
       <p className="eyebrow">
         {article.category} · {article.readingTime}
       </p>
-      <h1 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-50">{article.title}</h1>
-      <p className="mt-3 text-zinc-400">{article.summary}</p>
+      <h1 className="display mt-4 text-3xl leading-tight sm:text-4xl">{article.title}</h1>
+      <p className="mt-4 text-lg leading-relaxed text-paper-muted">{article.summary}</p>
 
-      <nav className="mt-6 text-sm">
-        <ul className="space-y-1">
-          {article.sections.map((sec) => (
-            <li key={sec.id}>
-              <a href={`#${sec.id}`} className="text-zinc-500 hover:text-zinc-200">
+      <nav className="card mt-8 p-5 text-sm" aria-label="On this page">
+        <p className="eyebrow">On this page</p>
+        <ol className="mt-3 space-y-1.5">
+          {article.sections.map((sec, k) => (
+            <li key={sec.id} className="flex gap-3">
+              <span className="font-mono text-[11px] text-paper-faint">{String(k + 1).padStart(2, "0")}</span>
+              <a href={`#${sec.id}`} className="text-paper-muted hover:text-paper">
                 {sec.heading}
               </a>
             </li>
           ))}
-        </ul>
+        </ol>
       </nav>
 
-      <div className="mt-12 space-y-12">
-        {article.sections.map((sec) => (
+      <div className="mt-14 space-y-14">
+        {article.sections.map((sec, k) => (
           <section key={sec.id} id={sec.id} className="scroll-mt-24">
-            <h2 className="text-xl font-medium text-zinc-100">{sec.heading}</h2>
-            <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-zinc-300">
-              {sec.paragraphs.map((p, k) => (
-                <p key={k}>{p}</p>
+            <h2 className="display text-2xl">
+              <span className="eyebrow mr-3 align-middle">{String(k + 1).padStart(2, "0")}</span>
+              {sec.heading}
+            </h2>
+            <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-paper-muted">
+              {sec.paragraphs.map((p, j) => (
+                <p key={j}>{p}</p>
               ))}
             </div>
             {sec.bullets && (
-              <ul className="mt-4 space-y-1.5 text-sm text-zinc-300">
-                {sec.bullets.map((b, k) => (
-                  <li key={k} className="flex gap-2">
-                    <span className="text-zinc-600">—</span>
-                    <span>{b}</span>
-                  </li>
+              <ul className="mt-5 space-y-2">
+                {sec.bullets.map((b, j) => (
+                  <Dash key={j}>{b}</Dash>
                 ))}
               </ul>
             )}
             {sec.codeBlock && (
-              <div className="card mt-4 overflow-hidden">
-                <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-2 text-xs text-zinc-500">
-                  <span className="font-mono">{sec.codeBlock.title}</span>
+              <div className="card mt-5 overflow-hidden">
+                <div className="flex items-center justify-between border-b border-line px-4 py-2 font-mono text-[11px] text-paper-faint">
+                  <span>{sec.codeBlock.title}</span>
                   <span>{sec.codeBlock.language}</span>
                 </div>
-                <pre className="overflow-x-auto p-4 text-xs leading-relaxed text-zinc-200">
+                <pre className="overflow-x-auto p-4 text-xs leading-relaxed text-paper">
                   <code>{sec.codeBlock.code}</code>
                 </pre>
               </div>
@@ -70,16 +80,16 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
         ))}
       </div>
 
-      <div className="mt-16 flex justify-between gap-4 border-t border-zinc-800 pt-6 text-sm">
+      <div className="rule mt-16 flex justify-between gap-4 pt-6 text-sm">
         {prev ? (
-          <Link href={`/docs/${prev.slug}`} className="text-zinc-400 hover:text-zinc-100">
+          <Link href={`/docs/${prev.slug}`} className="text-paper-muted hover:text-paper">
             ← {prev.shortTitle}
           </Link>
         ) : (
           <span />
         )}
         {next && (
-          <Link href={`/docs/${next.slug}`} className="text-right text-zinc-400 hover:text-zinc-100">
+          <Link href={`/docs/${next.slug}`} className="text-right text-paper-muted hover:text-paper">
             {next.shortTitle} →
           </Link>
         )}

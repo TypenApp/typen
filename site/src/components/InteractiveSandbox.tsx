@@ -5,19 +5,23 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 /**
  * Live demo.
  *
- * Nothing here simulates autocorrect. Every keystroke is sent to the real
- * Python engine (the same InputSessionManager + AutocorrectEngine the desktop
- * daemon runs) through /api/engine/*, and the engine's replacement plan is
- * applied to the textarea exactly as the OS injector would apply it. If the
- * engine is not reachable the demo says so and shows recorded engine output
- * instead of pretending.
+ * Nothing here simulates autocorrect. Every keystroke goes to the real engine
+ * (the same InputSessionManager + AutocorrectEngine the desktop daemon runs),
+ * hosted as a Python function at /api/demo, and the engine's replacement plan
+ * is applied to the textarea exactly as the OS injector would apply it.
+ *
+ * The function is serverless, so a request may land on an instance that has
+ * never seen this session. Every `key`/`caret` request therefore carries the
+ * text before the caret and the visitor's dictionary words; a fresh instance
+ * primes a new session from them (without re-correcting anything) and answers
+ * as if it had been there all along. `session_new: true` tells us that happened.
  */
 
 type Mode = "connecting" | "live" | "offline";
 
 interface LogEntry {
   id: number;
-  kind: "CORRECTED" | "UNDO" | "DICTIONARY" | "INFO" | "ERROR";
+  kind: "FIXED" | "UNDO" | "DICT" | "INFO" | "ERROR";
   message: string;
 }
 
@@ -34,11 +38,9 @@ interface EngineResponse {
   reason: string | null;
   reverted_word: string | null;
   latency_ms: number;
-  current_word: string;
-  buffer_state: string;
-  sentence_state: string;
   active_undo: string | null;
   word_count: number;
+  session_new?: boolean;
 }
 
 interface Health {
@@ -53,24 +55,15 @@ interface Dictionary {
   suggested: Array<{ word: string; corrected_to?: string | null }>;
 }
 
+const API = "/api/demo";
 const SAMPLES: Array<{ label: string; text: string }> = [
-  { label: "i receive montly subs becos…", text: "i receive montly subs becos i am a beast ofa man. " },
-  { label: "its still not woking propaly", text: "Whats up? its still not woking propaly. " },
-  { label: "your welcome. raw eggs is best.", text: "your welcome. raw eggs is best. " },
-  { label: "I recieved your mesage.", text: "I recieved your mesage. " },
+  { label: "i recieved your mesage", text: "i recieved your mesage. its still not woking propaly. " },
+  { label: "your welcome", text: "your welcome. raw eggs is best. " },
+  { label: "dont forget teh milk", text: "dont forget teh milk ,and the bred. " },
   { label: ";sig", text: ";sig " },
 ];
-
-/** Output recorded from the engine (1.2.0, lexicon 1.0.9) for the offline notice. */
-const RECORDED: Array<{ before: string; after: string }> = [
-  { before: "i receive montly subs becos i am a beast ofa man.", after: "I receive monthly subs because I am a beast of a man." },
-  { before: "Whats up? its still not woking propaly.", after: "What's up? It's still not working properly." },
-  { before: "your welcome. raw eggs is best.", after: "You're welcome. Raw eggs are best." },
-  { before: "I recieved your mesage.", after: "I received your message." },
-  { before: "dont forget teh milk.", after: "Don't forget the milk." },
-];
-
 const MAX_PASTE = 300;
+const PRIME_TAIL = 600;
 
 function newSessionId(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -87,40 +80,53 @@ export function InteractiveSandbox() {
   const [dictionary, setDictionary] = useState<Dictionary>({ words: [], suggested: [] });
   const [newWord, setNewWord] = useState("");
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef<string>("");
+  const wordsRef = useRef<string[]>([]);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
 
   const pushLog = useCallback((kind: LogEntry["kind"], message: string) => {
-    setLogs((prev) => [{ id: Date.now() + Math.random(), kind, message }, ...prev.slice(0, 11)]);
+    setLogs((prev) => [{ id: Date.now() + Math.random(), kind, message }, ...prev.slice(0, 9)]);
   }, []);
 
-  // --- engine transport ------------------------------------------------------
-  const call = useCallback(async <T,>(path: string, body?: object): Promise<T> => {
-    const res = await fetch(`/api/engine/${path}`, {
+  // --- transport ---------------------------------------------------------------
+  const call = useCallback(async <T,>(route: string, body?: object): Promise<T> => {
+    const res = await fetch(`${API}/${route}`, {
       method: body === undefined ? "GET" : "POST",
       headers: { "Content-Type": "application/json", "X-Session-Id": sessionRef.current },
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     });
     if (!res.ok) {
-      const err = new Error(`engine ${res.status}`);
-      (err as Error & { status?: number }).status = res.status;
+      const err = new Error(`engine ${res.status}`) as Error & { status?: number };
+      err.status = res.status;
       throw err;
     }
     return (await res.json()) as T;
   }, []);
 
+  /** Context a fresh serverless instance needs to rebuild this session. */
+  const primingContext = () => {
+    const ed = editorRef.current;
+    const before = ed ? ed.value.slice(0, ed.selectionStart) : "";
+    let text = before.length > PRIME_TAIL ? before.slice(-PRIME_TAIL) : before;
+    if (text.length === PRIME_TAIL) {
+      const cut = text.indexOf(" ");
+      if (cut >= 0) text = text.slice(cut + 1);
+    }
+    return { text, words: wordsRef.current.slice(0, 64) };
+  };
+
   const enqueue = useCallback(
     (task: () => Promise<void>) => {
       queueRef.current = queueRef.current.then(task).catch((err: unknown) => {
         const status = (err as { status?: number })?.status;
-        if (status === 503) {
+        if (status === undefined || status >= 500) {
           setMode("offline");
-          pushLog("ERROR", "Lost connection to the engine.");
         } else {
-          pushLog("ERROR", String(err));
+          pushLog("ERROR", String((err as Error)?.message ?? err));
         }
       });
       return queueRef.current;
@@ -128,24 +134,30 @@ export function InteractiveSandbox() {
     [pushLog],
   );
 
-  const loadDictionary = useCallback(async () => {
-    const d = await call<Dictionary>("api/dictionary");
+  const setDict = useCallback((d: Dictionary) => {
+    wordsRef.current = d.words;
     setDictionary(d);
-  }, [call]);
+  }, []);
 
-  // --- connect ---------------------------------------------------------------
+  const loadDictionary = useCallback(async () => {
+    setDict(await call<Dictionary>("dictionary"));
+  }, [call, setDict]);
+
+  // --- connect -----------------------------------------------------------------
   useEffect(() => {
     sessionRef.current = newSessionId();
     let cancelled = false;
+    setMode("connecting");
     (async () => {
       try {
-        const h = await call<Health>("api/health");
+        const h = await call<Health>("health");
         if (cancelled) return;
         setHealth(h);
-        setMode("live");
-        await call("api/reset", {});
+        await call("reset", {});
         await loadDictionary();
-        pushLog("INFO", `Connected to engine ${h.version}, lexicon ${h.lexicon_version}.`);
+        if (cancelled) return;
+        setMode("live");
+        pushLog("INFO", `Engine ${h.version} · lexicon ${h.lexicon_version} · ${h.word_count.toLocaleString()} words.`);
       } catch {
         if (!cancelled) setMode("offline");
       }
@@ -153,9 +165,9 @@ export function InteractiveSandbox() {
     return () => {
       cancelled = true;
     };
-  }, [call, loadDictionary, pushLog]);
+  }, [attempt, call, loadDictionary, pushLog]);
 
-  // --- editor mutations (mirror of the OS injector) --------------------------
+  // --- editor mutations (mirror of the OS injector) ------------------------------
   const applyPlan = (plan: EnginePlan) => {
     const ed = editorRef.current;
     if (!ed) return;
@@ -187,17 +199,18 @@ export function InteractiveSandbox() {
   };
 
   const processKey = async (keyName: string, ch: string) => {
-    const data = await call<EngineResponse>("api/key", { key_name: keyName, char: ch });
+    const data = await call<EngineResponse>("key", { key_name: keyName, char: ch, ...primingContext() });
     setLatency(data.latency_ms);
     if (data.action === "SUPPRESS_AND_INJECT" && data.plan) {
       applyPlan(data.plan);
       if (data.reverted_word) {
-        pushLog("UNDO", `Reverted to "${data.reverted_word}" — added to suggestions.`);
+        pushLog("UNDO", `Kept "${data.reverted_word}" — added to suggestions.`);
         await loadDictionary();
       } else {
+        const why = (data.reason ?? "auto").toLowerCase().replace(/_/g, " ");
         pushLog(
-          "CORRECTED",
-          `"${data.plan.original_full.trim()}" → "${data.plan.target_full.trim()}" (${(data.reason ?? "AUTO").toLowerCase().replace(/_/g, " ")}, ${data.latency_ms.toFixed(2)} ms)`,
+          "FIXED",
+          `${data.plan.original_full.trim()} → ${data.plan.target_full.trim()}  (${why}, ${data.latency_ms.toFixed(1)} ms)`,
         );
       }
     } else {
@@ -208,7 +221,8 @@ export function InteractiveSandbox() {
   const invalidateCaret = () =>
     enqueue(async () => {
       const ed = editorRef.current;
-      await call(ed && ed.value === "" ? "api/reset" : "api/caret", {});
+      if (ed && ed.value === "") await call("reset", {});
+      else await call("caret", primingContext());
     });
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -218,7 +232,7 @@ export function InteractiveSandbox() {
     }
     if (e.ctrlKey || e.altKey || e.metaKey) {
       invalidateCaret();
-      return; // browser shortcut (copy, select-all, …)
+      return;
     }
     let keyName = e.key;
     let ch = e.key.length === 1 ? e.key : "";
@@ -234,9 +248,8 @@ export function InteractiveSandbox() {
       invalidateCaret();
       return;
     } else if (e.key.length > 1) {
-      return; // Shift, CapsLock, F-keys
+      return;
     }
-    // Suppress the browser's own insertion synchronously; the engine decides.
     e.preventDefault();
     enqueue(() => processKey(keyName, ch));
   };
@@ -245,8 +258,7 @@ export function InteractiveSandbox() {
     const ed = editorRef.current;
     for (const ch of text) {
       if (ed) ed.setSelectionRange(ed.value.length, ed.value.length);
-      const keyName = ch === " " ? "Space" : ch === "\n" ? "Return" : ch;
-      await processKey(keyName, ch);
+      await processKey(ch === " " ? "Space" : ch === "\n" ? "Return" : ch, ch);
     }
   };
 
@@ -256,9 +268,7 @@ export function InteractiveSandbox() {
     const text = e.clipboardData.getData("text").replace(/\r\n/g, "\n").slice(0, MAX_PASTE);
     if (!text) return;
     setBusy(true);
-    enqueue(async () => {
-      await typeThroughEngine(text);
-    }).finally(() => setBusy(false));
+    enqueue(() => typeThroughEngine(text)).finally(() => setBusy(false));
   };
 
   const runSample = (sample: string) => {
@@ -267,7 +277,7 @@ export function InteractiveSandbox() {
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
-      await call("api/reset", {});
+      await call("reset", {});
       await typeThroughEngine(sample);
       ed?.focus();
     }).finally(() => setBusy(false));
@@ -277,16 +287,15 @@ export function InteractiveSandbox() {
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
-      await call("api/reset", {});
+      await call("reset", {});
       ed?.focus();
     });
 
   const dictionaryAction = (action: "add" | "delete" | "dismiss", word: string) =>
     enqueue(async () => {
-      const d = await call<Dictionary>(`api/dictionary/${action}`, { word });
-      setDictionary(d);
-      if (action === "add") pushLog("DICTIONARY", `"${word}" added — accepted as typed.`);
-      if (action === "delete") pushLog("DICTIONARY", `"${word}" removed — corrected again.`);
+      setDict(await call<Dictionary>(`dictionary/${action}`, { word, words: wordsRef.current }));
+      if (action === "add") pushLog("DICT", `"${word}" added — accepted as typed from now on.`);
+      if (action === "delete") pushLog("DICT", `"${word}" removed — corrected again.`);
     });
 
   const addWord = () => {
@@ -296,46 +305,43 @@ export function InteractiveSandbox() {
     dictionaryAction("add", w);
   };
 
-  // --- render ----------------------------------------------------------------
-  const status =
+  // --- render ------------------------------------------------------------------
+  const dot =
+    mode === "live" ? "bg-emerald-400" : mode === "connecting" ? "animate-pulse bg-paper-faint" : "bg-proof";
+  const statusText =
     mode === "live" && health
-      ? `Live engine ${health.version} · lexicon ${health.lexicon_version} · ${health.word_count.toLocaleString()} words${
-          latency !== null ? ` · ${latency.toFixed(2)} ms` : ""
-        }`
+      ? `Live · engine ${health.version}${latency !== null ? ` · ${latency.toFixed(1)} ms` : ""}`
       : mode === "connecting"
-        ? "Connecting to engine…"
-        : "Engine offline";
+        ? "Waking the engine…"
+        : "Engine unreachable";
 
   return (
     <div className="card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 px-5 py-3">
-        <p className="text-sm text-zinc-300">
-          Try it — corrections apply on Space or punctuation. Backspace twice to undo.
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
+        <p className="text-sm text-paper-muted">
+          Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; press{" "}
+          <kbd className="kbd">Backspace</kbd> right after one to keep what you typed.
         </p>
-        <span className="text-xs text-zinc-500">{status}</span>
+        <span className="inline-flex items-center gap-2 font-mono text-[11px] text-paper-faint">
+          <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
+          {statusText}
+        </span>
       </div>
 
       {mode === "offline" ? (
-        <div className="p-5">
-          <p className="text-sm text-zinc-300">
-            The live demo runs the real engine, and it isn&apos;t reachable from this page right now.
-            Rather than imitate it in the browser, here is output recorded from the engine:
+        <div className="p-6">
+          <p className="text-sm text-paper">The engine function did not answer.</p>
+          <p className="mt-2 max-w-prose text-sm text-paper-muted">
+            This demo runs the real engine as a serverless function, not a browser imitation, so when
+            the function cannot be reached there is nothing honest to show in its place. A cold start
+            can take a few seconds on the first visit; try once more.
           </p>
-          <ul className="mt-4 space-y-2 text-sm">
-            {RECORDED.map((r) => (
-              <li key={r.before} className="grid gap-1 rounded-lg border border-zinc-800 bg-zinc-950 p-3 sm:grid-cols-2">
-                <span className="text-zinc-500 line-through decoration-zinc-700">{r.before}</span>
-                <span className="text-zinc-100">{r.after}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 text-xs text-zinc-500">
-            To run it live: <code className="text-zinc-300">autocorrect-sandbox --no-browser</code> next to the site
-            (or set <code className="text-zinc-300">AUTOCORRECT_ENGINE_URL</code>), or download the beta and type anywhere.
-          </p>
+          <button type="button" className="btn-secondary mt-5" onClick={() => setAttempt((n) => n + 1)}>
+            Retry
+          </button>
         </div>
       ) : (
-        <div className="grid gap-6 p-5 lg:grid-cols-[1fr_280px]">
+        <div className="grid gap-6 p-5 lg:grid-cols-[1fr_260px]">
           <div>
             <textarea
               ref={editorRef}
@@ -343,23 +349,25 @@ export function InteractiveSandbox() {
               onKeyDown={onKeyDown}
               onPaste={onPaste}
               onMouseDown={() => mode === "live" && invalidateCaret()}
-              rows={5}
+              rows={6}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               disabled={mode !== "live"}
-              placeholder={mode === "live" ? "Type here…" : "Connecting…"}
-              className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-950 p-4 text-sm leading-relaxed text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none disabled:opacity-60"
+              placeholder={mode === "live" ? "dont forget teh milk" : "Connecting…"}
+              aria-label="Live demo editor"
+              className="field min-h-[9.5rem] resize-none p-4 font-display text-xl leading-relaxed"
             />
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="eyebrow mr-1">Try</span>
               {SAMPLES.map((s) => (
                 <button
                   key={s.label}
                   type="button"
                   disabled={mode !== "live" || busy}
                   onClick={() => runSample(s.text)}
-                  className="rounded-md border border-zinc-800 px-2.5 py-1 text-xs text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100 disabled:opacity-50"
+                  className="rounded border border-line px-2.5 py-1 font-mono text-xs text-paper-muted transition hover:border-paper-faint hover:text-paper disabled:opacity-50"
                 >
                   {s.label}
                 </button>
@@ -368,26 +376,33 @@ export function InteractiveSandbox() {
                 type="button"
                 disabled={mode !== "live" || busy}
                 onClick={clear}
-                className="px-2.5 py-1 text-xs text-zinc-500 hover:text-zinc-200 disabled:opacity-50"
+                className="btn-ghost h-7 text-xs"
               >
                 Clear
               </button>
             </div>
 
-            <ul className="mt-4 max-h-28 space-y-1 overflow-y-auto text-xs text-zinc-400">
-              {logs.length === 0 && <li className="text-zinc-600">Ready.</li>}
+            <ol className="mt-4 max-h-32 space-y-1.5 overflow-y-auto font-mono text-xs text-paper-muted" aria-live="polite">
+              {logs.length === 0 && <li className="text-paper-faint">Ready.</li>}
               {logs.map((log) => (
-                <li key={log.id} className="flex gap-2">
-                  <span className="w-20 shrink-0 font-mono uppercase text-zinc-600">{log.kind}</span>
-                  <span className={log.kind === "ERROR" ? "text-red-400" : undefined}>{log.message}</span>
+                <li key={log.id} className="flex gap-3">
+                  <span
+                    className={`w-10 shrink-0 ${
+                      log.kind === "ERROR" ? "text-proof" : log.kind === "FIXED" ? "text-proof-strong" : "text-paper-faint"
+                    }`}
+                  >
+                    {log.kind}
+                  </span>
+                  <span className={log.kind === "ERROR" ? "text-proof-strong" : undefined}>{log.message}</span>
                 </li>
               ))}
-            </ul>
+            </ol>
           </div>
 
           <aside className="text-sm">
-            <p className="eyebrow">Your dictionary</p>
-            <div className="mt-2 flex gap-2">
+            <p className="eyebrow">Your words</p>
+            <p className="mt-2 text-xs text-paper-faint">Anything here is never corrected. Lives only in this session.</p>
+            <div className="mt-3 flex gap-2">
               <input
                 type="text"
                 value={newWord}
@@ -398,31 +413,24 @@ export function InteractiveSandbox() {
                   if (e.key === "Enter") addWord();
                 }}
                 placeholder="Add a word"
-                className="min-w-0 flex-1 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-600 focus:border-zinc-600 focus:outline-none disabled:opacity-60"
+                aria-label="Add a word to your dictionary"
+                className="field h-9 min-w-0 flex-1 text-xs"
               />
-              <button
-                type="button"
-                disabled={mode !== "live"}
-                onClick={addWord}
-                className="rounded-md border border-zinc-700 px-3 py-1.5 text-xs text-zinc-200 hover:bg-zinc-900 disabled:opacity-50"
-              >
+              <button type="button" disabled={mode !== "live"} onClick={addWord} className="btn-secondary h-9 px-3 text-xs">
                 Add
               </button>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {dictionary.words.length === 0 && (
-                <span className="text-xs text-zinc-600">Words here are never corrected.</span>
-              )}
               {dictionary.words.map((word) => (
                 <span
                   key={word}
-                  className="inline-flex items-center gap-1.5 rounded-md border border-zinc-800 px-2 py-0.5 text-xs text-zinc-300"
+                  className="inline-flex items-center gap-1.5 rounded border border-line px-2 py-0.5 font-mono text-xs text-paper"
                 >
                   {word}
                   <button
                     type="button"
                     onClick={() => dictionaryAction("delete", word)}
-                    className="text-zinc-500 hover:text-zinc-200"
+                    className="text-paper-faint hover:text-paper"
                     aria-label={`Remove ${word}`}
                   >
                     ×
@@ -432,7 +440,7 @@ export function InteractiveSandbox() {
             </div>
 
             {dictionary.suggested.length > 0 && (
-              <div className="mt-5">
+              <div className="mt-6">
                 <p className="eyebrow">Suggested from undo</p>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {dictionary.suggested.map((item) => (
@@ -440,7 +448,7 @@ export function InteractiveSandbox() {
                       <button
                         type="button"
                         onClick={() => dictionaryAction("add", item.word)}
-                        className="rounded-md border border-dashed border-zinc-700 px-2 py-0.5 text-xs text-zinc-300 hover:border-zinc-500"
+                        className="rounded border border-dashed border-line-strong px-2 py-0.5 font-mono text-xs text-paper-muted hover:border-paper-faint hover:text-paper"
                         title={item.corrected_to ? `Was corrected to ${item.corrected_to}. Click to keep.` : "Click to keep."}
                       >
                         + {item.word}
@@ -448,7 +456,7 @@ export function InteractiveSandbox() {
                       <button
                         type="button"
                         onClick={() => dictionaryAction("dismiss", item.word)}
-                        className="text-xs text-zinc-600 hover:text-zinc-300"
+                        className="text-xs text-paper-faint hover:text-paper"
                         aria-label={`Dismiss ${item.word}`}
                       >
                         ×

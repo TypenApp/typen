@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DOC_ARTICLES } from "@/data/docs";
-import { IS_PRERELEASE, WINDOWS_INSTALLER } from "@/data/releases";
+import { IS_PRERELEASE, PLATFORM_RELEASES } from "@/data/releases";
+import { Wordmark } from "./Brand";
 
 interface SearchResultItem {
   title: string;
@@ -23,6 +24,7 @@ export function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -32,29 +34,36 @@ export function Navbar() {
         setSearchOpen((prev) => !prev);
       } else if (e.key === "Escape") {
         setSearchOpen(false);
+        setMenuOpen(false);
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [pathname]);
+
   const allSearchItems = useMemo<SearchResultItem[]>(() => {
-    const items: SearchResultItem[] = [
-      {
-        title: "Download for Windows",
-        subtitle: WINDOWS_INSTALLER
-          ? `${WINDOWS_INSTALLER.filename} · ${WINDOWS_INSTALLER.sizeFormatted}`
-          : "Installer and portable build",
+    const items: SearchResultItem[] = [];
+    for (const p of PLATFORM_RELEASES) {
+      items.push({
+        title: `Download for ${p.osName}`,
+        subtitle:
+          p.status === "beta"
+            ? p.artifacts.map((a) => a.filename).join(" · ")
+            : "Not built for this release yet",
         href: "/download",
         category: "Download",
-      },
-      {
-        title: "Pricing",
-        subtitle: "Standard and Pro perpetual licences · USD, NGN, GHS, KES",
-        href: "/pricing",
-        category: "Pricing",
-      },
-    ];
+      });
+    }
+    items.push({
+      title: "Pricing",
+      subtitle: "Standard and Pro perpetual licences · USD, NGN, GHS, KES",
+      href: "/pricing",
+      category: "Pricing",
+    });
     for (const doc of DOC_ARTICLES) {
       items.push({
         title: doc.title,
@@ -89,30 +98,21 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur">
-        <div className="container-narrow flex h-14 items-center justify-between">
-          <div className="flex items-center gap-8">
-            <Link href="/" className="flex items-center gap-2.5">
-              <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-sm font-semibold text-white">
-                ✓
-              </span>
-              <span className="text-sm font-semibold text-zinc-100">AutoCorrect</span>
-              {IS_PRERELEASE && (
-                <span className="rounded border border-zinc-700 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-zinc-400">
-                  Beta
-                </span>
-              )}
-            </Link>
-            <nav className="hidden items-center gap-1 md:flex">
+      <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-md">
+        <div className="container-site flex h-16 items-center justify-between">
+          <div className="flex items-center gap-10">
+            <Wordmark beta={IS_PRERELEASE} />
+            <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
               {NAV_LINKS.map((link) => {
                 const isActive = pathname?.startsWith(link.href);
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`rounded-md px-3 py-1.5 text-sm transition ${
-                      isActive ? "text-zinc-100" : "text-zinc-400 hover:text-zinc-100"
+                    className={`text-sm transition-colors ${
+                      isActive ? "text-paper" : "text-paper-muted hover:text-paper"
                     }`}
+                    aria-current={isActive ? "page" : undefined}
                   >
                     {link.label}
                   </Link>
@@ -126,46 +126,89 @@ export function Navbar() {
               type="button"
               onClick={() => setSearchOpen(true)}
               aria-label="Search"
-              className="hidden items-center gap-2 rounded-md border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-400 transition hover:border-zinc-700 hover:text-zinc-200 sm:flex"
+              className="btn-secondary hidden h-9 gap-3 px-3 text-xs text-paper-muted sm:inline-flex"
             >
               <span>Search</span>
-              <kbd className="rounded border border-zinc-700 px-1 text-[10px] text-zinc-400">Ctrl K</kbd>
+              <kbd className="kbd">Ctrl K</kbd>
             </button>
-            <Link
-              href="/download"
-              className="rounded-md bg-zinc-100 px-3.5 py-1.5 text-sm font-medium text-zinc-900 transition hover:bg-white"
-            >
+            <Link href="/download" className="btn-primary hidden h-9 sm:inline-flex">
               Download
             </Link>
+            <button
+              type="button"
+              className="btn-ghost h-9 md:hidden"
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span className="relative block h-3 w-5">
+                <span
+                  className={`absolute left-0 top-0 h-px w-5 bg-current transition-transform ${
+                    menuOpen ? "translate-y-[6px] rotate-45" : ""
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-[6px] h-px w-5 bg-current transition-opacity ${
+                    menuOpen ? "opacity-0" : ""
+                  }`}
+                />
+                <span
+                  className={`absolute left-0 top-3 h-px w-5 bg-current transition-transform ${
+                    menuOpen ? "-translate-y-[6px] -rotate-45" : ""
+                  }`}
+                />
+              </span>
+            </button>
           </div>
         </div>
+        {menuOpen && (
+          <nav className="container-site rule flex flex-col gap-1 py-3 md:hidden" aria-label="Mobile">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded px-2 py-2 text-sm text-paper-muted hover:bg-ink-2 hover:text-paper"
+              >
+                {link.label}
+              </Link>
+            ))}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setSearchOpen(true);
+              }}
+              className="rounded px-2 py-2 text-left text-sm text-paper-muted hover:bg-ink-2 hover:text-paper"
+            >
+              Search
+            </button>
+          </nav>
+        )}
       </header>
 
       {searchOpen && (
         <div
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-24"
           onClick={() => setSearchOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Search"
         >
-          <div
-            className="w-full max-w-xl overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center border-b border-zinc-800 px-4 py-3">
+          <div className="card w-full max-w-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center border-b border-line px-4 py-3">
               <input
                 type="text"
                 autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search docs and downloads…"
-                className="w-full bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none"
+                className="w-full bg-transparent text-sm text-paper placeholder-paper-faint outline-none"
               />
-              <kbd className="rounded border border-zinc-700 px-1.5 py-0.5 text-[10px] text-zinc-500">
-                Esc
-              </kbd>
+              <kbd className="kbd">Esc</kbd>
             </div>
             <div className="max-h-96 overflow-y-auto p-2">
               {filteredResults.length === 0 ? (
-                <p className="py-8 text-center text-sm text-zinc-500">No results for “{query}”.</p>
+                <p className="py-8 text-center text-sm text-paper-faint">No results for “{query}”.</p>
               ) : (
                 filteredResults.map((item) => (
                   <button
@@ -175,13 +218,13 @@ export function Navbar() {
                       setSearchOpen(false);
                       router.push(item.href);
                     }}
-                    className="flex w-full flex-col items-start rounded-lg px-3 py-2.5 text-left transition hover:bg-zinc-900"
+                    className="flex w-full flex-col items-start rounded px-3 py-2.5 text-left transition hover:bg-ink-2"
                   >
                     <div className="flex w-full items-center justify-between gap-3">
-                      <span className="text-sm text-zinc-100">{item.title}</span>
-                      <span className="shrink-0 text-xs text-zinc-500">{item.category}</span>
+                      <span className="text-sm text-paper">{item.title}</span>
+                      <span className="eyebrow shrink-0 tracking-normal">{item.category}</span>
                     </div>
-                    <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500">{item.subtitle}</p>
+                    <p className="mt-0.5 line-clamp-1 text-xs text-paper-faint">{item.subtitle}</p>
                   </button>
                 ))
               )}

@@ -27,7 +27,7 @@ export const DOC_ARTICLES: DocArticle[] = [
     shortTitle: "Getting Started",
     category: "Foundation",
     summary:
-      "Install the Windows beta, understand the tray service and Settings window, and verify your 14-day full-featured Pro trial. macOS and Linux notes describe the planned setup.",
+      "Install the beta on Windows, macOS or Linux, understand the tray service and Settings window, grant the OS permissions each platform needs, and verify your 14-day full-featured Pro trial.",
     readingTime: "4 min read",
     sections: [
       {
@@ -39,7 +39,7 @@ export const DOC_ARTICLES: DocArticle[] = [
         ],
         bullets: [
           "100% Offline Core: Zero cloud dependency for everyday spelling, grammar, homophone, and punctuation corrections.",
-          "158,988-Word Memory-Mapped Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.",
+          "166,000+-Word Memory-Mapped Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.",
           "14-Day Full Pro Trial: Automatically starts on first launch with no credit card required.",
         ],
       },
@@ -47,7 +47,7 @@ export const DOC_ARTICLES: DocArticle[] = [
         id: "windows-setup",
         heading: "Windows 10 & 11 Installation (Beta)",
         paragraphs: [
-          "Download the installer (.exe) or portable (.zip) build from the Downloads page and compare its SHA-256 with the value shown there. The beta is not code-signed, so SmartScreen will show a warning on first run: choose More info, then Run anyway.",
+          "Download the installer (.exe) or portable (.zip) build from the Download page — every file is attached to the matching GitHub release — and compare its SHA-256 with the value shown there. The beta is not code-signed, so SmartScreen will show a warning on first run: choose More info, then Run anyway.",
           "The installer offers launch-at-login and creates Start menu shortcuts for the service and for Settings. After launch a tray icon appears; right-click it to pause, open Settings, or quit. The portable build is a one-folder PyInstaller bundle: unzip it anywhere and run AutoCorrectDesktop.exe.",
           "On Windows, AutoCorrect uses SetWindowsHookExW (WH_KEYBOARD_LL and WH_MOUSE_LL) paired with atomic SendInput (KEYEVENTF_UNICODE) packets tagged with AUTOCORRECT_EXTRA_INFO_TAG so synthetic keystrokes are never re-evaluated.",
         ],
@@ -55,7 +55,8 @@ export const DOC_ARTICLES: DocArticle[] = [
           language: "powershell",
           title: "Verify and launch from PowerShell",
           code: `# 1. Verify the download
-Get-FileHash .\\AutoCorrect-Desktop-1.2.0-beta.1-win64-setup.exe -Algorithm SHA256
+Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
+# ...and compare with SHA256SUMS.txt on the GitHub release
 
 # 2. Start the background service (tray icon)
 & "$env:LOCALAPPDATA\\Programs\\AutoCorrect Desktop\\AutoCorrectDesktop.exe"
@@ -69,17 +70,20 @@ Get-FileHash .\\AutoCorrect-Desktop-1.2.0-beta.1-win64-setup.exe -Algorithm SHA2
       },
       {
         id: "macos-setup",
-        heading: "macOS 12+ Accessibility Setup (planned)",
+        heading: "macOS 12+ Setup (Input Monitoring & Accessibility)",
         paragraphs: [
-          "A macOS build is not part of the current beta. When it ships, you will drag AutoCorrect.app to /Applications. Because AutoCorrect intercepts physical keystrokes via a Quartz Event Tap (CGEventTapCreate), macOS requires explicit Accessibility permission.",
-          "Navigate to System Settings -> Privacy & Security -> Accessibility and toggle AutoCorrect.app ON. AutoCorrect automatically inspects AXSecureTextField and IsSecureEventInputEnabled on every focus change so password prompts and Secure Input terminals are never read.",
+          "Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag AutoCorrect Desktop to /Applications. Because AutoCorrect listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
+          "On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings and your licence remain available.",
+          "Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/AutoCorrect.",
         ],
       },
       {
         id: "linux-setup",
-        heading: "Linux (X11 & Wayland IBus) Setup (planned)",
+        heading: "Linux Setup (X11 & Wayland via IBus)",
         paragraphs: [
-          "A Linux build is not part of the current beta. On X11 sessions, X11FocusInspector and X11TextInjector operate directly; on Wayland sessions, WaylandIBusEngineAdapter integrates with IBus and respects IBUS_INPUT_PURPOSE_PASSWORD automatically.",
+          "Check the Downloads page for availability: Linux artifacts (.deb, AppImage, portable tar.gz) are listed there only once they have been published, each with a minisign signature. Data lives in $XDG_DATA_HOME/autocorrect (default ~/.local/share/autocorrect) and launch at login uses an XDG autostart entry.",
+          "X11 sessions: the service uses the XRecord extension to observe keys and XTest to type corrections; window class and title (EWMH _NET_ACTIVE_WINDOW / WM_CLASS) identify password managers, polkit and keyring prompts, and terminals. Because XRecord observes keys after delivery, the delimiter you typed is deleted and re-typed together with the corrected word.",
+          "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (AutoCorrect)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
         ],
       },
     ],
@@ -414,7 +418,7 @@ autocorrect-pipeline build --version 1.0.9 --out-dir ./build/en_1.0.9`,
         paragraphs: [
           "During development or evaluation, autocorrect-sandbox starts a local HTTP server on 127.0.0.1:8765 connected to the real Python InputSessionManager and AutocorrectEngine with dry_run_hooks=True.",
           "Every keystroke in the browser textarea is serialized and evaluated against the mmap lexicon, displaying live telemetry for Active Word Buffer, Caret State, Sentence Capitaliser, Undo Transaction Slot, evaluation latency in milliseconds, and Device Lock SHA-256.",
-          "The same server powers the demo on this website. The site never simulates corrections: its /api/engine route proxies each keystroke to autocorrect-sandbox (AUTOCORRECT_ENGINE_URL, default http://127.0.0.1:8765), and every visitor gets an isolated session (own word buffer, undo ledger and custom dictionary) keyed by an X-Session-Id header. If the engine is unreachable the demo says so and shows recorded engine output instead.",
+          "The same code powers the demo on this website. The site never simulates corrections: /api/demo is a Python serverless function that imports the engine and the en_base resources vendored from the same commit, and every visitor gets an isolated session (own word buffer, undo ledger and custom dictionary) keyed by an X-Session-Id header. Because a request may land on a fresh instance, each keystroke also carries the text before the caret and the visitor's dictionary words, from which a new instance primes an equivalent session without re-correcting anything. During local development `next dev` proxies /api/demo to autocorrect-sandbox on 127.0.0.1:8765 instead.",
         ],
       },
       {
