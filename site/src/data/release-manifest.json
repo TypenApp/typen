@@ -3,7 +3,7 @@
   "version": "1.2.0",
   "channel": "beta.3",
   "full_version": "1.2.0-beta.3",
-  "built_at": "2026-11-03T23:03:19Z",
+  "built_at": "2026-11-03T23:08:30Z",
   "resources": {
     "bundle_version": "1.0.9",
     "schema_version": 1,
@@ -25,8 +25,8 @@
       "id": "academic",
       "version": "1.0.1",
       "file": "academic.pack.json",
-      "size_bytes": 716,
-      "sha256": "00aa723e93092ce8cd6489234ee9fb5484e32dce8395bc24b22089029e0ff9e3",
+      "size_bytes": 751,
+      "sha256": "5663105689c38b5f211d32efc6738fd9d8f531a72faab71fc5d645579f23adaa",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -34,8 +34,8 @@
       "id": "business",
       "version": "1.0.1",
       "file": "business.pack.json",
-      "size_bytes": 820,
-      "sha256": "7f73728ebb32b47648a6fc1454d1db51ae140abd65e3802a5f2d22623c87da7f",
+      "size_bytes": 860,
+      "sha256": "d8d9a4dc54279a2f27b9536cef0bfdea2ff4993e7d29902d02202fbbafc12f59",
       "word_count": 6,
       "direct_typo_count": 2
     },
@@ -43,8 +43,8 @@
       "id": "finance",
       "version": "1.0.2",
       "file": "finance.pack.json",
-      "size_bytes": 829,
-      "sha256": "8274c2c6a23a37be1cccb942a31ae5e67c61cb50c109171c10dbf241fcb1483c",
+      "size_bytes": 869,
+      "sha256": "98f2a2f4cbdd6f86c53bbf8db0e97b4093d70d57e883de2276a9a001d17d7eb1",
       "word_count": 6,
       "direct_typo_count": 2
     },
@@ -52,8 +52,8 @@
       "id": "law",
       "version": "1.0.1",
       "file": "law.pack.json",
-      "size_bytes": 708,
-      "sha256": "60ec5292c9d77630a074c262b66e153025a09b1ac95bfe8d6195b317c2d2ba5c",
+      "size_bytes": 743,
+      "sha256": "d2c596ab5b16a6466de8f4411d3ed7867fec1265da7761596bdbdf560d1d6270",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -61,8 +61,8 @@
       "id": "medicine",
       "version": "1.0.2",
       "file": "medicine.pack.json",
-      "size_bytes": 724,
-      "sha256": "31dd3b75540d0e657001b32e98bda00f8721ae68c4d5087ac083ac5b176fd396",
+      "size_bytes": 759,
+      "sha256": "285cf280b537e407df1f5c7afeee9f4d0f4d6d86f8c43618aa6e21c9082bc43a",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -70,67 +70,73 @@
       "id": "programming",
       "version": "1.0.3",
       "file": "programming.pack.json",
-      "size_bytes": 1380,
-      "sha256": "e248d157dde613be77909394eb769565bc1bf44efaeabec468a00f804eeaac75",
+      "size_bytes": 1446,
+      "sha256": "32459a91b97a34c8a2407daadced6a9ed261c9fdb7dbec4ff3a1993f477c08ca",
       "word_count": 11,
       "direct_typo_count": 3
     }
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-03T22:54:12Z",
+      "built_at": "2026-11-03T23:08:30Z",
       "full_version": "1.2.0-beta.3",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "portable",
           "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-portable.zip",
-          "size_bytes": 40917774,
-          "sha256": "8dd168567564567dce41fa17bb42268df526d4c080a1d77fa5fcd580b6a101c1"
+          "size_bytes": 40915767,
+          "sha256": "be78e646ebdbd616d672e61e7f1ecb43303ce79bc3cc38022b664ea2f24bf7b7"
         },
         {
           "kind": "installer",
           "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-setup.exe",
-          "size_bytes": 29702758,
-          "sha256": "ec699d84282049503f23ad466874d384040e1e2c7161259318b316a39453e779"
+          "size_bytes": 29645779,
+          "sha256": "de0cf29d1d6bc520c968e6a5d45962e1de4c5f309f4d611e89ed301ada0b8129"
         }
       ]
     },
-    "macos-arm64": {
-      "built_at": "2026-11-03T23:03:19Z",
+    "linux-x86_64": {
+      "built_at": "2026-11-03T23:08:23Z",
       "full_version": "1.2.0-beta.3",
       "code_signed": false,
       "artifacts": [
         {
-          "kind": "installer",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-macos-arm64.dmg",
-          "size_bytes": 40152782,
-          "sha256": "9b13f72c5cdb4e6e3e3ed661d2fecf9c61ab96ac735d01d3f9c790f0df1e16a9"
+          "kind": "portable",
+          "file": "AutoCorrect-Desktop-1.2.0-beta.3-linux-x86_64-portable.tar.gz",
+          "size_bytes": 67055046,
+          "sha256": "daf47fa6648c3903c65f7cabdc8bb57ea3ae7968f154b5ecb4280f15e0a2d13f"
         },
         {
-          "kind": "portable",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-macos-arm64.zip",
-          "size_bytes": 36074574,
-          "sha256": "bb160c5406752e55bf1907ed57c6f91a824a8fcc2e2f5ec7cad70b24c93dced7"
+          "kind": "appimage",
+          "file": "AutoCorrect-Desktop-1.2.0-beta.3-linux-x86_64.AppImage",
+          "size_bytes": 62093816,
+          "sha256": "74b58e62adeefb85725c08457140bbcb914a030b1e81c93526577190c995afbc"
+        },
+        {
+          "kind": "deb",
+          "file": "autocorrect-desktop_1.2.0~beta.3_amd64.deb",
+          "size_bytes": 54243824,
+          "sha256": "1615087c304565653f4126747fb7f62b5b3e83f954a3f50d47496e4d177839c1"
         }
-      ],
-      "notarized": false
+      ]
     }
   },
+  "download_repo": "litlEMPEROR/AutoCorrect",
   "platform": "win64",
   "code_signed": false,
   "artifacts": [
     {
       "kind": "portable",
       "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-portable.zip",
-      "size_bytes": 40917774,
-      "sha256": "8dd168567564567dce41fa17bb42268df526d4c080a1d77fa5fcd580b6a101c1"
+      "size_bytes": 40915767,
+      "sha256": "be78e646ebdbd616d672e61e7f1ecb43303ce79bc3cc38022b664ea2f24bf7b7"
     },
     {
       "kind": "installer",
       "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-setup.exe",
-      "size_bytes": 29702758,
-      "sha256": "ec699d84282049503f23ad466874d384040e1e2c7161259318b316a39453e779"
+      "size_bytes": 29645779,
+      "sha256": "de0cf29d1d6bc520c968e6a5d45962e1de4c5f309f4d611e89ed301ada0b8129"
     }
   ]
 }
