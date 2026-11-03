@@ -1,0 +1,218 @@
+name: Release builds
+
+# One tag (`v<version>-<channel>`, e.g. v1.2.0-beta.3) builds the three platform
+# distributables, signs them when the corresponding secrets are configured,
+# merges the per-platform manifests, attaches everything to a GitHub pre-release
+# and commits the merged manifest to master. That commit is what the website
+# reads: it renders download links as
+#   https://github.com/<repo>/releases/download/<tag>/<file>
+# so binaries never enter git and the site can never advertise a file that was
+# not actually built and published.
+#
+# Secrets (all optional; builds are unsigned without them):
+#   Windows : AC_WIN_SIGN_PFX_BASE64, AC_WIN_SIGN_PFX_PASSWORD
+#   macOS   : AC_MAC_CERT_P12_BASE64, AC_MAC_CERT_PASSWORD, AC_SIGN_IDENTITY,
+#             AC_NOTARY_APPLE_ID, AC_NOTARY_TEAM_ID, AC_NOTARY_PASSWORD
+#   Linux   : AC_MINISIGN_KEY_BASE64, AC_MINISIGN_PASSWORD
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: "Pre-release channel suffix (e.g. beta.3). Builds only; nothing is published."
+        required: true
+        default: "beta.3"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Resolve version and channel
+    runs-on: ubuntu-latest
+    outputs:
+      channel: ${{ steps.meta.outputs.channel }}
+      full_version: ${{ steps.meta.outputs.full_version }}
+      publish: ${{ steps.meta.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: meta
+        shell: bash
+        run: |
+          APP_VERSION=$(python3 -c "import re,pathlib; print(re.search(r'APP_VERSION: str = \"([^\"]+)\"', pathlib.Path('src/autocorrect/version.py').read_text()).group(1))")
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            TAG="${GITHUB_REF_NAME#v}"                 # 1.2.0-beta.3
+            if [[ "$TAG" != "$APP_VERSION-"* ]]; then
+              echo "::error::tag v$TAG does not match APP_VERSION $APP_VERSION in src/autocorrect/version.py"; exit 1
+            fi
+            CHANNEL="${TAG#"$APP_VERSION"-}"          # beta.3
+            PUBLISH=true
+          else
+            CHANNEL="${{ github.event.inputs.channel }}"
+            PUBLISH=false
+          fi
+          echo "channel=$CHANNEL"               >> "$GITHUB_OUTPUT"
+          echo "full_version=$APP_VERSION-$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH"               >> "$GITHUB_OUTPUT"
+          echo "Building $APP_VERSION-$CHANNEL (publish=$PUBLISH)"
+
+  windows:
+    needs: prepare
+    runs-on: windows-latest
+    env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      HAS_PFX: ${{ secrets.AC_WIN_SIGN_PFX_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: python -m pip install -e ".[dev]"
+      - name: Inno Setup
+        run: choco install innosetup --no-progress -y
+      - name: Signing certificate
+        if: env.HAS_PFX == 'true'
+        shell: pwsh
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "codesign.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String("${{ secrets.AC_WIN_SIGN_PFX_BASE64 }}"))
+          "AC_WIN_SIGN_PFX=$pfx" | Out-File -Append $env:GITHUB_ENV
+          "AC_WIN_SIGN_PFX_PASSWORD=${{ secrets.AC_WIN_SIGN_PFX_PASSWORD }}" | Out-File -Append $env:GITHUB_ENV
+      - run: pwsh packaging/build_windows_beta.ps1 -Channel $env:CHANNEL -SkipPublish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: win64
+          path: |
+            dist/installer/*.exe
+            dist/installer/*.zip
+            dist/installer/release-manifest-win64.json
+            dist/installer/packs/
+
+  macos:
+    needs: prepare
+    runs-on: macos-latest
+    env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      HAS_P12: ${{ secrets.AC_MAC_CERT_P12_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - run: python -m pip install -e ".[dev,macos]"
+      - name: Import Developer ID certificate
+        if: env.HAS_P12 == 'true'
+        env:
+          P12_B64: ${{ secrets.AC_MAC_CERT_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.AC_MAC_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/build.keychain-db"
+          KC_PASS="$(openssl rand -hex 16)"
+          security create-keychain -p "$KC_PASS" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KC_PASS" "$KEYCHAIN"
+          echo "$P12_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KC_PASS" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          echo "AC_SIGN_IDENTITY=${{ secrets.AC_SIGN_IDENTITY }}" >> "$GITHUB_ENV"
+          echo "AC_NOTARY_APPLE_ID=${{ secrets.AC_NOTARY_APPLE_ID }}" >> "$GITHUB_ENV"
+          echo "AC_NOTARY_TEAM_ID=${{ secrets.AC_NOTARY_TEAM_ID }}" >> "$GITHUB_ENV"
+          echo "AC_NOTARY_PASSWORD=${{ secrets.AC_NOTARY_PASSWORD }}" >> "$GITHUB_ENV"
+      - run: chmod +x packaging/build_macos_beta.sh && packaging/build_macos_beta.sh --channel "$CHANNEL" --skip-publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: |
+            dist/installer/*.dmg
+            dist/installer/*.zip
+            dist/installer/release-manifest-macos-*.json
+
+  linux:
+    needs: prepare
+    runs-on: ubuntu-latest
+    env:
+      CHANNEL: ${{ needs.prepare.outputs.channel }}
+      HAS_MINISIGN: ${{ secrets.AC_MINISIGN_KEY_BASE64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - name: System packages (X11, GObject/IBus typelib for bundling, packaging tools)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libx11-6 libxtst6 libgirepository1.0-dev gir1.2-ibus-1.0 python3-gi \
+            dpkg-dev fuse libfuse2 minisign
+          curl -fsSL -o /usr/local/bin/appimagetool https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+          sudo chmod +x /usr/local/bin/appimagetool
+      - run: python -m pip install -e ".[dev]" "python-xlib>=0.33" "SecretStorage>=3.3" "jeepney>=0.8" "PyGObject>=3.46"
+      - name: minisign key
+        if: env.HAS_MINISIGN == 'true'
+        run: |
+          echo "${{ secrets.AC_MINISIGN_KEY_BASE64 }}" | base64 --decode > "$RUNNER_TEMP/minisign.key"
+          echo "AC_MINISIGN_KEY=$RUNNER_TEMP/minisign.key" >> "$GITHUB_ENV"
+          echo "MINISIGN_PASSWORD=${{ secrets.AC_MINISIGN_PASSWORD }}" >> "$GITHUB_ENV"
+      - run: chmod +x packaging/build_linux_beta.sh && APPIMAGE_EXTRACT_AND_RUN=1 packaging/build_linux_beta.sh --channel "$CHANNEL" --skip-publish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/installer/*.tar.gz
+            dist/installer/*.AppImage
+            dist/installer/*.deb
+            dist/installer/*.minisig
+            dist/installer/release-manifest-linux-*.json
+
+  publish:
+    name: Publish release and site manifest
+    needs: [prepare, windows, macos, linux]
+    # Publish whatever was built: a platform that failed is simply absent from the
+    # manifest, so the site shows it as "coming soon" instead of a broken link.
+    if: always() && needs.prepare.result == 'success' && (needs.windows.result == 'success' || needs.macos.result == 'success' || needs.linux.result == 'success')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      FULL_VERSION: ${{ needs.prepare.outputs.full_version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.publish == 'true' && 'master' || github.ref }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads-raw
+      - name: Assemble release assets and merged manifest
+        run: |
+          mkdir -p dist/installer
+          find downloads-raw -type f -exec cp {} dist/installer/ \;
+          python -m pipeline.merge_release_manifests --downloads dist/installer --out site/src/data/release-manifest.json
+          ls -la dist/installer
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/installer/
+      - name: GitHub pre-release
+        if: needs.prepare.outputs.publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AutoCorrect Desktop ${{ env.FULL_VERSION }}
+          prerelease: true
+          generate_release_notes: true
+          files: dist/installer/*
+      - name: Commit merged manifest to master (deploys the site)
+        if: needs.prepare.outputs.publish == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site/src/data/release-manifest.json
+          if git diff --cached --quiet; then echo "manifest unchanged"; exit 0; fi
+          git commit -m "Release ${GITHUB_REF_NAME}: publish site manifest"
+          for attempt in 1 2 3; do
+            git push origin HEAD:master && break
+            git pull --rebase origin master
+          done

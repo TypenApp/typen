@@ -1,6 +1,8 @@
-site/public/downloads/*.zip filter=lfs diff=lfs merge=lfs -text
-site/public/downloads/*.exe filter=lfs diff=lfs merge=lfs -text
-site/public/downloads/*.dmg filter=lfs diff=lfs merge=lfs -text
-site/public/downloads/*.tar.gz filter=lfs diff=lfs merge=lfs -text
-site/public/downloads/*.AppImage filter=lfs diff=lfs merge=lfs -text
-site/public/downloads/*.deb filter=lfs diff=lfs merge=lfs -text
+# Shell scripts and macOS property lists must stay LF even on Windows checkouts
+# (bash rejects CRLF shebangs; plutil rejects CRLF in some contexts).
+*.sh text eol=lf
+*.plist text eol=lf
+*.mjs text eol=lf
+
+# Release binaries are never stored in git (not even via LFS). They are attached
+# to GitHub Releases by .github/workflows/release.yml and the site links there.
