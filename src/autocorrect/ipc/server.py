@@ -30,7 +30,7 @@ from autocorrect.ipc.protocol import (
     compute_default_ipc_address,
     create_and_persist_auth_token,
 )
-from autocorrect.licensing.signed_licence import ProductSKU
+from autocorrect.licensing.signed_licence import Edition, current_platform_sku
 from autocorrect.payments.upgrade_pricing import UpgradePricingCalculator
 from autocorrect.productivity.app_profiles import ApplicationProfile
 from autocorrect.version import APP_RELEASE_TIMESTAMP, APP_VERSION, BINARY_SCHEMA_VERSION
@@ -133,11 +133,7 @@ class LocalIPCServer:
             endpoint_meta = {
                 "protocol_version": IPC_PROTOCOL_VERSION,
                 "family": self._family,
-                "address": (
-                    list(self._address)
-                    if isinstance(self._address, tuple)
-                    else self._address
-                ),
+                "address": (list(self._address) if isinstance(self._address, tuple) else self._address),
                 "pid": os.getpid(),
             }
             ep_path = self._data_dir / IPC_ENDPOINT_FILENAME
@@ -250,9 +246,7 @@ class LocalIPCServer:
                 error=f"Unsupported IPC protocol_version '{req.protocol_version}' (expected '{IPC_PROTOCOL_VERSION}')",
             )
 
-        if not self._auth_token or not hmac.compare_digest(
-            req.auth_token, self._auth_token
-        ):
+        if not self._auth_token or not hmac.compare_digest(req.auth_token, self._auth_token):
             return IPCResponse(
                 request_id=req.request_id,
                 ok=False,
@@ -274,6 +268,11 @@ class LocalIPCServer:
                 error=str(exc),
             )
 
+    def _require_pro(self, feature: str) -> None:
+        """Raise unless the current entitlement unlocks Pro features."""
+        if not self._daemon.entitlement_manager.is_pro_enabled():
+            raise PermissionError(f"{feature} require a Pro Edition licence (or the active 14-day trial).")
+
     def _dispatch(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         d = self._daemon
         prefs = d.preference_store
@@ -286,6 +285,7 @@ class LocalIPCServer:
             return {
                 "app_version": APP_VERSION,
                 "hooks_active": d.hooks_active,
+                "hook_status": d.hook_status.to_dict(),
                 "is_paused": d.session.is_paused,
                 "active_region": prefs.overlay.active_region.name or "EN_GB",
                 "custom_word_count": len(prefs.list_custom_words()),
@@ -299,9 +299,7 @@ class LocalIPCServer:
                     "pro_features_enabled": snap.pro_features_enabled,
                     "can_download_new_updates": snap.can_download_new_updates,
                     "updates_expire_at": (
-                        snap.updates_expire_at.isoformat()
-                        if snap.updates_expire_at
-                        else None
+                        snap.updates_expire_at.isoformat() if snap.updates_expire_at else None
                     ),
                     "status_message": snap.status_message,
                 },
@@ -323,7 +321,10 @@ class LocalIPCServer:
             return {"is_paused": d.session.is_paused, "hooks_active": d.hooks_active}
 
         if method == "insights.set_enabled":
-            d.insights.set_enabled(bool(params.get("enabled", True)))
+            enabled = bool(params.get("enabled", True))
+            if enabled:
+                self._require_pro("Local typing insights")
+            d.insights.set_enabled(enabled)
             return {"enabled": d.insights.enabled}
 
         if method == "insights.reset":
@@ -349,9 +350,7 @@ class LocalIPCServer:
                 if not d.dry_run_hooks:
                     StartupManager.set_launch_at_login(enabled)
             if "show_tray_icon" in params:
-                prefs.set_setting(
-                    "show_tray_icon", "true" if params["show_tray_icon"] else "false"
-                )
+                prefs.set_setting("show_tray_icon", "true" if params["show_tray_icon"] else "false")
             for hk_key in ("rewrite_hotkey", "pause_hotkey", "settings_hotkey"):
                 if hk_key in params and str(params[hk_key]).strip():
                     prefs.set_setting(hk_key, str(params[hk_key]).strip())
@@ -487,30 +486,23 @@ class LocalIPCServer:
         if method == "languages.set_domain_packs":
             raw_packs = params.get("pack_ids", [])
             pack_set = {str(p).strip().lower() for p in raw_packs if str(p).strip()}
-            d.resource_manager.set_enabled_domain_packs(pack_set)
+            if pack_set:
+                self._require_pro("Domain vocabulary packs")
+            d.set_user_domain_packs(pack_set)
             prefs.set_setting("enabled_domain_packs", ",".join(sorted(pack_set)))
             return self._dispatch("languages.get_state", {})
 
         # --- 5. Corrections, Sensitivity, Rejected & Preferred Variants ------
         if method == "corrections.get_state":
             return {
-                "enable_punctuation_assist": prefs.get_setting(
-                    "enable_punctuation_assist", "true"
-                )
+                "enable_punctuation_assist": prefs.get_setting("enable_punctuation_assist", "true") == "true",
+                "enable_double_space_period": prefs.get_setting("enable_double_space_period", "true")
                 == "true",
-                "enable_double_space_period": prefs.get_setting(
-                    "enable_double_space_period", "true"
-                )
-                == "true",
-                "enable_auto_capitalise": prefs.get_setting(
-                    "enable_auto_capitalise", "true"
-                )
-                == "true",
+                "enable_auto_capitalise": prefs.get_setting("enable_auto_capitalise", "true") == "true",
                 "aggressiveness": float(prefs.get_setting("aggressiveness", "1.0")),
                 "rejected_corrections": prefs.list_rejected_corrections(),
                 "preferred_variants": [
-                    {"source": k, "preferred": v}
-                    for k, v in prefs.list_preferred_variants().items()
+                    {"source": k, "preferred": v} for k, v in prefs.list_preferred_variants().items()
                 ],
             }
 
@@ -521,13 +513,9 @@ class LocalIPCServer:
             agg = params.get("aggressiveness")
 
             if punct is not None:
-                prefs.set_setting(
-                    "enable_punctuation_assist", "true" if punct else "false"
-                )
+                prefs.set_setting("enable_punctuation_assist", "true" if punct else "false")
             if dbl is not None:
-                prefs.set_setting(
-                    "enable_double_space_period", "true" if dbl else "false"
-                )
+                prefs.set_setting("enable_double_space_period", "true" if dbl else "false")
             if cap is not None:
                 prefs.set_setting("enable_auto_capitalise", "true" if cap else "false")
             if agg is not None:
@@ -584,8 +572,7 @@ class LocalIPCServer:
                     "total_ram_mb": hw.total_ram_mb,
                     "accelerator": hw.accelerator,
                     "recommended_model_id": hw.recommended_model_id,
-                    "pause_pill_enabled": prefs.get_setting("pause_pill_enabled", "true")
-                    == "true",
+                    "pause_pill_enabled": prefs.get_setting("pause_pill_enabled", "true") == "true",
                 },
                 "byok": {
                     "local_only_mode": d.spending_controller.local_only_mode,
@@ -641,11 +628,7 @@ class LocalIPCServer:
                     "true" if params["pause_pill_enabled"] else "false",
                 )
             if "daily_limit_usd" in params or "monthly_limit_usd" in params:
-                d_str = str(
-                    params.get(
-                        "daily_limit_usd", prefs.get_setting("daily_limit_usd", "2.00")
-                    )
-                )
+                d_str = str(params.get("daily_limit_usd", prefs.get_setting("daily_limit_usd", "2.00")))
                 m_str = str(
                     params.get(
                         "monthly_limit_usd",
@@ -686,6 +669,7 @@ class LocalIPCServer:
             }
 
         if method == "profiles.upsert":
+            self._require_pro("Per-application profiles")
             app_id = str(params.get("app_identifier", "")).strip().lower()
             if not app_id:
                 raise ValueError("app_identifier is required")
@@ -693,17 +677,11 @@ class LocalIPCServer:
                 app_identifier=app_id,
                 display_name=str(params.get("display_name") or app_id).strip(),
                 enabled=bool(params.get("enabled", True)),
-                enable_punctuation_assist=bool(
-                    params.get("enable_punctuation_assist", True)
-                ),
-                enable_double_space_period=bool(
-                    params.get("enable_double_space_period", True)
-                ),
+                enable_punctuation_assist=bool(params.get("enable_punctuation_assist", True)),
+                enable_double_space_period=bool(params.get("enable_double_space_period", True)),
                 enable_auto_capitalise=bool(params.get("enable_auto_capitalise", True)),
                 aggressiveness=float(params.get("aggressiveness", 1.0)),
-                active_domain_packs=frozenset(
-                    str(x) for x in params.get("active_domain_packs", [])
-                ),
+                active_domain_packs=frozenset(str(x) for x in params.get("active_domain_packs", [])),
             )
             d.app_profiles.set_profile(prof)
             return self._dispatch("profiles.list", {})
@@ -728,12 +706,11 @@ class LocalIPCServer:
             }
 
         if method == "snippets.upsert":
+            self._require_pro("Text-expansion snippets")
             trigger = str(params.get("trigger", "")).strip()
             expansion = str(params.get("expansion", ""))
             desc = str(params.get("description", "")).strip()
-            d.snippet_engine.add_snippet(
-                trigger=trigger, expansion=expansion, description=desc
-            )
+            d.snippet_engine.add_snippet(trigger=trigger, expansion=expansion, description=desc)
             return self._dispatch("snippets.list", {})
 
         if method == "snippets.delete":
@@ -768,9 +745,7 @@ class LocalIPCServer:
                 "entitlement": {
                     "can_download_new_updates": snap.can_download_new_updates,
                     "updates_expire_at": (
-                        snap.updates_expire_at.isoformat()
-                        if snap.updates_expire_at
-                        else None
+                        snap.updates_expire_at.isoformat() if snap.updates_expire_at else None
                     ),
                 },
             }
@@ -784,42 +759,28 @@ class LocalIPCServer:
             snap = d.entitlement_manager.evaluate()
             cert = d.entitlement_manager.active_certificate
             calc = UpgradePricingCalculator(d.pricing_config)
-            std_quote = calc.calculate_quote(
-                ProductSKU.STANDARD_WIN, existing_cert=cert
-            )
-            pro_quote = calc.calculate_quote(ProductSKU.PRO_WIN, existing_cert=cert)
+            std_quote = calc.calculate_quote(current_platform_sku(Edition.STANDARD), existing_cert=cert)
+            pro_quote = calc.calculate_quote(current_platform_sku(Edition.PRO), existing_cert=cert)
             return {
                 "mode": snap.mode,
                 "status_message": snap.status_message,
                 "typing_assistance_enabled": snap.typing_assistance_enabled,
                 "pro_features_enabled": snap.pro_features_enabled,
                 "can_download_new_updates": snap.can_download_new_updates,
-                "updates_expire_at": (
-                    snap.updates_expire_at.isoformat()
-                    if snap.updates_expire_at
-                    else None
-                ),
+                "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
                 "device_id_hash": d.device_id_hash,
-                "certificate": (
-                    cert.to_unsigned_dict() if cert is not None else None
-                ),
+                "certificate": (cert.to_unsigned_dict() if cert is not None else None),
                 "pricing": {
                     "currency": d.pricing_config.primary_currency,
                     "standard_quote_usd": std_quote.final_amount_str,
                     "standard_upgrade_type": std_quote.upgrade_type.value,
                     "pro_quote_usd": pro_quote.final_amount_str,
                     "pro_upgrade_type": pro_quote.upgrade_type.value,
-                    "renewal_discount_pct": int(
-                        d.pricing_config.renewal_discount_fraction * 100
-                    ),
+                    "renewal_discount_pct": int(d.pricing_config.renewal_discount_fraction * 100),
                     "regional_standard": {
-                        k: f"{v:.2f}"
-                        for k, v in d.pricing_config.standard_regional_prices.items()
+                        k: f"{v:.2f}" for k, v in d.pricing_config.standard_regional_prices.items()
                     },
-                    "regional_pro": {
-                        k: f"{v:.2f}"
-                        for k, v in d.pricing_config.pro_regional_prices.items()
-                    },
+                    "regional_pro": {k: f"{v:.2f}" for k, v in d.pricing_config.pro_regional_prices.items()},
                 },
             }
 

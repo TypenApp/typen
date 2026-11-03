@@ -68,9 +68,7 @@ class PreferenceMemoryOverlay:
         with self._lock:
             self._custom_words.pop(word.strip().lower(), None)
 
-    def note_reverted_word(
-        self, word: str, corrected_to: str = "", *, _from_store: bool = False
-    ) -> None:
+    def note_reverted_word(self, word: str, corrected_to: str = "", *, _from_store: bool = False) -> None:
         """
         Quietly record a reverted single-token word as a candidate for 'Add to Dictionary'
         without interrupting typing or automatically pardoning subsequent instances.
@@ -99,9 +97,7 @@ class PreferenceMemoryOverlay:
         if sink is not None:
             sink(cleaned, corr_cleaned)
 
-    def load_suggested_word(
-        self, display_word: str, corrected_to: str, revert_count: int
-    ) -> None:
+    def load_suggested_word(self, display_word: str, corrected_to: str, revert_count: int) -> None:
         cleaned = display_word.strip()
         if not cleaned:
             return
@@ -132,9 +128,7 @@ class PreferenceMemoryOverlay:
 
     def set_preferred_variant(self, source_word: str, preferred_word: str) -> None:
         with self._lock:
-            self._preferred_variants[source_word.strip().lower()] = (
-                preferred_word.strip().lower()
-            )
+            self._preferred_variants[source_word.strip().lower()] = preferred_word.strip().lower()
 
     def remove_preferred_variant(self, source_word: str) -> None:
         with self._lock:
@@ -142,10 +136,7 @@ class PreferenceMemoryOverlay:
 
     def list_rejected_pairs(self) -> list[dict[str, str]]:
         with self._lock:
-            return [
-                {"original": o, "candidate": c}
-                for o, c in sorted(self._rejected_pairs)
-            ]
+            return [{"original": o, "candidate": c} for o, c in sorted(self._rejected_pairs)]
 
     def list_preferred_variants(self) -> dict[str, str]:
         with self._lock:
@@ -163,9 +154,6 @@ class PreferenceMemoryOverlay:
             return {
                 "region": self._active_region.name or "EN_GB",
                 "custom_words": dict(self._custom_words),
-                "rejected_pairs": [
-                    {"original": o, "candidate": c}
-                    for o, c in sorted(self._rejected_pairs)
-                ],
+                "rejected_pairs": [{"original": o, "candidate": c} for o, c in sorted(self._rejected_pairs)],
                 "preferred_variants": dict(self._preferred_variants),
             }

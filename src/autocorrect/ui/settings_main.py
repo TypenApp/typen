@@ -24,20 +24,23 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-
 from autocorrect.ai.api_key_manager import ApiKeyManager
 from autocorrect.ai.local_model_manager import LocalModelManager
 from autocorrect.ai.provider_manager import AIProviderId
 from autocorrect.ai.spending_controls import SpendingController
 from autocorrect.ai.usage_tracker import UsageTracker
 from autocorrect.ipc.client import LocalIPCClient
-from autocorrect.ipc.protocol import IPC_ENDPOINT_FILENAME
+from autocorrect.ipc.protocol import IPC_ENDPOINT_FILENAME, IPCConnectionError, IPCError
 from autocorrect.ipc.server import AVAILABLE_DOMAIN_PACK_METADATA
 from autocorrect.licensing.activation_manager import compute_local_device_id_hash
 from autocorrect.licensing.entitlement_manager import EntitlementManager
 from autocorrect.licensing.licence_service import LicenceService
-from autocorrect.licensing.signed_licence import ProductSKU, SignedLicenceCertificate
+from autocorrect.licensing.root_key import load_root_public_key
+from autocorrect.licensing.signed_licence import (
+    Edition,
+    SignedLicenceCertificate,
+    current_platform_sku,
+)
 from autocorrect.licensing.trial_manager import TrialManager
 from autocorrect.payments.pricing_config import PricingConfig
 from autocorrect.payments.upgrade_pricing import UpgradePricingCalculator
@@ -81,17 +84,14 @@ class SettingsController:
         self._api_keys = ApiKeyManager(use_memory_backend=use_memory_keyring)
         self._usage_tracker = UsageTracker(self._data_dir / "ai_usage.sqlite3")
         self._spending = SpendingController(usage_tracker=self._usage_tracker)
-        self._local_ai = LocalModelManager(is_pro_entitled=True)
+        self._local_ai = LocalModelManager(is_pro_entitled=False)  # synced from entitlement below
         self._profiles = ApplicationProfileManager()
         self._snippets = SnippetEngine()
         self._insights = LocalInsightsStore(enabled=True)
         self._pricing_config = PricingConfig()
         self._device_id_hash = compute_local_device_id_hash()
 
-        default_priv = Ed25519PrivateKey.from_private_bytes(
-            b"AutoCorrect-Embedded-Root-Key-v1"
-        )
-        self._public_key = default_priv.public_key()
+        self._public_key = load_root_public_key()
         self._trial_mgr = TrialManager(
             trial_file_path=self._data_dir / "licence" / "trial.dat",
             device_id_hash=self._device_id_hash,
@@ -107,6 +107,18 @@ class SettingsController:
             entitlement_manager=self._entitlement_mgr,
             device_id_hash=self._device_id_hash,
         )
+        self._licence_service.load_cached_licence_offline()
+        self._local_ai.set_pro_entitled(self._entitlement_mgr.is_pro_enabled())
+
+    def _offline_pro_enabled(self) -> bool:
+        """Entitlement as seen by the UI process when the daemon is offline (same signed sources)."""
+        snap = self._licence_service.load_cached_licence_offline()
+        self._local_ai.set_pro_entitled(snap.pro_features_enabled)
+        return snap.pro_features_enabled
+
+    def _offline_require_pro(self, feature: str) -> None:
+        if not self._offline_pro_enabled():
+            raise PermissionError(f"{feature} require a Pro Edition licence (or the active 14-day trial).")
 
     @property
     def preferences(self) -> SQLitePreferenceStore:
@@ -126,15 +138,19 @@ class SettingsController:
             return False
         return self._ipc_client.is_daemon_online()
 
-    def _call_ipc_if_online(
-        self, method: str, params: dict[str, Any] | None = None
-    ) -> dict[str, Any] | None:
+    def _call_ipc_if_online(self, method: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:
         if not (self._data_dir / IPC_ENDPOINT_FILENAME).exists():
             return None
         try:
             return self._ipc_client.call(method, params or {}, retries=1)
-        except Exception:
-            return None
+        except IPCConnectionError:
+            return None  # daemon offline: use the direct-SQLite fallback
+        except IPCError as exc:
+            # The daemon answered and *refused* (e.g. Pro gate). Never fall back to
+            # the offline path here, or the UI would silently bypass the gate.
+            if "Pro Edition" in str(exc):
+                raise PermissionError(str(exc)) from exc
+            raise
 
     def get_settings_summary(self) -> dict[str, object]:
         self._prefs.reload_into_overlay()
@@ -162,6 +178,12 @@ class SettingsController:
         return {
             "app_version": APP_VERSION,
             "hooks_active": False,
+            "hook_status": {
+                "state": "inactive",
+                "backend": "",
+                "detail": "The background service is not running.",
+                "remediation": "Start AutoCorrect Desktop (it normally launches at login).",
+            },
             "is_paused": self._prefs.get_setting("is_paused", "false") == "true",
             "active_region": self._prefs.overlay.active_region.name or "EN_GB",
             "custom_word_count": len(self._prefs.list_custom_words()),
@@ -174,11 +196,7 @@ class SettingsController:
                 "typing_assistance_enabled": snap.typing_assistance_enabled,
                 "pro_features_enabled": snap.pro_features_enabled,
                 "can_download_new_updates": snap.can_download_new_updates,
-                "updates_expire_at": (
-                    snap.updates_expire_at.isoformat()
-                    if snap.updates_expire_at
-                    else None
-                ),
+                "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
                 "status_message": snap.status_message,
             },
             "insights": {
@@ -222,17 +240,11 @@ class SettingsController:
         if ipc_res is not None:
             return ipc_res
         return {
-            "launch_at_login": self._prefs.get_setting("launch_at_login", "false")
-            == "true",
-            "show_tray_icon": self._prefs.get_setting("show_tray_icon", "true")
-            == "true",
-            "rewrite_hotkey": self._prefs.get_setting(
-                "rewrite_hotkey", "Ctrl+Shift+R"
-            ),
+            "launch_at_login": self._prefs.get_setting("launch_at_login", "false") == "true",
+            "show_tray_icon": self._prefs.get_setting("show_tray_icon", "true") == "true",
+            "rewrite_hotkey": self._prefs.get_setting("rewrite_hotkey", "Ctrl+Shift+R"),
             "pause_hotkey": self._prefs.get_setting("pause_hotkey", "Ctrl+Alt+P"),
-            "settings_hotkey": self._prefs.get_setting(
-                "settings_hotkey", "Ctrl+Alt+,"
-            ),
+            "settings_hotkey": self._prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"),
         }
 
     def update_general_settings(
@@ -261,13 +273,9 @@ class SettingsController:
             return ipc_res
 
         if launch_at_login is not None:
-            self._prefs.set_setting(
-                "launch_at_login", "true" if launch_at_login else "false"
-            )
+            self._prefs.set_setting("launch_at_login", "true" if launch_at_login else "false")
         if show_tray_icon is not None:
-            self._prefs.set_setting(
-                "show_tray_icon", "true" if show_tray_icon else "false"
-            )
+            self._prefs.set_setting("show_tray_icon", "true" if show_tray_icon else "false")
         if rewrite_hotkey is not None and rewrite_hotkey.strip():
             self._prefs.set_setting("rewrite_hotkey", rewrite_hotkey.strip())
         if pause_hotkey is not None and pause_hotkey.strip():
@@ -308,9 +316,7 @@ class SettingsController:
         """Add a manually typed word to the custom dictionary and return the list."""
         cleaned = word.strip()
         if cleaned and len(cleaned) <= 64 and " " not in cleaned:
-            ipc_res = self._call_ipc_if_online(
-                "dictionary.add_word", {"word": cleaned, "category": category}
-            )
+            ipc_res = self._call_ipc_if_online("dictionary.add_word", {"word": cleaned, "category": category})
             if ipc_res is not None and isinstance(ipc_res.get("words"), list):
                 self._prefs.reload_into_overlay()
                 return [str(w) for w in ipc_res["words"]]
@@ -335,9 +341,7 @@ class SettingsController:
 
     def accept_suggested_word(self, word: str) -> list[str]:
         """Promote a suggested reverted word into the user's custom dictionary."""
-        ipc_res = self._call_ipc_if_online(
-            "dictionary.accept_suggested", {"word": word}
-        )
+        ipc_res = self._call_ipc_if_online("dictionary.accept_suggested", {"word": word})
         if ipc_res is not None and isinstance(ipc_res.get("words"), list):
             self._prefs.reload_into_overlay()
             return [str(w) for w in ipc_res["words"]]
@@ -346,9 +350,7 @@ class SettingsController:
 
     def dismiss_suggested_word(self, word: str) -> list[dict[str, object]]:
         """Dismiss a suggested word without adding it to the custom dictionary."""
-        ipc_res = self._call_ipc_if_online(
-            "dictionary.dismiss_suggested", {"word": word}
-        )
+        ipc_res = self._call_ipc_if_online("dictionary.dismiss_suggested", {"word": word})
         if ipc_res is not None and isinstance(ipc_res.get("suggested"), list):
             self._prefs.reload_into_overlay()
             return [dict(item) for item in ipc_res["suggested"]]
@@ -409,13 +411,11 @@ class SettingsController:
                 }
                 for m in AVAILABLE_DOMAIN_PACK_METADATA
             ],
-            "pro_enabled": True,
+            "pro_enabled": self._offline_pro_enabled(),
         }
 
     def set_region(self, region_code: str) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online(
-            "languages.set_region", {"region": region_code}
-        )
+        ipc_res = self._call_ipc_if_online("languages.set_region", {"region": region_code})
         if ipc_res is not None:
             self._prefs.reload_into_overlay()
             return ipc_res
@@ -424,11 +424,11 @@ class SettingsController:
 
     def set_enabled_domain_packs(self, pack_ids: list[str] | set[str]) -> dict[str, Any]:
         norm = sorted({str(p).strip().lower() for p in pack_ids if str(p).strip()})
-        ipc_res = self._call_ipc_if_online(
-            "languages.set_domain_packs", {"pack_ids": norm}
-        )
+        ipc_res = self._call_ipc_if_online("languages.set_domain_packs", {"pack_ids": norm})
         if ipc_res is not None:
             return ipc_res
+        if norm:
+            self._offline_require_pro("Domain vocabulary packs")
         self._prefs.set_setting("enabled_domain_packs", ",".join(norm))
         return self.get_languages_state()
 
@@ -440,23 +440,15 @@ class SettingsController:
         if ipc_res is not None:
             return ipc_res
         return {
-            "enable_punctuation_assist": self._prefs.get_setting(
-                "enable_punctuation_assist", "true"
-            )
+            "enable_punctuation_assist": self._prefs.get_setting("enable_punctuation_assist", "true")
             == "true",
-            "enable_double_space_period": self._prefs.get_setting(
-                "enable_double_space_period", "true"
-            )
+            "enable_double_space_period": self._prefs.get_setting("enable_double_space_period", "true")
             == "true",
-            "enable_auto_capitalise": self._prefs.get_setting(
-                "enable_auto_capitalise", "true"
-            )
-            == "true",
+            "enable_auto_capitalise": self._prefs.get_setting("enable_auto_capitalise", "true") == "true",
             "aggressiveness": float(self._prefs.get_setting("aggressiveness", "1.0")),
             "rejected_corrections": self._prefs.list_rejected_corrections(),
             "preferred_variants": [
-                {"source": k, "preferred": v}
-                for k, v in self._prefs.list_preferred_variants().items()
+                {"source": k, "preferred": v} for k, v in self._prefs.list_preferred_variants().items()
             ],
         }
 
@@ -493,9 +485,7 @@ class SettingsController:
                 "true" if enable_double_space_period else "false",
             )
         if enable_auto_capitalise is not None:
-            self._prefs.set_setting(
-                "enable_auto_capitalise", "true" if enable_auto_capitalise else "false"
-            )
+            self._prefs.set_setting("enable_auto_capitalise", "true" if enable_auto_capitalise else "false")
         if aggressiveness is not None:
             clamped = max(0.5, min(1.5, float(aggressiveness)))
             self._prefs.set_setting("aggressiveness", f"{clamped:.2f}")
@@ -511,9 +501,7 @@ class SettingsController:
         self._prefs.add_rejected_correction(original, candidate)
         return self.get_corrections_state()
 
-    def remove_rejected_correction(
-        self, original: str, candidate: str
-    ) -> dict[str, Any]:
+    def remove_rejected_correction(self, original: str, candidate: str) -> dict[str, Any]:
         ipc_res = self._call_ipc_if_online(
             "corrections.remove_rejected",
             {"original": original, "candidate": candidate},
@@ -536,9 +524,7 @@ class SettingsController:
         return self.get_corrections_state()
 
     def remove_preferred_variant(self, source: str) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online(
-            "corrections.remove_preferred_variant", {"source": source}
-        )
+        ipc_res = self._call_ipc_if_online("corrections.remove_preferred_variant", {"source": source})
         if ipc_res is not None:
             self._prefs.reload_into_overlay()
             return ipc_res
@@ -555,38 +541,24 @@ class SettingsController:
         hw = self._local_ai.detect_hardware_profile()
         day_u = self._usage_tracker.get_summary_since(0.0)
         return {
-            "pro_enabled": True,
+            "pro_enabled": self._offline_pro_enabled(),
             "local_ai": {
                 "model_loaded": self._local_ai.is_model_loaded,
                 "cpu_cores": hw.cpu_cores,
                 "total_ram_mb": hw.total_ram_mb,
                 "accelerator": hw.accelerator,
                 "recommended_model_id": hw.recommended_model_id,
-                "pause_pill_enabled": self._prefs.get_setting(
-                    "pause_pill_enabled", "true"
-                )
-                == "true",
+                "pause_pill_enabled": self._prefs.get_setting("pause_pill_enabled", "true") == "true",
             },
             "byok": {
-                "local_only_mode": self._prefs.get_setting("local_only_mode", "false")
-                == "true",
-                "global_cloud_consent": self._prefs.get_setting(
-                    "global_cloud_consent", "false"
-                )
-                == "true",
+                "local_only_mode": self._prefs.get_setting("local_only_mode", "false") == "true",
+                "global_cloud_consent": self._prefs.get_setting("global_cloud_consent", "false") == "true",
                 "daily_limit_usd": self._prefs.get_setting("daily_limit_usd", "2.00"),
-                "monthly_limit_usd": self._prefs.get_setting(
-                    "monthly_limit_usd", "15.00"
-                ),
-                "active_provider": self._prefs.get_setting(
-                    "active_ai_provider", "openai"
-                ),
-                "active_model": self._prefs.get_setting(
-                    "active_ai_model", "gpt-4o-mini"
-                ),
+                "monthly_limit_usd": self._prefs.get_setting("monthly_limit_usd", "15.00"),
+                "active_provider": self._prefs.get_setting("active_ai_provider", "openai"),
+                "active_model": self._prefs.get_setting("active_ai_model", "gpt-4o-mini"),
                 "providers": {
-                    p.value: {"has_key": self._api_keys.has_api_key(p.value)}
-                    for p in AIProviderId
+                    p.value: {"has_key": self._api_keys.has_api_key(p.value)} for p in AIProviderId
                 },
                 "usage_24h": {
                     "requests": day_u.total_requests,
@@ -604,9 +576,7 @@ class SettingsController:
         }
 
     def set_byok_api_key(self, provider: str, api_key: str) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online(
-            "ai.set_api_key", {"provider": provider, "api_key": api_key}
-        )
+        ipc_res = self._call_ipc_if_online("ai.set_api_key", {"provider": provider, "api_key": api_key})
         if ipc_res is not None:
             return ipc_res
         prov = provider.strip().lower()
@@ -658,25 +628,15 @@ class SettingsController:
 
         if local_only_mode is not None:
             self._spending.set_local_only_mode(local_only_mode)
-            self._prefs.set_setting(
-                "local_only_mode", "true" if local_only_mode else "false"
-            )
+            self._prefs.set_setting("local_only_mode", "true" if local_only_mode else "false")
         if global_cloud_consent is not None:
-            self._prefs.set_setting(
-                "global_cloud_consent", "true" if global_cloud_consent else "false"
-            )
+            self._prefs.set_setting("global_cloud_consent", "true" if global_cloud_consent else "false")
         if pause_pill_enabled is not None:
-            self._prefs.set_setting(
-                "pause_pill_enabled", "true" if pause_pill_enabled else "false"
-            )
+            self._prefs.set_setting("pause_pill_enabled", "true" if pause_pill_enabled else "false")
         if daily_limit_usd is not None:
-            self._prefs.set_setting(
-                "daily_limit_usd", f"{Decimal(str(daily_limit_usd)):.2f}"
-            )
+            self._prefs.set_setting("daily_limit_usd", f"{Decimal(str(daily_limit_usd)):.2f}")
         if monthly_limit_usd is not None:
-            self._prefs.set_setting(
-                "monthly_limit_usd", f"{Decimal(str(monthly_limit_usd)):.2f}"
-            )
+            self._prefs.set_setting("monthly_limit_usd", f"{Decimal(str(monthly_limit_usd)):.2f}")
         if active_provider is not None:
             self._prefs.set_setting("active_ai_provider", active_provider)
         if active_model is not None:
@@ -733,6 +693,7 @@ class SettingsController:
         ipc_res = self._call_ipc_if_online("profiles.upsert", payload)
         if ipc_res is not None and isinstance(ipc_res.get("profiles"), list):
             return list(ipc_res["profiles"])
+        self._offline_require_pro("Per-application profiles")
         self._profiles.set_profile(
             ApplicationProfile(
                 app_identifier=app_identifier.strip().lower(),
@@ -748,9 +709,7 @@ class SettingsController:
         return self.list_app_profiles()
 
     def delete_app_profile(self, app_identifier: str) -> list[dict[str, Any]]:
-        ipc_res = self._call_ipc_if_online(
-            "profiles.delete", {"app_identifier": app_identifier}
-        )
+        ipc_res = self._call_ipc_if_online("profiles.delete", {"app_identifier": app_identifier})
         if ipc_res is not None and isinstance(ipc_res.get("profiles"), list):
             return list(ipc_res["profiles"])
         self._profiles.remove_profile(app_identifier)
@@ -772,18 +731,15 @@ class SettingsController:
             for s in self._snippets.list_snippets()
         ]
 
-    def upsert_snippet(
-        self, trigger: str, expansion: str, description: str = ""
-    ) -> list[dict[str, str]]:
+    def upsert_snippet(self, trigger: str, expansion: str, description: str = "") -> list[dict[str, str]]:
         ipc_res = self._call_ipc_if_online(
             "snippets.upsert",
             {"trigger": trigger, "expansion": expansion, "description": description},
         )
         if ipc_res is not None and isinstance(ipc_res.get("snippets"), list):
             return list(ipc_res["snippets"])
-        self._snippets.add_snippet(
-            trigger=trigger, expansion=expansion, description=description
-        )
+        self._offline_require_pro("Text-expansion snippets")
+        self._snippets.add_snippet(trigger=trigger, expansion=expansion, description=description)
         return self.list_snippets()
 
     def delete_snippet(self, trigger: str) -> list[dict[str, str]]:
@@ -822,11 +778,7 @@ class SettingsController:
             },
             "entitlement": {
                 "can_download_new_updates": snap.can_download_new_updates,
-                "updates_expire_at": (
-                    snap.updates_expire_at.isoformat()
-                    if snap.updates_expire_at
-                    else None
-                ),
+                "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
             },
         }
 
@@ -846,17 +798,15 @@ class SettingsController:
         snap = self._licence_service.load_cached_licence_offline()
         cert = self._entitlement_mgr.active_certificate
         calc = UpgradePricingCalculator(self._pricing_config)
-        std_q = calc.calculate_quote(ProductSKU.STANDARD_WIN, existing_cert=cert)
-        pro_q = calc.calculate_quote(ProductSKU.PRO_WIN, existing_cert=cert)
+        std_q = calc.calculate_quote(current_platform_sku(Edition.STANDARD), existing_cert=cert)
+        pro_q = calc.calculate_quote(current_platform_sku(Edition.PRO), existing_cert=cert)
         return {
             "mode": snap.mode,
             "status_message": snap.status_message,
             "typing_assistance_enabled": snap.typing_assistance_enabled,
             "pro_features_enabled": snap.pro_features_enabled,
             "can_download_new_updates": snap.can_download_new_updates,
-            "updates_expire_at": (
-                snap.updates_expire_at.isoformat() if snap.updates_expire_at else None
-            ),
+            "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
             "device_id_hash": self._device_id_hash,
             "certificate": cert.to_unsigned_dict() if cert is not None else None,
             "pricing": {
@@ -865,17 +815,11 @@ class SettingsController:
                 "standard_upgrade_type": std_q.upgrade_type.value,
                 "pro_quote_usd": pro_q.final_amount_str,
                 "pro_upgrade_type": pro_q.upgrade_type.value,
-                "renewal_discount_pct": int(
-                    self._pricing_config.renewal_discount_fraction * 100
-                ),
+                "renewal_discount_pct": int(self._pricing_config.renewal_discount_fraction * 100),
                 "regional_standard": {
-                    k: f"{v:.2f}"
-                    for k, v in self._pricing_config.standard_regional_prices.items()
+                    k: f"{v:.2f}" for k, v in self._pricing_config.standard_regional_prices.items()
                 },
-                "regional_pro": {
-                    k: f"{v:.2f}"
-                    for k, v in self._pricing_config.pro_regional_prices.items()
-                },
+                "regional_pro": {k: f"{v:.2f}" for k, v in self._pricing_config.pro_regional_prices.items()},
             },
         }
 
@@ -947,12 +891,8 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
                     controller.delete_custom_word(listbox.get(sel[0]))
                     refresh_list()
 
-            ttk.Button(add_row, text="Add Word", command=on_add).pack(
-                side="left", padx=(8, 0)
-            )
-            ttk.Button(tab, text="Delete Selected Word", command=on_delete).pack(
-                anchor="w"
-            )
+            ttk.Button(add_row, text="Add Word", command=on_add).pack(side="left", padx=(8, 0))
+            ttk.Button(tab, text="Delete Selected Word", command=on_delete).pack(anchor="w")
             refresh_list()
         else:
             ov = controller.get_overview()
@@ -967,15 +907,13 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="AutoCorrect Desktop Settings")
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=Path.home() / ".autocorrect_desktop",
-    )
+    parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--headless-check", action="store_true")
     args = parser.parse_args(argv)
 
-    controller = SettingsController(args.data_dir, use_memory_keyring=args.headless_check)
+    from autocorrect.platform_paths import resolve_data_dir
+
+    controller = SettingsController(resolve_data_dir(args.data_dir), use_memory_keyring=args.headless_check)
     if args.headless_check:
         summary = controller.get_settings_summary()
         print(f"Settings OK: {summary}")

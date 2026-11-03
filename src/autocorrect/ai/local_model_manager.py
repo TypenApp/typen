@@ -57,7 +57,21 @@ SENTENCE_GRAMMAR_PATTERNS: Final[list[tuple[re.Pattern[str], str, str]]] = [
 
 # Words starting with vowel letters that actually have consonant initial sounds ('a user', 'a university', 'a one-time')
 VOWEL_LETTER_CONSONANT_SOUND: Final[frozenset[str]] = frozenset(
-    {"user", "users", "university", "universal", "unique", "unit", "united", "union", "uniform", "utility", "one", "once", "european"}
+    {
+        "user",
+        "users",
+        "university",
+        "universal",
+        "unique",
+        "unit",
+        "united",
+        "union",
+        "uniform",
+        "utility",
+        "one",
+        "once",
+        "european",
+    }
 )
 
 

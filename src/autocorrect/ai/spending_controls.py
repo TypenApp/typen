@@ -58,9 +58,7 @@ class SpendingController:
         Raises `LocalOnlyLockdownError` or `SpendLimitExceededError` if blocked.
         """
         if self._local_only_mode:
-            raise LocalOnlyLockdownError(
-                "Cloud AI is blocked because Local-Only Mode is enabled."
-            )
+            raise LocalOnlyLockdownError("Cloud AI is blocked because Local-Only Mode is enabled.")
 
         now = now_utc if now_utc is not None else time.time()
 

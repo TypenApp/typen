@@ -115,9 +115,17 @@ def compute_default_ipc_address(data_dir: Path) -> tuple[str, str]:
     if sys.platform == "win32":
         return (rf"\\.\pipe\AutoCorrectIPC_{dir_hash}", "AF_PIPE")
     sock_path = data_dir / "ipc.sock"
-    # Unix domain socket paths have a ~104-108 char limit on macOS/BSD
+    # Unix domain socket paths have a ~104-108 char limit on macOS/BSD. Fall back to a
+    # per-user runtime directory (never world-writable /tmp, where a predictable name
+    # could be squatted by another local user).
     if len(str(sock_path)) > 96:
-        return (f"/tmp/autocorrect_ipc_{dir_hash}.sock", "AF_UNIX")
+        runtime = os.environ.get("XDG_RUNTIME_DIR") or os.environ.get("TMPDIR") or "/tmp"  # noqa: S108
+        short_dir = Path(runtime) / f"autocorrect-{os.getuid() if hasattr(os, 'getuid') else 'user'}"
+        try:
+            short_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        except OSError:
+            pass
+        return (str(short_dir / f"ipc_{dir_hash}.sock"), "AF_UNIX")
     return (str(sock_path), "AF_UNIX")
 
 

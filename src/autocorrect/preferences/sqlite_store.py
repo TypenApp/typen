@@ -106,17 +106,13 @@ class SQLitePreferenceStore:
         """Load all persisted preferences into the zero-latency in-memory overlay."""
         self._overlay.clear_all()
         with self._connect() as conn:
-            for _, display_word in conn.execute(
-                "SELECT word_lower, display_word FROM custom_words"
-            ):
+            for _, display_word in conn.execute("SELECT word_lower, display_word FROM custom_words"):
                 self._overlay.add_custom_word(display_word)
 
             for display_word, corrected_to, revert_count in conn.execute(
                 "SELECT display_word, corrected_to, revert_count FROM suggested_dictionary_words"
             ):
-                self._overlay.load_suggested_word(
-                    display_word, corrected_to, int(revert_count)
-                )
+                self._overlay.load_suggested_word(display_word, corrected_to, int(revert_count))
 
             for orig_low, cand_low in conn.execute(
                 "SELECT original_lower, candidate_lower FROM rejected_corrections"
@@ -128,9 +124,7 @@ class SQLitePreferenceStore:
             ):
                 self._overlay.set_preferred_variant(src_low, pref_low)
 
-            row = conn.execute(
-                "SELECT value FROM user_settings WHERE key = 'region'"
-            ).fetchone()
+            row = conn.execute("SELECT value FROM user_settings WHERE key = 'region'").fetchone()
             if row and row[0] in REGION_NAME_TO_FLAG:
                 self._overlay.set_active_region(REGION_NAME_TO_FLAG[row[0]])
 
@@ -225,9 +219,7 @@ class SQLitePreferenceStore:
 
     def list_custom_words(self) -> list[str]:
         with self._connect() as conn:
-            rows = conn.execute(
-                "SELECT display_word FROM custom_words ORDER BY word_lower ASC"
-            ).fetchall()
+            rows = conn.execute("SELECT display_word FROM custom_words ORDER BY word_lower ASC").fetchall()
         return [r[0] for r in rows]
 
     def add_rejected_correction(self, original: str, candidate: str) -> None:
@@ -313,9 +305,7 @@ class SQLitePreferenceStore:
 
     def get_setting(self, key: str, default: str = "") -> str:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT value FROM user_settings WHERE key = ?", (key,)
-            ).fetchone()
+            row = conn.execute("SELECT value FROM user_settings WHERE key = ?", (key,)).fetchone()
         return str(row[0]) if row else default
 
     def clear_all_preferences(self) -> None:
@@ -344,9 +334,7 @@ class SQLitePreferenceStore:
         for display_word in data.get("custom_words", {}).values():
             self.add_custom_word(str(display_word))
         for pair in data.get("rejected_pairs", []):
-            self.add_rejected_correction(
-                str(pair.get("original", "")), str(pair.get("candidate", ""))
-            )
+            self.add_rejected_correction(str(pair.get("original", "")), str(pair.get("candidate", "")))
         for src, pref in data.get("preferred_variants", {}).items():
             self.set_preferred_variant(str(src), str(pref))
 

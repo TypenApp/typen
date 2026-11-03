@@ -17,7 +17,7 @@ import subprocess
 import sys
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
 
@@ -152,21 +152,13 @@ class ActivationManager:
                 f"Platform mismatch: {seat.sku.value} cannot be activated on {client_platform.value}."
             )
 
-        if (
-            seat.active_device_id_hash is not None
-            and seat.active_device_id_hash != device_id_hash
-        ):
+        if seat.active_device_id_hash is not None and seat.active_device_id_hash != device_id_hash:
             raise PermissionError(
                 "This licence is already active on another device. "
                 "Please deactivate the existing device first or use Device Recovery."
             )
 
-        now_iso = (
-            (now_utc or datetime.now(timezone.utc))
-            .astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        now_iso = (now_utc or datetime.now(UTC)).astimezone(UTC).isoformat().replace("+00:00", "Z")
         seat.active_device_id_hash = device_id_hash
         seat.activated_at_iso = now_iso
 
@@ -214,7 +206,7 @@ class ActivationManager:
         if seat.customer_email.strip().lower() != customer_email.strip().lower():
             raise PermissionError("Customer email does not match licence owner.")
 
-        now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
         cutoff = now.timestamp() - 365 * 86400
         recent_recoveries = [
             ts

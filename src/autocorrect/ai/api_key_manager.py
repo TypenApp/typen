@@ -36,13 +36,10 @@ class SecretRedactingFilter(logging.Filter):
             record.msg = redact_secrets(record.msg)
         if record.args:
             if isinstance(record.args, tuple):
-                record.args = tuple(
-                    redact_secrets(a) if isinstance(a, str) else a for a in record.args
-                )
+                record.args = tuple(redact_secrets(a) if isinstance(a, str) else a for a in record.args)
             elif isinstance(record.args, dict):
                 record.args = {
-                    k: (redact_secrets(v) if isinstance(v, str) else v)
-                    for k, v in record.args.items()
+                    k: (redact_secrets(v) if isinstance(v, str) else v) for k, v in record.args.items()
                 }
         return True
 

@@ -13,9 +13,9 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-
-from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
 from pipeline.sign_release import verify_manifest_signature
+
+from autocorrect.updates.update_policy import UpdatePolicyEngine
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +60,7 @@ class ModelUpdater:
         if not is_pro_entitled:
             raise PermissionError("Local AI models require a Pro Edition entitlement")
 
-        if not verify_manifest_signature(
-            descriptor.to_canonical_dict(), signature_b64, self._public_key
-        ):
+        if not verify_manifest_signature(descriptor.to_canonical_dict(), signature_b64, self._public_key):
             raise ValueError("Invalid Ed25519 signature on local model manifest")
 
         elig = UpdatePolicyEngine.check_resource_update_eligibility(

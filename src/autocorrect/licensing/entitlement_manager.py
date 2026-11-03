@@ -10,13 +10,12 @@ the application safely stops intercepting keyboard input without deleting any us
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
-from autocorrect.env_config import creator_device_hashes, creator_name
 from autocorrect.licensing.signed_licence import (
     Edition,
     PlatformOS,
@@ -70,8 +69,17 @@ class EntitlementManager:
         return self._active_cert
 
     def is_creator_device(self) -> bool:
-        """True when this device's SHA-256 id hash is listed as a creator device."""
-        return self._device_id_hash.lower() in creator_device_hashes()
+        """True when a valid creator certificate (issued by the root key) is active."""
+        cert = self._active_cert
+        if cert is None or not cert.is_creator_certificate:
+            return False
+        valid, _ = verify_licence_certificate(
+            cert=cert,
+            public_key=self._public_key,
+            expected_device_id_hash=self._device_id_hash,
+            expected_platform=self._platform,
+        )
+        return valid
 
     def install_certificate(
         self,
@@ -104,23 +112,11 @@ class EntitlementManager:
     ) -> EntitlementSnapshot:
         """
         Evaluate current entitlements 100% offline.
-        Creator devices (listed in `.env` as AUTOCORRECT_CREATOR_DEVICE_HASHES)
-        hold a perpetual Pro entitlement with no update window.
-        If a valid licence certificate is present, evaluates its perpetual and update rights.
-        Otherwise falls back to the 14-day full-featured trial.
+        A creator certificate (licence_id prefixed `CREATOR-`, signed by the root
+        key and bound to this device) holds a perpetual Pro entitlement with no
+        update window. Otherwise, a valid licence certificate is evaluated for
+        its perpetual and update rights, and finally the 14-day trial applies.
         """
-        if self.is_creator_device():
-            snap = EntitlementSnapshot(
-                mode="CREATOR_LIFETIME",
-                typing_assistance_enabled=True,
-                pro_features_enabled=True,
-                can_download_new_updates=True,
-                updates_expire_at=None,
-                status_message=f"{creator_name()} Lifetime Pro Licence (this device)",
-            )
-            self._apply_snapshot(snap)
-            return snap
-
         if self._active_cert is not None:
             valid, reason = verify_licence_certificate(
                 cert=self._active_cert,
@@ -128,6 +124,17 @@ class EntitlementManager:
                 expected_device_id_hash=self._device_id_hash,
                 expected_platform=self._platform,
             )
+            if valid and self._active_cert.is_creator_certificate:
+                snap = EntitlementSnapshot(
+                    mode="CREATOR_LIFETIME",
+                    typing_assistance_enabled=True,
+                    pro_features_enabled=True,
+                    can_download_new_updates=True,
+                    updates_expire_at=None,
+                    status_message="Creator Lifetime Pro Licence (this device)",
+                )
+                self._apply_snapshot(snap)
+                return snap
             if valid:
                 upd_state: UpdateEntitlementState = UpdateEntitlementEvaluator.evaluate(
                     cert=self._active_cert,

@@ -52,11 +52,11 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
         def statusMessage(self) -> str:
             ov = self._ctrl.get_overview()
             ent = ov.get("entitlement", {})
-            return (
-                str(ent.get("status_message", "Active"))
-                if isinstance(ent, dict)
-                else "Active"
-            )
+            hook = ov.get("hook_status", {})
+            if isinstance(hook, dict) and hook.get("state") in ("failed", "unsupported"):
+                # Typing assistance is not actually running: say why and what to do.
+                return f"Not correcting — {hook.get('remediation') or hook.get('detail') or 'input hook unavailable'}"
+            return str(ent.get("status_message", "Active")) if isinstance(ent, dict) else "Active"
 
         @Property(bool, notify=stateChanged)  # type: ignore[misc]
         def isPaused(self) -> bool:
@@ -76,11 +76,7 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def ipcTransportLabel(self) -> str:
-            return (
-                "Connected via Local IPC"
-                if self._ctrl.is_daemon_ipc_connected()
-                else "Local Direct Mode"
-            )
+            return "Connected via Local IPC" if self._ctrl.is_daemon_ipc_connected() else "Local Direct Mode"
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def insightsSummaryText(self) -> str:
@@ -102,15 +98,11 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def rewriteHotkey(self) -> str:
-            return str(
-                self._ctrl.get_general_settings().get("rewrite_hotkey", "Ctrl+Shift+R")
-            )
+            return str(self._ctrl.get_general_settings().get("rewrite_hotkey", "Ctrl+Shift+R"))
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def pauseHotkey(self) -> str:
-            return str(
-                self._ctrl.get_general_settings().get("pause_hotkey", "Ctrl+Alt+P")
-            )
+            return str(self._ctrl.get_general_settings().get("pause_hotkey", "Ctrl+Alt+P"))
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def customWordsPreview(self) -> str:

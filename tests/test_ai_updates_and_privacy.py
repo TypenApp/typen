@@ -10,16 +10,23 @@ Acceptance Tests for:
 
 from __future__ import annotations
 
-import json
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
 import httpx
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from pipeline.compile_binary import compile_dataset_to_directory
+from pipeline.ingest import build_master_english_dataset
+from pipeline.sign_release import (
+    create_zstd_bundle_archive,
+    create_zstd_delta_patch,
+    sign_manifest_payload,
+)
+from pipeline.validate import validate_and_sanitize_dataset
 
 from autocorrect.ai.api_key_manager import (
     ApiKeyManager,
@@ -47,14 +54,6 @@ from autocorrect.updates.language_resource_updater import (
     LanguageResourceUpdater,
     ResourceUpdateDescriptor,
 )
-from pipeline.compile_binary import compile_dataset_to_directory
-from pipeline.ingest import build_master_english_dataset
-from pipeline.sign_release import (
-    create_zstd_bundle_archive,
-    create_zstd_delta_patch,
-    sign_manifest_payload,
-)
-from pipeline.validate import validate_and_sanitize_dataset
 
 
 def test_byok_cloud_ai_consent_spending_caps_local_only_and_redaction(
@@ -94,9 +93,7 @@ def test_byok_cloud_ai_consent_spending_caps_local_only_and_redaction(
         return httpx.Response(
             200,
             json={
-                "choices": [
-                    {"message": {"content": "I have received your message."}}
-                ],
+                "choices": [{"message": {"content": "I have received your message."}}],
                 "usage": {"prompt_tokens": 100, "completion_tokens": 100},
             },
         )
@@ -155,17 +152,10 @@ def test_layer2_local_ai_pause_pill_and_hotkey_triggers() -> None:
     assert hw.recommended_model_id == "grammar-onnx-int8-small"
 
     # Too short pause -> no interruption
-    assert (
-        local_ai.evaluate_sentence(
-            "I should of gone to the meeting.", pause_elapsed_ms=100.0
-        )
-        is None
-    )
+    assert local_ai.evaluate_sentence("I should of gone to the meeting.", pause_elapsed_ms=100.0) is None
 
     # >= 400ms pause at sentence boundary -> non-focus-stealing PAUSE_PILL suggestion
-    pill = local_ai.evaluate_sentence(
-        "I should of gone to the meeting.", pause_elapsed_ms=450.0
-    )
+    pill = local_ai.evaluate_sentence("I should of gone to the meeting.", pause_elapsed_ms=450.0)
     assert pill is not None
     assert pill.suggested_sentence == "I should have gone to the meeting."
     assert pill.presentation_mode == "PAUSE_PILL"
@@ -282,7 +272,7 @@ def test_independent_signed_resource_updates_delta_and_rollback(
         assert rm.active_bundle.version == "1.0.8"
 
         # 3. Expired update entitlement blocks installing v1.0.9 (released Dec 2026)
-        expired_cutoff = datetime(2026, 11, 15, tzinfo=timezone.utc)
+        expired_cutoff = datetime(2026, 11, 15, tzinfo=UTC)
         with pytest.raises(PermissionError, match="outside the 12-month update entitlement"):
             updater.install_from_archive_bytes(
                 descriptor, sig_b64, v2_bytes, updates_expire_at=expired_cutoff
@@ -291,7 +281,7 @@ def test_independent_signed_resource_updates_delta_and_rollback(
         assert rm.active_bundle.version == "1.0.8"
 
         # 4. Install v1.0.9 via Zstd Delta Patch within active entitlement window!
-        entitled_cutoff = datetime(2027, 11, 1, tzinfo=timezone.utc)
+        entitled_cutoff = datetime(2027, 11, 1, tzinfo=UTC)
         installed = updater.install_from_archive_bytes(
             descriptor=descriptor,
             signature_b64=sig_b64,
@@ -342,7 +332,16 @@ def test_preferences_import_export_and_performance_benchmarks(tmp_path: Path) ->
 
     engine = AutocorrectEngine(rm, preferences=prefs.overlay)
     try:
-        sample_words = ["received", "recieved", "mesage", "definite", "definately", "the", "application", "seperate"]
+        sample_words = [
+            "received",
+            "recieved",
+            "mesage",
+            "definite",
+            "definately",
+            "the",
+            "application",
+            "seperate",
+        ]
         latencies_ms: list[float] = []
         for _ in range(25):
             for w in sample_words:

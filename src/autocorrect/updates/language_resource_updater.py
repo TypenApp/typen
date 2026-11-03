@@ -24,10 +24,10 @@ from pathlib import Path
 
 import zstandard as zstd
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from pipeline.sign_release import verify_manifest_signature
 
 from autocorrect.intelligence.resource_manager import ResourceManager
 from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
-from pipeline.sign_release import verify_manifest_signature
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,9 +80,7 @@ class LanguageResourceUpdater:
         signature_b64: str,
     ) -> bool:
         """Verify the Ed25519 signature of the update manifest descriptor."""
-        return verify_manifest_signature(
-            descriptor.to_canonical_dict(), signature_b64, self._public_key
-        )
+        return verify_manifest_signature(descriptor.to_canonical_dict(), signature_b64, self._public_key)
 
     def check_eligibility(
         self,
@@ -117,9 +115,7 @@ class LanguageResourceUpdater:
         Verify signature, eligibility, and SHA-256 digest; apply delta or full archive
         into staging; validate binary integrity; and atomically hot-swap the active bundle.
         """
-        eligibility = self.check_eligibility(
-            descriptor, signature_b64, updates_expire_at=updates_expire_at
-        )
+        eligibility = self.check_eligibility(descriptor, signature_b64, updates_expire_at=updates_expire_at)
         if not eligibility.eligible:
             raise PermissionError(f"Resource update rejected: {eligibility.reason}")
 
@@ -130,9 +126,7 @@ class LanguageResourceUpdater:
             if actual_patch_hash != descriptor.delta_patch_sha256:
                 raise ValueError("Corrupted delta patch: SHA-256 mismatch")
 
-            dict_data = zstd.ZstdCompressionDict(
-                base_archive_bytes, dict_type=zstd.DICT_TYPE_RAWCONTENT
-            )
+            dict_data = zstd.ZstdCompressionDict(base_archive_bytes, dict_type=zstd.DICT_TYPE_RAWCONTENT)
             decompressor = zstd.ZstdDecompressor(dict_data=dict_data)
             full_archive_bytes = decompressor.decompress(
                 archive_or_patch_bytes, max_output_size=descriptor.full_archive_size + 1024 * 1024
@@ -167,9 +161,7 @@ class LanguageResourceUpdater:
                 tar.extractall(path=self._staging_dir, filter="data")
 
             # Verify per-file artifact hashes in extracted manifest.json
-            extracted_manifest = json.loads(
-                (self._staging_dir / "manifest.json").read_text(encoding="utf-8")
-            )
+            extracted_manifest = json.loads((self._staging_dir / "manifest.json").read_text(encoding="utf-8"))
             for fname, expected_sha in extracted_manifest.get("artifacts", {}).items():
                 fpath = self._staging_dir / fname
                 if not fpath.exists():

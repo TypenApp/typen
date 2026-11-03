@@ -15,7 +15,7 @@ import hashlib
 import hmac
 import json
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Final
@@ -25,7 +25,10 @@ import keyring
 TRIAL_DURATION_DAYS: Final[int] = 14
 TRIAL_CLOCK_ROLLBACK_TOLERANCE_SECONDS: Final[float] = 3600.0  # 1 hour DST/NTP tolerance
 TRIAL_KEYRING_SERVICE: Final[str] = "AutoCorrect.Desktop.TrialAnchor"
-TRIAL_HMAC_KEY: Final[bytes] = b"AutoCorrect-Offline-Trial-Integrity-v1-Key"
+# v1 key (beta.1/beta.2) is accepted read-only so existing trials survive an upgrade;
+# new records are always written with the per-device v2 key.
+_TRIAL_HMAC_KEY_V1: Final[bytes] = b"AutoCorrect-Offline-Trial-Integrity-v1-Key"
+_TRIAL_HMAC_DOMAIN_V2: Final[bytes] = b"AutoCorrect-Offline-Trial-Integrity-v2|"
 
 
 class TrialState(str, Enum):
@@ -66,9 +69,21 @@ class TrialManager:
         self._use_keyring = use_os_keyring
         self._memory_vault_anchor: str | None = None
 
+    def _mac_message(self, started_iso: str, max_seen_iso: str) -> bytes:
+        return f"{self._device_id_hash}|{started_iso}|{max_seen_iso}".encode()
+
     def _compute_mac(self, started_iso: str, max_seen_iso: str) -> str:
-        msg = f"{self._device_id_hash}|{started_iso}|{max_seen_iso}".encode("utf-8")
-        return hmac.new(TRIAL_HMAC_KEY, msg, hashlib.sha256).hexdigest()
+        """Per-device HMAC key: domain separator || SHA-256(device hash || app salt)."""
+        key = hashlib.sha256(_TRIAL_HMAC_DOMAIN_V2 + self._device_id_hash.encode("utf-8")).digest()
+        return hmac.new(key, self._mac_message(started_iso, max_seen_iso), hashlib.sha256).hexdigest()
+
+    def _mac_matches(self, started_iso: str, max_seen_iso: str, mac: str) -> bool:
+        if hmac.compare_digest(self._compute_mac(started_iso, max_seen_iso), mac):
+            return True
+        legacy = hmac.new(
+            _TRIAL_HMAC_KEY_V1, self._mac_message(started_iso, max_seen_iso), hashlib.sha256
+        ).hexdigest()
+        return hmac.compare_digest(legacy, mac)
 
     def _load_raw_record(self) -> dict[str, str] | None:
         # Check OS keyring / vault first (survives deleting the app folder / reinstalling)
@@ -95,7 +110,7 @@ class TrialManager:
                 s_iso = str(parsed["started_at"])
                 m_iso = str(parsed["max_observed_utc"])
                 mac = str(parsed["mac"])
-                if hmac.compare_digest(self._compute_mac(s_iso, m_iso), mac):
+                if self._mac_matches(s_iso, m_iso, mac):
                     candidates.append(parsed)
             except Exception:
                 continue
@@ -143,7 +158,7 @@ class TrialManager:
         Start or evaluate the 14-day trial.
         Detects system clock rollback and file tampering.
         """
-        now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
         now_iso = now.isoformat().replace("+00:00", "Z")
 
         record = self._load_raw_record()
@@ -155,7 +170,7 @@ class TrialManager:
                 state=TrialState.ACTIVE,
                 started_at=now,
                 expires_at=expires,
-                days_remaining= float(TRIAL_DURATION_DAYS),
+                days_remaining=float(TRIAL_DURATION_DAYS),
             )
 
         if record.get("tampered") == "true":
@@ -167,12 +182,10 @@ class TrialManager:
                 days_remaining=0.0,
             )
 
-        started_dt = datetime.fromisoformat(
-            record["started_at"].replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
-        max_seen_dt = datetime.fromisoformat(
-            record["max_observed_utc"].replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
+        started_dt = datetime.fromisoformat(record["started_at"].replace("Z", "+00:00")).astimezone(UTC)
+        max_seen_dt = datetime.fromisoformat(record["max_observed_utc"].replace("Z", "+00:00")).astimezone(
+            UTC
+        )
         expires_dt = started_dt + timedelta(days=TRIAL_DURATION_DAYS)
 
         # Check if system clock was rolled backward beyond tolerance

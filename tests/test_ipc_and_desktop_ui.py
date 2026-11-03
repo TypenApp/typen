@@ -14,9 +14,7 @@ import pytest
 
 from autocorrect.daemon.app import AutoCorrectDaemon
 from autocorrect.ipc import (
-    IPCAuthenticationError,
     IPCRequest,
-    IPCResponse,
     LocalIPCClient,
 )
 from autocorrect.ui import (
@@ -59,9 +57,7 @@ def test_ipc_authentication_and_protocol_guards(tmp_path: Path) -> None:
             auth_token="00" * 32,
             protocol_version="99.0",
         )
-        bad_ver_resp = daemon.ipc_server.handle_raw_request(
-            bad_ver_req.to_json_bytes()
-        )
+        bad_ver_resp = daemon.ipc_server.handle_raw_request(bad_ver_req.to_json_bytes())
         assert not bad_ver_resp.ok
         assert "Unsupported IPC protocol_version" in (bad_ver_resp.error or "")
 
@@ -147,13 +143,9 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         assert daemon.session._active_region.name == "EN_US"
 
         lang2 = controller.set_enabled_domain_packs(["programming", "medicine", "law"])
-        enabled_ids = [
-            p["id"] for p in lang2["domain_packs"] if p["enabled"]
-        ]
+        enabled_ids = [p["id"] for p in lang2["domain_packs"] if p["enabled"]]
         assert set(enabled_ids) == {"programming", "medicine", "law"}
-        assert (
-            daemon.engine.evaluate_token("kubernets").replacement_token == "Kubernetes"
-        )
+        assert daemon.engine.evaluate_token("kubernets").replacement_token == "Kubernetes"
 
         # --- Screen 5: Corrections, Sensitivity, Rejected & Preferred Variants ---
         corr = controller.update_correction_features(
@@ -170,9 +162,7 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         assert not daemon.preference_store.overlay.is_rejected_pair("teh", "the")
 
         controller.set_preferred_variant("color", "colour")
-        assert (
-            daemon.preference_store.overlay.get_preferred_variant("color") == "colour"
-        )
+        assert daemon.preference_store.overlay.get_preferred_variant("color") == "colour"
         controller.remove_preferred_variant("color")
         assert daemon.preference_store.overlay.get_preferred_variant("color") is None
 
@@ -200,15 +190,10 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         )
         assert any(p["app_identifier"] == "obsidian.exe" for p in profs)
         controller.delete_app_profile("obsidian.exe")
-        assert not any(
-            p["app_identifier"] == "obsidian.exe"
-            for p in controller.list_app_profiles()
-        )
+        assert not any(p["app_identifier"] == "obsidian.exe" for p in controller.list_app_profiles())
 
         # --- Screen 8: Text Expansion Snippets ---
-        snips = controller.upsert_snippet(
-            ";addr", "100 Bishopsgate, London", "Office address"
-        )
+        snips = controller.upsert_snippet(";addr", "100 Bishopsgate, London", "Office address")
         assert any(s["trigger"] == ";addr" for s in snips)
         assert daemon.snippet_engine.match_snippet(";addr") == "100 Bishopsgate, London"
         controller.delete_snippet(";addr")

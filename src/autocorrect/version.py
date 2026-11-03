@@ -3,7 +3,7 @@ Version and build metadata constants used for independent resource compatibility
 and perpetual usage vs. 12-month update entitlement verification.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 APP_VERSION: str = "1.2.0"
 BINARY_SCHEMA_VERSION: int = 1
@@ -15,6 +15,4 @@ APP_RELEASE_TIMESTAMP: str = "2026-11-01T00:00:00Z"
 
 def get_app_release_datetime() -> datetime:
     """Return the parsed UTC release timestamp of this application binary."""
-    return datetime.fromisoformat(APP_RELEASE_TIMESTAMP.replace("Z", "+00:00")).astimezone(
-        timezone.utc
-    )
+    return datetime.fromisoformat(APP_RELEASE_TIMESTAMP.replace("Z", "+00:00")).astimezone(UTC)

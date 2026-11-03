@@ -31,6 +31,8 @@ class PricingConfig:
             ProductSKU.PRO_WIN: "prod_pro_win",
             ProductSKU.STANDARD_MAC: "prod_standard_mac",
             ProductSKU.PRO_MAC: "prod_pro_mac",
+            ProductSKU.STANDARD_LINUX: "prod_standard_linux",
+            ProductSKU.PRO_LINUX: "prod_pro_linux",
         }
     )
 
@@ -60,11 +62,7 @@ class PricingConfig:
 
     def get_currency_options_for_sku(self, sku: ProductSKU) -> list[dict[str, str]]:
         """Format regional currency options for BACHS product creation (`currency_options`)."""
-        table = (
-            self.pro_regional_prices
-            if sku.edition == Edition.PRO
-            else self.standard_regional_prices
-        )
+        table = self.pro_regional_prices if sku.edition == Edition.PRO else self.standard_regional_prices
         return [
             {"currency": code, "amount": f"{amt:.2f}"}
             for code, amt in sorted(table.items())

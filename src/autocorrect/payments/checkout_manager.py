@@ -99,9 +99,7 @@ class CheckoutManager:
             },
         )
         session = self._provider.create_checkout_session(req)
-        self._verification.attach_provider_checkout_id(
-            order.order_id, session.provider_checkout_id
-        )
+        self._verification.attach_provider_checkout_id(order.order_id, session.provider_checkout_id)
 
         return CheckoutSessionResult(
             order_id=order.order_id,

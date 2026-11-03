@@ -16,12 +16,12 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Mapping
 
 from autocorrect.licensing.activation_manager import ActivationManager, DeviceSeatRecord
 from autocorrect.licensing.signed_licence import ProductSKU, SignedLicenceCertificate
@@ -128,12 +128,7 @@ class PurchaseVerificationService:
         customer_email: str | None = None,
         now_utc: datetime | None = None,
     ) -> OrderRecord:
-        now_iso = (
-            (now_utc or datetime.now(timezone.utc))
-            .astimezone(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        now_iso = (now_utc or datetime.now(UTC)).astimezone(UTC).isoformat().replace("+00:00", "Z")
         order_id = f"ord_{uuid.uuid4().hex[:20]}"
         idem_key = f"checkout-{order_id}"
         order = OrderRecord(
@@ -187,9 +182,7 @@ class PurchaseVerificationService:
 
     def get_order(self, order_id: str) -> OrderRecord | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM orders WHERE order_id = ?", (order_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (order_id,)).fetchone()
         return self._row_to_order(row) if row else None
 
     def find_order_by_reference_or_checkout(
@@ -197,9 +190,7 @@ class PurchaseVerificationService:
     ) -> OrderRecord | None:
         with self._connect() as conn:
             if reference:
-                row = conn.execute(
-                    "SELECT * FROM orders WHERE order_id = ?", (reference,)
-                ).fetchone()
+                row = conn.execute("SELECT * FROM orders WHERE order_id = ?", (reference,)).fetchone()
                 if row:
                     return self._row_to_order(row)
             if checkout_id:
@@ -213,9 +204,7 @@ class PurchaseVerificationService:
 
     def find_order_by_charge_id(self, charge_id: str) -> OrderRecord | None:
         with self._connect() as conn:
-            row = conn.execute(
-                "SELECT * FROM orders WHERE provider_charge_id = ?", (charge_id,)
-            ).fetchone()
+            row = conn.execute("SELECT * FROM orders WHERE provider_charge_id = ?", (charge_id,)).fetchone()
         return self._row_to_order(row) if row else None
 
     @staticmethod
@@ -259,16 +248,14 @@ class PurchaseVerificationService:
         - `200`: Processed or safely ignored/deduplicated.
         """
         try:
-            event: ProviderWebhookEvent = self._provider.verify_and_parse_webhook(
-                raw_body, headers
-            )
+            event: ProviderWebhookEvent = self._provider.verify_and_parse_webhook(raw_body, headers)
         except ValueError as exc:
             return 400, str(exc)
 
         if self.is_webhook_already_processed(event.event_id):
             return 200, "DUPLICATE_EVENT_IGNORED"
 
-        now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
         now_iso = now.isoformat().replace("+00:00", "Z")
 
         if event.event_type in ("checkout.completed", "collection.succeeded"):
@@ -278,9 +265,7 @@ class PurchaseVerificationService:
                 self._record_event_processed(event.event_id, event.event_type, now_iso)
                 return 200, "UNREFERENCED_DEPOSIT_IGNORED"
 
-            order = self.find_order_by_reference_or_checkout(
-                event.reference, event.checkout_id
-            )
+            order = self.find_order_by_reference_or_checkout(event.reference, event.checkout_id)
             if order is None:
                 self._record_event_processed(event.event_id, event.event_type, now_iso)
                 return 200, "UNKNOWN_ORDER_IGNORED"
@@ -318,7 +303,12 @@ class PurchaseVerificationService:
 
             # Fulfil order and issue licence seat atomically
             charge_id = event.charge_id or checkout.charge_id
-            buyer_email = checkout.customer_email or event.customer_email or order.customer_email or "customer@example.com"
+            buyer_email = (
+                checkout.customer_email
+                or event.customer_email
+                or order.customer_email
+                or "customer@example.com"
+            )
             self._fulfil_verified_order(
                 order=order,
                 charge_id=charge_id,
@@ -330,9 +320,7 @@ class PurchaseVerificationService:
             return 200, "FULFILLED"
 
         if event.event_type == "checkout.expired":
-            order = self.find_order_by_reference_or_checkout(
-                event.reference, event.checkout_id
-            )
+            order = self.find_order_by_reference_or_checkout(event.reference, event.checkout_id)
             if order and order.status == OrderStatus.PENDING:
                 # Note: per BACHS docs, a late bank transfer can still complete after checkout.expired,
                 # so marking EXPIRED does not delete the order.
@@ -396,19 +384,15 @@ class PurchaseVerificationService:
             lic_id = existing_seat.licence_id
             current_exp = datetime.fromisoformat(
                 existing_seat.updates_expire_at_iso.replace("Z", "+00:00")
-            ).astimezone(timezone.utc)
+            ).astimezone(UTC)
             base_dt = max(now, current_exp)
-            new_exp_iso = (
-                (base_dt + timedelta(days=365)).isoformat().replace("+00:00", "Z")
-            )
+            new_exp_iso = (base_dt + timedelta(days=365)).isoformat().replace("+00:00", "Z")
             existing_seat.sku = order.sku
             existing_seat.order_id = order.order_id
             existing_seat.updates_expire_at_iso = new_exp_iso
         else:
             lic_id = f"lic_{uuid.uuid4().hex[:20]}"
-            new_exp_iso = (
-                (now + timedelta(days=365)).isoformat().replace("+00:00", "Z")
-            )
+            new_exp_iso = (now + timedelta(days=365)).isoformat().replace("+00:00", "Z")
             seat = DeviceSeatRecord(
                 licence_id=lic_id,
                 order_id=order.order_id,
@@ -465,9 +449,7 @@ class PurchaseVerificationService:
                 (event_id, event_type, now_iso),
             )
 
-    def _record_event_processed(
-        self, event_id: str, event_type: str, now_iso: str
-    ) -> None:
+    def _record_event_processed(self, event_id: str, event_type: str, now_iso: str) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
@@ -499,7 +481,7 @@ class PurchaseVerificationService:
             and checkout.currency.upper() == order.expected_currency.upper()
             and to_minor_units(checkout.amount_str) == to_minor_units(order.expected_amount)
         ):
-            now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+            now = (now_utc or datetime.now(UTC)).astimezone(UTC)
             self._fulfil_verified_order(
                 order=order,
                 charge_id=checkout.charge_id,

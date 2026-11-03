@@ -71,12 +71,8 @@ class UsageTracker:
         prompt_tokens: int,
         completion_tokens: int,
     ) -> Decimal:
-        in_rate, out_rate = MODEL_PRICING_PER_1M_USD.get(
-            model, (Decimal("1.00"), Decimal("3.00"))
-        )
-        cost = (
-            Decimal(prompt_tokens) * in_rate + Decimal(completion_tokens) * out_rate
-        ) / Decimal("1000000")
+        in_rate, out_rate = MODEL_PRICING_PER_1M_USD.get(model, (Decimal("1.00"), Decimal("3.00")))
+        cost = (Decimal(prompt_tokens) * in_rate + Decimal(completion_tokens) * out_rate) / Decimal("1000000")
         return cost.quantize(Decimal("0.000001"))
 
     def record_usage(

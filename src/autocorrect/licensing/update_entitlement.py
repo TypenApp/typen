@@ -12,7 +12,7 @@ Guarantees:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from autocorrect.licensing.signed_licence import SignedLicenceCertificate
 from autocorrect.version import get_app_release_datetime
@@ -39,17 +39,14 @@ class UpdateEntitlementEvaluator:
         app_release_dt: datetime | None = None,
         is_security_patch_build: bool = False,
     ) -> UpdateEntitlementState:
-        now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        binary_dt = (app_release_dt or get_app_release_datetime()).astimezone(timezone.utc)
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
+        binary_dt = (app_release_dt or get_app_release_datetime()).astimezone(UTC)
         expire_dt = cert.get_updates_expire_datetime()
         max_app_dt = cert.get_entitled_max_release_datetime()
 
         # Perpetual usage check: was this application binary released on or before
         # the customer's entitled update window (or is it a security patch)?
-        can_use_binary = bool(
-            cert.perpetual_usage
-            and (binary_dt <= max_app_dt or is_security_patch_build)
-        )
+        can_use_binary = bool(cert.perpetual_usage and (binary_dt <= max_app_dt or is_security_patch_build))
 
         rem_seconds = (expire_dt - now).total_seconds()
         within_window = rem_seconds >= 0

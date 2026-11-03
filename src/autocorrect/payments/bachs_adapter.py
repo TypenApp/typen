@@ -14,8 +14,9 @@ Uses:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any
 
 import httpx
 from bachs import (
@@ -119,9 +120,7 @@ class BachsPaymentAdapter:
         product = self._client.products.create(**kwargs)
         return str(product.id)
 
-    def create_checkout_session(
-        self, request: ProviderCheckoutRequest
-    ) -> ProviderCheckoutSession:
+    def create_checkout_session(self, request: ProviderCheckoutRequest) -> ProviderCheckoutSession:
         """
         Create a hosted checkout session via `bachs.checkout_sessions.create`.
         Uses `product_cart[].pricing` override when `request.override_catalog_price=True`
@@ -180,9 +179,7 @@ class BachsPaymentAdapter:
             metadata=dict(raw_dict.get("metadata") or request.metadata),
         )
 
-    def retrieve_checkout_session(
-        self, provider_checkout_id: str
-    ) -> ProviderCheckoutSession:
+    def retrieve_checkout_session(self, provider_checkout_id: str) -> ProviderCheckoutSession:
         """Fetch authoritative checkout session state from BACHS via SDK."""
         session = self._client.checkout_sessions.get(provider_checkout_id)
         raw = session.to_dict() if hasattr(session, "to_dict") else {}
@@ -205,9 +202,7 @@ class BachsPaymentAdapter:
             provider_checkout_id=str(session.checkout_id),
             checkout_url=str(getattr(session, "checkout_url", "")),
             status=str(getattr(session, "status", "")),
-            payment_status=(
-                str(raw["payment_status"]) if raw.get("payment_status") is not None else None
-            ),
+            payment_status=(str(raw["payment_status"]) if raw.get("payment_status") is not None else None),
             amount_str=str(raw.get("amount") or "0.00"),
             currency=str(raw.get("currency") or "USD"),
             reference=str(raw["reference"]) if raw.get("reference") else None,
@@ -216,9 +211,7 @@ class BachsPaymentAdapter:
             metadata=dict(raw.get("metadata") or {}),
         )
 
-    def verify_and_parse_webhook(
-        self, raw_body: bytes, headers: Mapping[str, str]
-    ) -> ProviderWebhookEvent:
+    def verify_and_parse_webhook(self, raw_body: bytes, headers: Mapping[str, str]) -> ProviderWebhookEvent:
         """
         Verify `X-Bachs-Signature-V2` on the unparsed `raw_body` using the official
         `bachs.webhooks.construct_event` helper.
@@ -304,9 +297,7 @@ class BachsPaymentAdapter:
                 status=str(body["status"]),
                 requested_amount_str=str(body["requested_amount"]),
                 refunded_amount_str=(
-                    str(body["refunded_amount"])
-                    if body.get("refunded_amount") is not None
-                    else None
+                    str(body["refunded_amount"]) if body.get("refunded_amount") is not None else None
                 ),
             )
         finally:

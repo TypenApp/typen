@@ -77,9 +77,7 @@ class UpgradePricingCalculator:
 
         if eligibility.upgrade_type == UpgradeType.RENEWAL_30PCT:
             # e.g. $14.99 * 0.70 = $10.493 -> $10.49; $34.99 * 0.70 = $24.493 -> $24.49
-            discounted = (retail * discount_mult).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+            discounted = (retail * discount_mult).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             return PriceQuote(
                 target_sku=target_sku,
                 upgrade_type=UpgradeType.RENEWAL_30PCT,
@@ -93,9 +91,7 @@ class UpgradePricingCalculator:
         if eligibility.upgrade_type == UpgradeType.CROSSGRADE_ACTIVE:
             # Fair active Standard-to-Pro cross-grade: pay the retail difference ($34.99 - $14.99 = $20.00)
             std_retail = self._config.standard_retail_price
-            diff = max(Decimal("0.01"), retail - std_retail).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP
-            )
+            diff = max(Decimal("0.01"), retail - std_retail).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             return PriceQuote(
                 target_sku=target_sku,
                 upgrade_type=UpgradeType.CROSSGRADE_ACTIVE,
@@ -107,9 +103,7 @@ class UpgradePricingCalculator:
             )
 
         # CROSSGRADE_EXPIRED: 30% off Pro retail ($24.49)
-        expired_crossgrade = (retail * discount_mult).quantize(
-            Decimal("0.01"), rounding=ROUND_HALF_UP
-        )
+        expired_crossgrade = (retail * discount_mult).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         return PriceQuote(
             target_sku=target_sku,
             upgrade_type=UpgradeType.CROSSGRADE_EXPIRED,

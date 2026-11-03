@@ -11,7 +11,7 @@ Enforces:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from autocorrect.version import APP_VERSION, BINARY_SCHEMA_VERSION
 
@@ -50,9 +50,7 @@ class UpdatePolicyEngine:
                 requires_upgrade_purchase=False,
             )
 
-        released_dt = datetime.fromisoformat(
-            remote_released_at_iso.replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
+        released_dt = datetime.fromisoformat(remote_released_at_iso.replace("Z", "+00:00")).astimezone(UTC)
 
         if updates_expire_at is not None and released_dt > updates_expire_at:
             return UpdateEligibilityResult(
@@ -89,9 +87,7 @@ class UpdatePolicyEngine:
                 reason="ELIGIBLE_SECURITY_PATCH",
             )
 
-        released_dt = datetime.fromisoformat(
-            remote_released_at_iso.replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
+        released_dt = datetime.fromisoformat(remote_released_at_iso.replace("Z", "+00:00")).astimezone(UTC)
 
         if updates_expire_at is not None and released_dt > updates_expire_at:
             return UpdateEligibilityResult(

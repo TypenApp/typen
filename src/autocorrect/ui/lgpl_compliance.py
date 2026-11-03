@@ -76,9 +76,7 @@ def assert_no_gpl_qt_modules_loaded() -> list[str]:
         if sub in GPL_FORBIDDEN_QT_MODULES:
             violations.append(mod_name)
     if violations:
-        raise RuntimeError(
-            f"LGPLv3 compliance violation: GPLv3-only PySide6 modules loaded: {violations}"
-        )
+        raise RuntimeError(f"LGPLv3 compliance violation: GPLv3-only PySide6 modules loaded: {violations}")
     return violations
 
 

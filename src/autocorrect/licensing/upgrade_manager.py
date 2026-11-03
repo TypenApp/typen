@@ -9,7 +9,7 @@ Evaluates eligibility for:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from autocorrect.licensing.signed_licence import Edition, ProductSKU, SignedLicenceCertificate
@@ -44,7 +44,7 @@ class UpgradeManager:
         target_sku: ProductSKU,
         now_utc: datetime | None = None,
     ) -> UpgradeEligibility:
-        now = (now_utc or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        now = (now_utc or datetime.now(UTC)).astimezone(UTC)
 
         # Must be on the same OS platform (Windows licences upgrade to Windows SKUs; macOS to macOS)
         if existing_cert.platform != target_sku.platform:

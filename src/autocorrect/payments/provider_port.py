@@ -7,9 +7,10 @@ can be swapped in without modifying core licensing logic.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Mapping, Protocol
+from typing import Protocol
 
 
 @dataclass(frozen=True, slots=True)
@@ -94,13 +95,9 @@ class PaymentProviderPort(Protocol):
     @property
     def provider_name(self) -> str: ...
 
-    def create_checkout_session(
-        self, request: ProviderCheckoutRequest
-    ) -> ProviderCheckoutSession: ...
+    def create_checkout_session(self, request: ProviderCheckoutRequest) -> ProviderCheckoutSession: ...
 
-    def retrieve_checkout_session(
-        self, provider_checkout_id: str
-    ) -> ProviderCheckoutSession: ...
+    def retrieve_checkout_session(self, provider_checkout_id: str) -> ProviderCheckoutSession: ...
 
     def verify_and_parse_webhook(
         self, raw_body: bytes, headers: Mapping[str, str]

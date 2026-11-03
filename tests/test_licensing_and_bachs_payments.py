@@ -9,7 +9,7 @@ import hashlib
 import hmac
 import json
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -43,7 +43,7 @@ def _sign_bachs_webhook(raw_body: bytes, secret: str, timestamp: int | None = No
     ts = timestamp if timestamp is not None else int(time.time())
     sig = hmac.new(
         secret.encode("utf-8"),
-        f"{ts}.".encode("utf-8") + raw_body,
+        f"{ts}.".encode() + raw_body,
         hashlib.sha256,
     ).hexdigest()
     return {"x-bachs-signature-v2": f"t={ts},v1={sig}"}
@@ -77,7 +77,7 @@ def test_trial_commencement_expiry_tamper_resistance_and_safe_hook_release(
         assert snap.pro_features_enabled
         assert daemon.hooks_active
 
-        start_dt = datetime.now(timezone.utc)
+        start_dt = datetime.now(UTC)
         # Advance 5 days
         day5 = start_dt + timedelta(days=5)
         status_d5 = daemon.trial_manager.evaluate_trial(now_utc=day5)
@@ -91,9 +91,7 @@ def test_trial_commencement_expiry_tamper_resistance_and_safe_hook_release(
 
         # Delete local trial.dat file to simulate reinstall; vault anchor preserves original start
         (tmp_path / "app_data" / "licence" / "trial.dat").unlink()
-        status_reinstall = daemon.trial_manager.evaluate_trial(
-            now_utc=start_dt + timedelta(days=6)
-        )
+        status_reinstall = daemon.trial_manager.evaluate_trial(now_utc=start_dt + timedelta(days=6))
         assert status_reinstall.state == TrialState.ACTIVE
         assert 7.5 <= status_reinstall.days_remaining <= 8.5
 
@@ -146,10 +144,10 @@ def test_perpetual_usage_after_12_month_update_entitlement_expiry(
         ),
         priv_key,
     )
-    ent_mgr.install_certificate(cert, now_utc=datetime(2026, 6, 1, tzinfo=timezone.utc))
+    ent_mgr.install_certificate(cert, now_utc=datetime(2026, 6, 1, tzinfo=UTC))
 
     # Evaluate 3 years later (2029-06-01) offline -> Perpetual usage remains 100% active!
-    future_2029 = datetime(2029, 6, 1, tzinfo=timezone.utc)
+    future_2029 = datetime(2029, 6, 1, tzinfo=UTC)
     snap_2029 = ent_mgr.evaluate(now_utc=future_2029)
     assert snap_2029.mode == "LICENSED_STANDARD"
     assert snap_2029.typing_assistance_enabled is True
@@ -169,7 +167,6 @@ def test_platform_mismatch_and_device_deactivation_and_recovery(
     - Emergency dead-device recovery works with matching email and enforces the 2/year limit.
     """
     priv_key = Ed25519PrivateKey.generate()
-    pub_key = priv_key.public_key()
     act_mgr = ActivationManager(priv_key)
 
     from autocorrect.licensing.activation_manager import DeviceSeatRecord
@@ -194,9 +191,7 @@ def test_platform_mismatch_and_device_deactivation_and_recovery(
     assert cert_a.device_id_hash == "win_dev_A"
 
     # 3. Same-device reinstall on Windows Device A succeeds idempotently
-    cert_a_reinstall = act_mgr.activate_device(
-        "lic_win_pro", "win_dev_A", PlatformOS.WINDOWS
-    )
+    cert_a_reinstall = act_mgr.activate_device("lic_win_pro", "win_dev_A", PlatformOS.WINDOWS)
     assert cert_a_reinstall.device_id_hash == "win_dev_A"
 
     # 4. Activating on Windows Device B while Device A is active is blocked
@@ -266,7 +261,7 @@ def test_upgrade_and_crossgrade_pricing_rules() -> None:
     q_renew_std = calc.calculate_quote(
         ProductSKU.STANDARD_WIN,
         existing_cert=std_cert,
-        now_utc=datetime(2027, 2, 1, tzinfo=timezone.utc),
+        now_utc=datetime(2027, 2, 1, tzinfo=UTC),
     )
     assert q_renew_std.upgrade_type == UpgradeType.RENEWAL_30PCT
     assert q_renew_std.final_amount_str == "10.49"
@@ -276,7 +271,7 @@ def test_upgrade_and_crossgrade_pricing_rules() -> None:
     q_cross_active = calc.calculate_quote(
         ProductSKU.PRO_WIN,
         existing_cert=std_cert,
-        now_utc=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        now_utc=datetime(2026, 6, 1, tzinfo=UTC),
     )
     assert q_cross_active.upgrade_type == UpgradeType.CROSSGRADE_ACTIVE
     assert q_cross_active.final_amount_str == "20.00"
@@ -286,7 +281,7 @@ def test_upgrade_and_crossgrade_pricing_rules() -> None:
     q_cross_expired = calc.calculate_quote(
         ProductSKU.PRO_WIN,
         existing_cert=std_cert,
-        now_utc=datetime(2027, 6, 1, tzinfo=timezone.utc),
+        now_utc=datetime(2027, 6, 1, tzinfo=UTC),
     )
     assert q_cross_expired.upgrade_type == UpgradeType.CROSSGRADE_EXPIRED
     assert q_cross_expired.final_amount_str == "24.49"
@@ -320,11 +315,7 @@ def test_end_to_end_bachs_checkout_webhook_deduplication_and_refund_lifecycle(
             body = json.loads(request.content.decode("utf-8"))
             chk_id = "chk_test_987654321"
             cart_item = body["product_cart"][0]
-            override_amt = (
-                cart_item["pricing"]["amount"]
-                if "pricing" in cart_item
-                else "34.99"
-            )
+            override_amt = cart_item["pricing"]["amount"] if "pricing" in cart_item else "34.99"
             record = {
                 "checkout_id": chk_id,
                 "checkout_url": f"https://sandbox-checkout.bachs.io/c/{chk_id}",
@@ -413,9 +404,7 @@ def test_end_to_end_bachs_checkout_webhook_deduplication_and_refund_lifecycle(
 
     # Security Check: Trying to activate before webhook verification MUST fail
     with pytest.raises(PermissionError, match="not paid/fulfilled"):
-        checkout_mgr.retrieve_and_activate_on_client(
-            session_res.order_id, lic_svc, device_hash
-        )
+        checkout_mgr.retrieve_and_activate_on_client(session_res.order_id, lic_svc, device_hash)
 
     # Step 5: Webhook arrives with BAD signature -> rejected with HTTP 400
     webhook_payload = {
@@ -474,9 +463,7 @@ def test_end_to_end_bachs_checkout_webhook_deduplication_and_refund_lifecycle(
     assert msg_coll == "ALREADY_FULFILLED"
 
     # Step 9: Desktop client activates and persists signed entitlement.lic
-    snap = checkout_mgr.retrieve_and_activate_on_client(
-        session_res.order_id, lic_svc, device_hash
-    )
+    snap = checkout_mgr.retrieve_and_activate_on_client(session_res.order_id, lic_svc, device_hash)
     assert snap.mode == "LICENSED_PRO"
     assert snap.typing_assistance_enabled is True
     assert snap.pro_features_enabled is True
@@ -505,9 +492,7 @@ def test_end_to_end_bachs_checkout_webhook_deduplication_and_refund_lifecycle(
         },
     }
     raw_ref = json.dumps(refund_event).encode("utf-8")
-    st_ref, msg_ref = ver_svc.handle_raw_webhook(
-        raw_ref, _sign_bachs_webhook(raw_ref, webhook_secret)
-    )
+    st_ref, msg_ref = ver_svc.handle_raw_webhook(raw_ref, _sign_bachs_webhook(raw_ref, webhook_secret))
     assert st_ref == 200
     assert msg_ref == "LICENCE_REVOKED_ON_REFUND"
     assert ver_svc.get_order(session_res.order_id).status == OrderStatus.REFUNDED  # type: ignore[union-attr]

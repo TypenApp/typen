@@ -10,10 +10,10 @@ Strictly enforces:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-from typing import Callable
 
 import httpx
 
@@ -108,9 +108,7 @@ class BYOKProviderManager:
 
         api_key = self._keys.get_api_key(request.provider.value)
         if not api_key or not self._keys.validate_key_format(request.provider.value, api_key):
-            raise PermissionError(
-                f"Missing or invalid API key for provider '{request.provider.value}'."
-            )
+            raise PermissionError(f"Missing or invalid API key for provider '{request.provider.value}'.")
 
         try:
             with httpx.Client(transport=self._transport, timeout=15.0) as client:
@@ -211,21 +209,11 @@ class BYOKProviderManager:
         resp = client.post(
             url,
             headers={"x-goog-api-key": api_key},
-            json={
-                "contents": [
-                    {
-                        "parts": [
-                            {"text": f"{req.instruction}\n\nText:\n{req.text}"}
-                        ]
-                    }
-                ]
-            },
+            json={"contents": [{"parts": [{"text": f"{req.instruction}\n\nText:\n{req.text}"}]}]},
         )
         resp.raise_for_status()
         data = resp.json()
-        content = str(
-            data["candidates"][0]["content"]["parts"][0]["text"]
-        ).strip()
+        content = str(data["candidates"][0]["content"]["parts"][0]["text"]).strip()
         meta = data.get("usageMetadata", {})
         return (
             content,

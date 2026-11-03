@@ -7,7 +7,7 @@ with dynamic date/time template variables and single-Backspace undo support.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,7 +51,7 @@ class SnippetEngine:
         snip = self._snippets.get(trigger_token)
         if snip is None:
             return None
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         result = snip.expansion
         if "{{date}}" in result:
             result = result.replace("{{date}}", now.strftime("%Y-%m-%d"))

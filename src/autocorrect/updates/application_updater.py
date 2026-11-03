@@ -13,9 +13,9 @@ from datetime import datetime
 from pathlib import Path
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from pipeline.sign_release import verify_manifest_signature
 
 from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
-from pipeline.sign_release import verify_manifest_signature
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,9 +58,7 @@ class ApplicationUpdater:
         updates_expire_at: datetime | None,
         current_app_version: str,
     ) -> UpdateEligibilityResult:
-        if not verify_manifest_signature(
-            descriptor.to_canonical_dict(), signature_b64, self._public_key
-        ):
+        if not verify_manifest_signature(descriptor.to_canonical_dict(), signature_b64, self._public_key):
             return UpdateEligibilityResult(
                 eligible=False,
                 reason="Invalid Ed25519 application release signature",
@@ -83,9 +81,7 @@ class ApplicationUpdater:
         updates_expire_at: datetime | None,
         current_app_version: str,
     ) -> Path:
-        eligibility = self.evaluate_release(
-            descriptor, signature_b64, updates_expire_at, current_app_version
-        )
+        eligibility = self.evaluate_release(descriptor, signature_b64, updates_expire_at, current_app_version)
         if not eligibility.eligible:
             raise PermissionError(f"Application update not eligible: {eligibility.reason}")
 

@@ -10,13 +10,17 @@ import base64
 import json
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import (
     Ed25519PrivateKey,
     Ed25519PublicKey,
 )
+
+# Licence ids carrying this prefix denote a creator/lifetime certificate: the
+# holder gets Pro forever with no update window. Only the root key can mint one.
+CREATOR_LICENCE_ID_PREFIX = "CREATOR-"
 
 
 class Edition(str, Enum):
@@ -35,24 +39,29 @@ class PlatformOS(str, Enum):
 
 
 class ProductSKU(str, Enum):
-    """Approved distinct product SKUs."""
+    """Approved distinct product SKUs (one per edition x platform)."""
 
     STANDARD_WIN = "STANDARD-WIN"
     PRO_WIN = "PRO-WIN"
     STANDARD_MAC = "STANDARD-MAC"
     PRO_MAC = "PRO-MAC"
+    STANDARD_LINUX = "STANDARD-LINUX"
+    PRO_LINUX = "PRO-LINUX"
 
     @property
     def edition(self) -> Edition:
-        if self in (ProductSKU.PRO_WIN, ProductSKU.PRO_MAC):
-            return Edition.PRO
-        return Edition.STANDARD
+        return Edition.PRO if self.value.startswith("PRO-") else Edition.STANDARD
 
     @property
     def platform(self) -> PlatformOS:
-        if self in (ProductSKU.STANDARD_WIN, ProductSKU.PRO_WIN):
-            return PlatformOS.WINDOWS
-        return PlatformOS.MACOS
+        suffix = self.value.rsplit("-", 1)[1]
+        return {"WIN": PlatformOS.WINDOWS, "MAC": PlatformOS.MACOS, "LINUX": PlatformOS.LINUX}[suffix]
+
+    @classmethod
+    def for_platform(cls, edition: Edition, platform: PlatformOS) -> ProductSKU:
+        """Return the SKU for an edition on a platform (e.g. PRO + LINUX -> PRO-LINUX)."""
+        suffix = {PlatformOS.WINDOWS: "WIN", PlatformOS.MACOS: "MAC", PlatformOS.LINUX: "LINUX"}[platform]
+        return cls(f"{edition.value}-{suffix}")
 
 
 def detect_current_platform() -> PlatformOS:
@@ -61,6 +70,11 @@ def detect_current_platform() -> PlatformOS:
     if sys.platform == "darwin":
         return PlatformOS.MACOS
     return PlatformOS.LINUX
+
+
+def current_platform_sku(edition: Edition) -> ProductSKU:
+    """SKU of `edition` for the operating system this process is running on."""
+    return ProductSKU.for_platform(edition, detect_current_platform())
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +95,10 @@ class SignedLicenceCertificate:
     updates_expire_at: str
     entitled_app_max_release_date: str
     signature_b64: str = ""
+
+    @property
+    def is_creator_certificate(self) -> bool:
+        return self.licence_id.startswith(CREATOR_LICENCE_ID_PREFIX)
 
     def to_unsigned_dict(self) -> dict[str, object]:
         return {
@@ -119,20 +137,16 @@ class SignedLicenceCertificate:
         )
 
     def get_updates_expire_datetime(self) -> datetime:
-        return datetime.fromisoformat(
-            self.updates_expire_at.replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
+        return datetime.fromisoformat(self.updates_expire_at.replace("Z", "+00:00")).astimezone(UTC)
 
     def get_entitled_max_release_datetime(self) -> datetime:
-        return datetime.fromisoformat(
-            self.entitled_app_max_release_date.replace("Z", "+00:00")
-        ).astimezone(timezone.utc)
+        return datetime.fromisoformat(self.entitled_app_max_release_date.replace("Z", "+00:00")).astimezone(
+            UTC
+        )
 
 
 def _canonical_bytes(cert: SignedLicenceCertificate) -> bytes:
-    return json.dumps(
-        cert.to_unsigned_dict(), sort_keys=True, separators=(",", ":")
-    ).encode("utf-8")
+    return json.dumps(cert.to_unsigned_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def sign_licence_certificate(

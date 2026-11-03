@@ -8,11 +8,8 @@ import pytest
 @pytest.fixture(autouse=True)
 def _hermetic_env(monkeypatch: pytest.MonkeyPatch) -> None:
     """
-    Keep tests independent of the developer machine's `.env`.
-    `load_env_file` never overrides variables that are already set, so pinning
-    these to empty strings means a real creator `.env` cannot leak into tests
-    (tests that exercise the creator entitlement set the variables explicitly).
+    Keep tests independent of the developer machine's `.env`: pin the dev-only
+    overrides to empty so a real root-key override cannot leak into tests.
     """
-    monkeypatch.setenv("AUTOCORRECT_CREATOR_DEVICE_HASHES", "")
-    monkeypatch.setenv("AUTOCORRECT_CREATOR_NAME", "")
     monkeypatch.setenv("AUTOCORRECT_ENV_FILE", "")
+    monkeypatch.setenv("AUTOCORRECT_ROOT_PUBLIC_KEY_HEX", "")

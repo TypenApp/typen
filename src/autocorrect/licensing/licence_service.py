@@ -44,18 +44,14 @@ class LicenceService:
     def licence_file_path(self) -> Path:
         return self._lic_path
 
-    def load_cached_licence_offline(
-        self, now_utc: datetime | None = None
-    ) -> EntitlementSnapshot:
+    def load_cached_licence_offline(self, now_utc: datetime | None = None) -> EntitlementSnapshot:
         """
         Load `entitlement.lic` from local disk if present and evaluate offline.
         Never requires a network connection.
         """
         if self._lic_path.exists():
             try:
-                cert = SignedLicenceCertificate.from_json(
-                    self._lic_path.read_text(encoding="utf-8")
-                )
+                cert = SignedLicenceCertificate.from_json(self._lic_path.read_text(encoding="utf-8"))
                 return self._entitlement_mgr.install_certificate(cert, now_utc=now_utc)
             except Exception:
                 pass
