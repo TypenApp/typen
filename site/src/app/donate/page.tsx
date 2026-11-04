@@ -1,7 +1,12 @@
 import React from "react";
 import Link from "next/link";
 import { Check, Dash, PageHeader, Section } from "@/components/Page";
-import { DONATE_URL, GITHUB_ORG_URL, GITHUB_REPO_URL, LICENSE_NAME, LICENSE_URL } from "@/data/releases";
+import {
+  DONATE_URL,
+  GITHUB_REPO_URL,
+  LICENSE_NAME,
+  LICENSE_URL,
+} from "@/data/releases";
 
 const EVERYONE_GETS = [
   "Offline spelling, homophone, punctuation and capitalisation correction in every application",
@@ -52,25 +57,37 @@ export default function DonatePage() {
         }
         lede={
           <p>
-            Typen is open source under the {LICENSE_NAME} licence and has no paid tier, trial or licence key. If it saves
-            you time, a donation keeps the lexicon, the builds and the signing going.
+            Typen is open source under the {LICENSE_NAME} licence and has no
+            paid tier, trial or licence key. If it saves you time, a donation
+            keeps the lexicon, the builds and the signing going.
           </p>
         }
       >
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
+          <a
+            href={DONATE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-primary"
+          >
             Sponsor @TypenApp on GitHub <span aria-hidden="true">↗</span>
           </a>
-          <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-secondary"
+          >
             Source on GitHub <span aria-hidden="true">↗</span>
-          </a>
-          <a href={GITHUB_ORG_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
-            TypenApp Organisation <span aria-hidden="true">↗</span>
           </a>
         </div>
       </PageHeader>
 
-      <Section index="01" title="What everyone gets" aside="No editions, no gates">
+      <Section
+        index="01"
+        title="What everyone gets"
+        aside="No editions, no gates"
+      >
         <ul className="grid gap-3 sm:grid-cols-2">
           {EVERYONE_GETS.map((f) => (
             <Check key={f}>{f}</Check>
@@ -85,7 +102,8 @@ export default function DonatePage() {
           ))}
         </ul>
         <p className="mt-8 text-sm text-ink-muted">
-          Donations are handled by GitHub Sponsors; Typen never sees card details and never stores anything about you.
+          Donations are handled by GitHub Sponsors; Typen never sees card
+          details and never stores anything about you.
         </p>
       </Section>
 
@@ -94,13 +112,20 @@ export default function DonatePage() {
           {FAQ.map(([q, a]) => (
             <div key={q}>
               <dt className="font-medium text-ink">{q}</dt>
-              <dd className="mt-2 text-sm leading-relaxed text-ink-muted">{a}</dd>
+              <dd className="mt-2 text-sm leading-relaxed text-ink-muted">
+                {a}
+              </dd>
             </div>
           ))}
         </dl>
         <p className="mt-10 text-sm text-ink-muted">
           Licence text:{" "}
-          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="link">
+          <a
+            href={LICENSE_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link"
+          >
             LICENSE on GitHub
           </a>
           . Ready to try it?{" "}

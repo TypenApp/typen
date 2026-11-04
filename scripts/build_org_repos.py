@@ -358,7 +358,7 @@ This repository contains the lexicon ingestion pipeline, binary compiler, homoph
 | `pipeline/sign_release.py` | Ed25519 manifest signer and Zstandard `.tar.zst` full / `.patch.zst` delta archive builder |
 | `resources/en_base/` | Compiled binary baseline bundle (`schema_version = 1`) and `manifest.json` |
 | `resources/en_base/packs/` | 6 domain vocabulary packs: `programming`, `medicine`, `finance`, `law`, `business`, `academic` |
-| `tests/` | Curated and held-out corpus quality gates (`test_correction_quality.py`, `test_engine_quality_heldout.py`) |
+| `tests/` | Held-out corpus quality gate (`test_engine_quality_heldout.py`); the full curated suite lives in `TypenApp/typen` |
 
 ---
 
