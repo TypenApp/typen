@@ -52,6 +52,13 @@ jobs:
             fi
             CHANNEL="${TAG#"$APP_VERSION"-}"          # beta.3
             PUBLISH=true
+            # A mirror or development copy of this repository (the source tree is
+            # force-pushed to TypenApp/typen for publishing) sets the repository
+            # variable PUBLISH_RELEASES=false: a tag there builds but publishes
+            # nothing, so one tag cannot produce two releases.
+            if [[ "${{ vars.PUBLISH_RELEASES }}" == "false" ]]; then
+              PUBLISH=false; echo "PUBLISH_RELEASES=false: build only, nothing is published"
+            fi
           else
             CHANNEL="${{ github.event.inputs.channel }}"
             PUBLISH=false
