@@ -8,60 +8,56 @@ from __future__ import annotations
 
 import ctypes
 import sys
-from typing import Final
+from typing import Any, Final
 
+from autocorrect.adapters.windows import win32_api as w32
 from autocorrect.adapters.windows.win_keymap import VK_BACK
 
 # Custom magic tag ("ACOR" = 0x41434F52) stamped onto dwExtraInfo of all injected events
 AUTOCORRECT_EXTRA_INFO_TAG: Final[int] = 0x41434F52
 
-INPUT_KEYBOARD: Final[int] = 1
-KEYEVENTF_KEYUP: Final[int] = 0x0002
-KEYEVENTF_UNICODE: Final[int] = 0x0004
+INPUT_KEYBOARD: Final[int] = w32.INPUT_KEYBOARD
+KEYEVENTF_KEYUP: Final[int] = w32.KEYEVENTF_KEYUP
+KEYEVENTF_UNICODE: Final[int] = w32.KEYEVENTF_UNICODE
 
+if w32.IS_WINDOWS:
+    KEYBDINPUT = w32.KEYBDINPUT
+    MOUSEINPUT = w32.MOUSEINPUT
+    HARDWAREINPUT = w32.HARDWAREINPUT
+    INPUT = w32.INPUT
+else:  # Portable definitions so the struct builder is unit-testable on any OS.
 
-class KEYBDINPUT(ctypes.Structure):
-    _fields_ = [
-        ("wVk", ctypes.c_ushort),
-        ("wScan", ctypes.c_ushort),
-        ("dwFlags", ctypes.c_ulong),
-        ("time", ctypes.c_ulong),
-        ("dwExtraInfo", ctypes.c_size_t),
-    ]
+    class KEYBDINPUT(ctypes.Structure):  # type: ignore[no-redef]
+        _fields_ = [
+            ("wVk", ctypes.c_ushort),
+            ("wScan", ctypes.c_ushort),
+            ("dwFlags", ctypes.c_ulong),
+            ("time", ctypes.c_ulong),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
 
+    class MOUSEINPUT(ctypes.Structure):  # type: ignore[no-redef]
+        _fields_ = [
+            ("dx", ctypes.c_long),
+            ("dy", ctypes.c_long),
+            ("mouseData", ctypes.c_ulong),
+            ("dwFlags", ctypes.c_ulong),
+            ("time", ctypes.c_ulong),
+            ("dwExtraInfo", ctypes.c_size_t),
+        ]
 
-class MOUSEINPUT(ctypes.Structure):
-    _fields_ = [
-        ("dx", ctypes.c_long),
-        ("dy", ctypes.c_long),
-        ("mouseData", ctypes.c_ulong),
-        ("dwFlags", ctypes.c_ulong),
-        ("time", ctypes.c_ulong),
-        ("dwExtraInfo", ctypes.c_size_t),
-    ]
+    class HARDWAREINPUT(ctypes.Structure):  # type: ignore[no-redef]
+        _fields_ = [
+            ("uMsg", ctypes.c_ulong),
+            ("wParamL", ctypes.c_ushort),
+            ("wParamH", ctypes.c_ushort),
+        ]
 
+    class _INPUT_UNION(ctypes.Union):
+        _fields_ = [("ki", KEYBDINPUT), ("mi", MOUSEINPUT), ("hi", HARDWAREINPUT)]
 
-class HARDWAREINPUT(ctypes.Structure):
-    _fields_ = [
-        ("uMsg", ctypes.c_ulong),
-        ("wParamL", ctypes.c_ushort),
-        ("wParamH", ctypes.c_ushort),
-    ]
-
-
-class _INPUT_UNION(ctypes.Union):
-    _fields_ = [
-        ("ki", KEYBDINPUT),
-        ("mi", MOUSEINPUT),
-        ("hi", HARDWAREINPUT),
-    ]
-
-
-class INPUT(ctypes.Structure):
-    _fields_ = [
-        ("type", ctypes.c_ulong),
-        ("union", _INPUT_UNION),
-    ]
+    class INPUT(ctypes.Structure):  # type: ignore[no-redef]
+        _fields_ = [("type", ctypes.c_ulong), ("union", _INPUT_UNION)]
 
 
 class Win32UnicodeInjector:
@@ -75,56 +71,35 @@ class Win32UnicodeInjector:
         self.history: list[tuple[int, str]] = []
 
     @staticmethod
-    def build_input_structs(backspaces: int, text_to_inject: str) -> list[INPUT]:
+    def build_input_structs(backspaces: int, text_to_inject: str) -> list[Any]:
         """
         Construct the exact sequence of Win32 INPUT structs for `backspaces` + `text_to_inject`.
         Handles surrogate pairs (UTF-16LE code units) cleanly.
         """
-        events: list[INPUT] = []
+        events: list[Any] = []
+
+        def _key(vk: int, scan: int, flags: int) -> Any:
+            inp = INPUT(type=INPUT_KEYBOARD)
+            inp.union.ki = KEYBDINPUT(
+                wVk=vk,
+                wScan=scan,
+                dwFlags=flags,
+                time=0,
+                dwExtraInfo=AUTOCORRECT_EXTRA_INFO_TAG,
+            )
+            return inp
 
         # 1. Backspace keydown + keyup pairs
         for _ in range(max(0, backspaces)):
-            down = INPUT(type=INPUT_KEYBOARD)
-            down.union.ki = KEYBDINPUT(
-                wVk=VK_BACK,
-                wScan=0,
-                dwFlags=0,
-                time=0,
-                dwExtraInfo=AUTOCORRECT_EXTRA_INFO_TAG,
-            )
-            up = INPUT(type=INPUT_KEYBOARD)
-            up.union.ki = KEYBDINPUT(
-                wVk=VK_BACK,
-                wScan=0,
-                dwFlags=KEYEVENTF_KEYUP,
-                time=0,
-                dwExtraInfo=AUTOCORRECT_EXTRA_INFO_TAG,
-            )
-            events.append(down)
-            events.append(up)
+            events.append(_key(VK_BACK, 0, 0))
+            events.append(_key(VK_BACK, 0, KEYEVENTF_KEYUP))
 
         # 2. Unicode UTF-16LE code units
         utf16_bytes = text_to_inject.encode("utf-16-le")
         for i in range(0, len(utf16_bytes), 2):
             code_unit = int.from_bytes(utf16_bytes[i : i + 2], "little")
-            down = INPUT(type=INPUT_KEYBOARD)
-            down.union.ki = KEYBDINPUT(
-                wVk=0,
-                wScan=code_unit,
-                dwFlags=KEYEVENTF_UNICODE,
-                time=0,
-                dwExtraInfo=AUTOCORRECT_EXTRA_INFO_TAG,
-            )
-            up = INPUT(type=INPUT_KEYBOARD)
-            up.union.ki = KEYBDINPUT(
-                wVk=0,
-                wScan=code_unit,
-                dwFlags=KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
-                time=0,
-                dwExtraInfo=AUTOCORRECT_EXTRA_INFO_TAG,
-            )
-            events.append(down)
-            events.append(up)
+            events.append(_key(0, code_unit, KEYEVENTF_UNICODE))
+            events.append(_key(0, code_unit, KEYEVENTF_UNICODE | KEYEVENTF_KEYUP))
 
         return events
 
@@ -140,5 +115,13 @@ class Win32UnicodeInjector:
 
         array_type = INPUT * len(events)
         input_array = array_type(*events)
-        user32 = ctypes.windll.user32
-        user32.SendInput(len(events), ctypes.byref(input_array), ctypes.sizeof(INPUT))
+        sent = w32.user32.SendInput(len(events), input_array, ctypes.sizeof(INPUT))
+        if sent != len(events):
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "SendInput delivered %d/%d events: %s",
+                sent,
+                len(events),
+                w32.win_error_message(w32.last_error()),
+            )

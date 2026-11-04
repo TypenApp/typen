@@ -53,7 +53,7 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
             ov = self._ctrl.get_overview()
             ent = ov.get("entitlement", {})
             hook = ov.get("hook_status", {})
-            if isinstance(hook, dict) and hook.get("state") in ("failed", "unsupported"):
+            if isinstance(hook, dict) and hook.get("state") in ("failed", "unsupported", "disabled"):
                 # Typing assistance is not actually running: say why and what to do.
                 return f"Not correcting — {hook.get('remediation') or hook.get('detail') or 'input hook unavailable'}"
             return str(ent.get("status_message", "Active")) if isinstance(ent, dict) else "Active"

@@ -13,6 +13,7 @@ Self-generated XTest events are filtered through the shared
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 import time
@@ -26,6 +27,8 @@ from autocorrect.adapters.linux.x11_adapter import (
     translate_x11_key,
 )
 from autocorrect.input.ports import KeyAction, KeyEvent
+
+log = logging.getLogger(__name__)
 
 
 class X11HookError(RuntimeError):
@@ -47,9 +50,12 @@ class X11KeyboardMouseHook:
         on_key_event: Callable[[KeyEvent], KeyAction],
         on_mouse_click: Callable[[], None],
         tracker: X11SyntheticTracker | None = None,
+        *,
+        on_thread_exit: Callable[[BaseException | None], None] | None = None,
     ) -> None:
         self._on_key_event = on_key_event
         self._on_mouse_click = on_mouse_click
+        self._on_thread_exit = on_thread_exit
         self._tracker = tracker or shared_synthetic_tracker()
         self._running = False
         self._thread: threading.Thread | None = None
@@ -156,12 +162,21 @@ class X11KeyboardMouseHook:
     # ------------------------------------------------------------- recording
 
     def _run_record_loop(self) -> None:
+        exc: BaseException | None = None
         try:
             self._record_display.record_enable_context(self._context, self._record_callback)
-        except Exception:
-            pass
+        except Exception as e:
+            if self._running:  # a stop() in progress closes the connection on purpose
+                exc = e
+                log.exception("XRecord loop died")
         finally:
+            was_running = self._running
             self._running = False
+            if was_running and self._on_thread_exit is not None:
+                try:
+                    self._on_thread_exit(exc)
+                except Exception:
+                    log.exception("on_thread_exit raised")
 
     def _keysym_for(self, keycode: int, state: int) -> int:
         from autocorrect.adapters.linux.x11_adapter import LOCK_MASK, MOD5_MASK, SHIFT_MASK

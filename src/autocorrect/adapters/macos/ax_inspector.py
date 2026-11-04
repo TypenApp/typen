@@ -7,9 +7,26 @@ and provides user onboarding helpers for macOS Accessibility permissions.
 from __future__ import annotations
 
 import sys
-from typing import Final
+from functools import lru_cache
+from typing import Any, Final
 
 from autocorrect.input.ports import FocusContext
+
+
+@lru_cache(maxsize=1)
+def _carbon_is_secure_event_input_enabled() -> Any:
+    """
+    Load Carbon once (the focus monitor polls every 150 ms; re-opening the
+    framework on every poll is wasteful) and return the typed function.
+    """
+    import ctypes
+
+    carbon = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
+    fn = carbon.IsSecureEventInputEnabled
+    fn.restype = ctypes.c_ubyte
+    fn.argtypes = []
+    return fn
+
 
 MACOS_EXCLUDED_BUNDLES: Final[frozenset[str]] = frozenset(
     {
@@ -104,11 +121,8 @@ class MacAXFocusInspector:
         if sys.platform != "darwin":
             return False
         try:
-            import ctypes
-
-            carbon = ctypes.CDLL("/System/Library/Frameworks/Carbon.framework/Carbon")
-            carbon.IsSecureEventInputEnabled.restype = ctypes.c_ubyte
-            return bool(carbon.IsSecureEventInputEnabled())
+            fn = _carbon_is_secure_event_input_enabled()
+            return bool(fn()) if fn is not None else False
         except Exception:
             return False
 

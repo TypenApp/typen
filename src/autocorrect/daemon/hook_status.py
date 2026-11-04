@@ -16,8 +16,9 @@ class HookState(str, Enum):
     INACTIVE = "inactive"  # not entitled / paused at start / stopped
     ACTIVE = "active"  # hook installed and receiving events
     DRY_RUN = "dry_run"  # tests / --headless-check: session wired, no OS hook
-    FAILED = "failed"  # tried to install but the OS refused
+    FAILED = "failed"  # tried to install but the OS refused, or the hook died / was auto-released
     UNSUPPORTED = "unsupported"  # no hook exists for this session type
+    DISABLED = "disabled"  # switched off on purpose (Esc kill switch / safe mode) until the user resumes
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,11 @@ class HookStatus:
     @property
     def is_active(self) -> bool:
         return self.state in (HookState.ACTIVE, HookState.DRY_RUN)
+
+    @property
+    def needs_attention(self) -> bool:
+        """True when the user should be told why nothing is being corrected."""
+        return self.state in (HookState.FAILED, HookState.UNSUPPORTED, HookState.DISABLED)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

@@ -12,6 +12,7 @@ import sys
 from pathlib import Path
 from typing import Final
 
+from autocorrect.adapters.windows import win32_api as w32
 from autocorrect.input.ports import FocusContext
 
 # Default password managers, RDP/SSH clients, and games where autocorrect must auto-suspend
@@ -45,32 +46,9 @@ DEFAULT_TERMINAL_PROCESSES: Final[frozenset[str]] = frozenset(
     }
 )
 
-ES_PASSWORD: Final[int] = 0x0020
-GWL_STYLE: Final[int] = -16
-PROCESS_QUERY_LIMITED_INFORMATION: Final[int] = 0x1000
-
-
-class RECT(ctypes.Structure):
-    _fields_ = [
-        ("left", ctypes.c_long),
-        ("top", ctypes.c_long),
-        ("right", ctypes.c_long),
-        ("bottom", ctypes.c_long),
-    ]
-
-
-class GUITHREADINFO(ctypes.Structure):
-    _fields_ = [
-        ("cbSize", ctypes.c_ulong),
-        ("flags", ctypes.c_ulong),
-        ("hwndActive", ctypes.c_void_p),
-        ("hwndFocus", ctypes.c_void_p),
-        ("hwndCapture", ctypes.c_void_p),
-        ("hwndMenuOwner", ctypes.c_void_p),
-        ("hwndMoveSize", ctypes.c_void_p),
-        ("hwndCaret", ctypes.c_void_p),
-        ("rcCaret", RECT),
-    ]
+ES_PASSWORD: Final[int] = w32.ES_PASSWORD
+GWL_STYLE: Final[int] = w32.GWL_STYLE
+PROCESS_QUERY_LIMITED_INFORMATION: Final[int] = w32.PROCESS_QUERY_LIMITED_INFORMATION
 
 
 class Win32FocusInspector:
@@ -133,8 +111,8 @@ class Win32FocusInspector:
             return FocusContext()
 
         try:
-            user32 = ctypes.windll.user32
-            kernel32 = ctypes.windll.kernel32
+            user32 = w32.user32
+            kernel32 = w32.kernel32
 
             hwnd = user32.GetForegroundWindow()
             if not hwnd:
@@ -164,8 +142,8 @@ class Win32FocusInspector:
                         kernel32.CloseHandle(hproc)
 
             # Check focused control style for ES_PASSWORD
-            gti = GUITHREADINFO()
-            gti.cbSize = ctypes.sizeof(GUITHREADINFO)
+            gti = w32.GUITHREADINFO()
+            gti.cbSize = ctypes.sizeof(w32.GUITHREADINFO)
             style = 0
             if user32.GetGUIThreadInfo(thread_id, ctypes.byref(gti)) and gti.hwndFocus:
                 style = user32.GetWindowLongW(gti.hwndFocus, GWL_STYLE)

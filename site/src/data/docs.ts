@@ -28,7 +28,7 @@ export const DOC_ARTICLES: DocArticle[] = [
     category: "Foundation",
     summary:
       "Install Typen on Windows (stable), macOS or Linux (public beta), understand the tray service and Settings window, grant the OS permissions each platform needs, and check that corrections are live.",
-    readingTime: "4 min read",
+    readingTime: "5 min read",
     sections: [
       {
         id: "architecture-overview",
@@ -48,8 +48,8 @@ export const DOC_ARTICLES: DocArticle[] = [
         heading: "Windows 10 & 11 Installation",
         paragraphs: [
           "Windows is the stable platform: the build has been verified end to end on real machines. Download the installer (.exe) or portable (.zip) build from the Download page — every file is attached to the matching GitHub release — and compare its SHA-256 with the value shown there. The Windows build is not code-signed yet, so SmartScreen will show a warning on first run: choose More info, then Run anyway.",
-          "The installer offers launch-at-login and creates Start menu shortcuts for the service and for Settings. After launch a tray icon appears; right-click it to pause, open Settings, or quit. The portable build is a one-folder PyInstaller bundle: unzip it anywhere and run AutoCorrectDesktop.exe.",
-          "On Windows, AutoCorrect uses SetWindowsHookExW (WH_KEYBOARD_LL and WH_MOUSE_LL) paired with atomic SendInput (KEYEVENTF_UNICODE) packets tagged with AUTOCORRECT_EXTRA_INFO_TAG so synthetic keystrokes are never re-evaluated.",
+          "The installer offers launch-at-login and creates Start menu shortcuts for the service and for Settings. After launch the Typen mark (a black tile with \"Aa_\" and a red squiggle; white on dark taskbars, grey while paused) appears in the system tray, and on the very first run the Settings window opens so you can see the service is live. The keyboard hook is only attached once the tray icon is on screen, so Pause and Quit are always reachable. Right-click the icon to pause, open Settings, or quit; launching the Start-menu entry again while the service is running opens Settings instead of a second copy. The portable build is a one-folder PyInstaller bundle: unzip it anywhere and run AutoCorrectDesktop.exe.",
+          "On Windows, Typen uses SetWindowsHookExW (WH_KEYBOARD_LL) to observe keys and Raw Input (WM_INPUT) to notice mouse clicks, paired with atomic SendInput (KEYEVENTF_UNICODE) packets tagged with AUTOCORRECT_EXTRA_INFO_TAG so synthetic keystrokes are never re-evaluated. The hook callback does nothing but queue the event and return, so Typen can never hold up the system input chain; all correction work runs on a separate worker thread, and if that worker ever falls behind, the hook releases itself and the tray reports 'Not correcting' rather than slowing your machine down.",
         ],
         codeBlock: {
           language: "powershell",
@@ -85,6 +85,51 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
           "X11 sessions: the service uses the XRecord extension to observe keys and XTest to type corrections; window class and title (EWMH _NET_ACTIVE_WINDOW / WM_CLASS) identify password managers, polkit and keyring prompts, and terminals. Because XRecord observes keys after delivery, the delimiter you typed is deleted and re-typed together with the corrected word.",
           "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (Typen)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
         ],
+      },
+      {
+        id: "kill-switch",
+        heading: "Pausing and the Esc Kill Switch",
+        paragraphs: [
+          "There are three ways to stop Typen from touching your keyboard, from gentlest to strongest:",
+        ],
+        bullets: [
+          "Pause hotkey — Ctrl+Alt+P (changeable under Settings -> General). Toggles pause from any application; the tray icon turns grey while paused. Ctrl+Alt+, opens Settings.",
+          "Esc kill switch — hold Esc for 15 seconds. If anything ever feels wrong, hold the Escape key down for 15 seconds (adjustable between 3 and 120 seconds in Settings -> General, or switch it off there). Typen releases its keyboard hook immediately, pauses, shows a notification, and writes a safe-mode marker. The kill switch is watched independently of the keyboard hook, so it works even if the hook itself is the problem. It is available on Windows, macOS and X11 (not on Wayland, where Typen never holds a global hook).",
+          "Quit from the tray menu, or --stop from a terminal (see below).",
+        ],
+      },
+      {
+        id: "safe-mode",
+        heading: "Safe Mode",
+        paragraphs: [
+          "Once the kill switch has fired, Typen stays in safe mode across restarts: the service and tray still start, Settings still works, but no keyboard hook is attached and the status reads 'Not correcting — Typing assistance was switched off by the emergency stop (Esc held)'. To go live again, choose 'Resume typing assistance' in the tray menu, press the pause hotkey, click Resume in Settings, or start the service with --resume. You can also enter safe mode deliberately with --safe-mode.",
+        ],
+      },
+      {
+        id: "logs-and-flags",
+        heading: "Logs and Command-Line Flags",
+        paragraphs: [
+          "Typen writes a rotating log (1 MB x 5 files) to <data dir>/logs/typen.log; the service's data directory is %USERPROFILE%\\.autocorrect_desktop on Windows, ~/Library/Application Support/AutoCorrect on macOS and ~/.local/share/autocorrect on Linux. The log records hook installation, hotkey registration, health degradations and any unhandled exception, so it is the first thing to attach to a bug report. Set TYPEN_LOG_LEVEL=DEBUG for more detail.",
+          "The same flags work with python -m autocorrect.launcher when running from source, and --data-dir <path> points any of them at an alternative data directory.",
+        ],
+        codeBlock: {
+          language: "powershell",
+          title: "Service control flags",
+          code: `# Open Settings (starts the service first if it is not running)
+& "...\\AutoCorrectDesktop.exe" --settings
+
+# Ask a running service to shut down cleanly (falls back to terminating it)
+& "...\\AutoCorrectDesktop.exe" --stop
+
+# Start without attaching the keyboard hook (tray + Settings only)
+& "...\\AutoCorrectDesktop.exe" --safe-mode
+
+# Clear safe mode and start correcting again
+& "...\\AutoCorrectDesktop.exe" --resume
+
+# One-line health check (hook state, data dir), then exit
+& "...\\AutoCorrectDesktop.exe" --headless-check`,
+        },
       },
     ],
   },
@@ -400,7 +445,7 @@ python -m autocorrect.launcher --headless-check`,
         id: "cli-commands",
         heading: "Installed CLI Entry Points (pyproject.toml)",
         paragraphs: [
-          "The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-tray, --data-dir and --version. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:",
+          "The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:",
         ],
         codeBlock: {
           language: "bash",
@@ -408,6 +453,11 @@ python -m autocorrect.launcher --headless-check`,
           code: `# 0. Same entry point as the packaged executable (service + tray, or --settings)
 autocorrect-desktop --data-dir ~/.autocorrect_desktop
 autocorrect-desktop --settings
+
+# 0b. Service control: shut down cleanly, start without hooks, or leave safe mode
+autocorrect-desktop --stop
+autocorrect-desktop --safe-mode
+autocorrect-desktop --resume
 
 # 1. Start only the background hook daemon & Local IPC server (foreground, Ctrl+C to stop)
 autocorrect-daemon --live --data-dir ~/.autocorrect_desktop

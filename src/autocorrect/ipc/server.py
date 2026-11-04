@@ -290,6 +290,7 @@ class LocalIPCServer:
                 "hooks_active": d.hooks_active,
                 "hook_status": d.hook_status.to_dict(),
                 "is_paused": d.session.is_paused,
+                "safe_mode": d.in_safe_mode,
                 "active_region": prefs.overlay.active_region.name or "EN_GB",
                 "custom_word_count": len(prefs.list_custom_words()),
                 "suggested_word_count": len(prefs.list_suggested_words()),
@@ -320,8 +321,20 @@ class LocalIPCServer:
 
         if method == "system.set_paused":
             paused = bool(params.get("paused", False))
-            d.session.set_paused(paused)
-            return {"is_paused": d.session.is_paused, "hooks_active": d.hooks_active}
+            d.set_paused(paused)
+            return {
+                "is_paused": d.session.is_paused,
+                "hooks_active": d.hooks_active,
+                "hook_status": d.hook_status.to_dict(),
+                "safe_mode": d.in_safe_mode,
+            }
+
+        if method == "system.get_health":
+            return d.health_snapshot()
+
+        if method == "system.shutdown":
+            d.request_shutdown()
+            return {"ok": True}
 
         if method == "insights.set_enabled":
             enabled = bool(params.get("enabled", True))
@@ -342,6 +355,9 @@ class LocalIPCServer:
                 "rewrite_hotkey": prefs.get_setting("rewrite_hotkey", "Ctrl+Shift+R"),
                 "pause_hotkey": prefs.get_setting("pause_hotkey", "Ctrl+Alt+P"),
                 "settings_hotkey": prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"),
+                "panic_hotkey_enabled": prefs.get_setting("panic_hotkey_enabled", "true") == "true",
+                "panic_hold_seconds": float(prefs.get_setting("panic_hold_seconds", "15")),
+                "panic_hotkey_supported": d.kill_switch.is_supported,
             }
 
         if method == "general.update_settings":
@@ -354,9 +370,28 @@ class LocalIPCServer:
                     StartupManager.set_launch_at_login(enabled)
             if "show_tray_icon" in params:
                 prefs.set_setting("show_tray_icon", "true" if params["show_tray_icon"] else "false")
+            hotkeys_changed = False
             for hk_key in ("rewrite_hotkey", "pause_hotkey", "settings_hotkey"):
                 if hk_key in params and str(params[hk_key]).strip():
-                    prefs.set_setting(hk_key, str(params[hk_key]).strip())
+                    new_val = str(params[hk_key]).strip()
+                    if new_val != prefs.get_setting(hk_key, ""):
+                        hotkeys_changed = True
+                    prefs.set_setting(hk_key, new_val)
+            if "panic_hotkey_enabled" in params:
+                enabled = bool(params["panic_hotkey_enabled"])
+                prefs.set_setting("panic_hotkey_enabled", "true" if enabled else "false")
+                if enabled:
+                    d.kill_switch.start()
+                else:
+                    d.kill_switch.stop()
+            if "panic_hold_seconds" in params:
+                from autocorrect.daemon.kill_switch import clamp_hold_seconds
+
+                secs = clamp_hold_seconds(params["panic_hold_seconds"])
+                prefs.set_setting("panic_hold_seconds", str(secs))
+                d.kill_switch.set_hold_seconds(secs)
+            if hotkeys_changed:
+                d.reload_hotkeys()
             return self._dispatch("general.get_settings", {})
 
         if method == "general.privacy_wipe":

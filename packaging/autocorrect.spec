@@ -31,12 +31,17 @@ hidden = [
     "autocorrect.launcher",
     "autocorrect.ui.settings_main",
     "autocorrect.daemon.tray",
+    "autocorrect.daemon.kill_switch",
+    "autocorrect.daemon.input_dispatcher",
+    "autocorrect.branding",
+    "autocorrect.logging_setup",
     "autocorrect.platform_paths",
     "tkinter",
     "tkinter.ttk",
 ]
 if IS_WIN:
     hidden += [
+        "autocorrect.adapters.windows.win32_api",
         "autocorrect.adapters.windows.win32_hook",
         "autocorrect.adapters.windows.win32_injector",
         "autocorrect.adapters.windows.uia_inspector",
@@ -97,6 +102,8 @@ a = Analysis(
     binaries=[],
     datas=[
         (str(project_root / "resources" / "en_base"), "resources/en_base"),
+        # Syne (OFL) for the brand mark drawn at runtime by autocorrect.branding (tray icon).
+        (str(packaging_dir / "fonts"), "fonts"),
     ],
     hiddenimports=hidden,
     hookspath=[],

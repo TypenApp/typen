@@ -14,7 +14,7 @@
 <a id="cli-commands"></a>
 ## Installed CLI Entry Points (pyproject.toml)
 
-The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-tray, --data-dir and --version. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:
+The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:
 
 **CLI Commands Reference**
 
@@ -22,6 +22,11 @@ The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-t
 # 0. Same entry point as the packaged executable (service + tray, or --settings)
 autocorrect-desktop --data-dir ~/.autocorrect_desktop
 autocorrect-desktop --settings
+
+# 0b. Service control: shut down cleanly, start without hooks, or leave safe mode
+autocorrect-desktop --stop
+autocorrect-desktop --safe-mode
+autocorrect-desktop --resume
 
 # 1. Start only the background hook daemon & Local IPC server (foreground, Ctrl+C to stop)
 autocorrect-daemon --live --data-dir ~/.autocorrect_desktop

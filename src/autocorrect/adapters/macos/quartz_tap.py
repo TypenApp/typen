@@ -16,6 +16,7 @@ macOS Quartz Event Tap Manager (`CGEventTapCreate`).
 
 from __future__ import annotations
 
+import logging
 import sys
 import threading
 from collections.abc import Callable
@@ -26,6 +27,8 @@ from autocorrect.adapters.macos.quartz_injector import (
     MACOS_KEYCODE_DELETE,
 )
 from autocorrect.input.ports import KeyAction, KeyEvent
+
+log = logging.getLogger(__name__)
 
 MACOS_KEYCODE_MAP: Final[dict[int, str]] = {
     MACOS_KEYCODE_DELETE: "Backspace",
@@ -120,9 +123,12 @@ class QuartzEventTapManager:
         self,
         on_key_event: Callable[[KeyEvent], KeyAction],
         on_mouse_click: Callable[[], None],
+        *,
+        on_thread_exit: Callable[[BaseException | None], None] | None = None,
     ) -> None:
         self._on_key_event = on_key_event
         self._on_mouse_click = on_mouse_click
+        self._on_thread_exit = on_thread_exit
         self._running = False
         self._thread: threading.Thread | None = None
         self._tap = None
@@ -233,12 +239,22 @@ class QuartzEventTapManager:
     # ------------------------------------------------------------ tap thread
 
     def _run_tap_loop(self) -> None:
+        exc: BaseException | None = None
+        was_started = False
         try:
             import time
 
             import Quartz  # type: ignore[import-not-found]
 
             def _tap_callback(proxy: object, event_type: int, event: object, refcon: object) -> object:
+                # A raising callback would unwind through the CF bridge; always pass the event on.
+                try:
+                    return _tap_callback_inner(proxy, event_type, event, refcon)
+                except Exception:
+                    log.exception("Quartz tap callback raised (passing event through)")
+                    return event
+
+            def _tap_callback_inner(proxy: object, event_type: int, event: object, refcon: object) -> object:
                 if event_type in (
                     Quartz.kCGEventTapDisabledByTimeout,
                     Quartz.kCGEventTapDisabledByUserInput,
@@ -313,9 +329,21 @@ class QuartzEventTapManager:
             self._runloop = Quartz.CFRunLoopGetCurrent()
             Quartz.CFRunLoopAddSource(self._runloop, source, Quartz.kCFRunLoopCommonModes)
             Quartz.CGEventTapEnable(self._tap, True)
+            was_started = True
             self._started.set()
             Quartz.CFRunLoopRun()
-        except Exception as exc:
-            self._start_error = QuartzTapError(f"Quartz event tap failed: {exc}")
-            self._running = False
+        except Exception as e:
+            exc = e
+            if not was_started:
+                self._start_error = QuartzTapError(f"Quartz event tap failed: {e}")
+            else:
+                log.exception("Quartz tap run loop died")
             self._started.set()
+        finally:
+            was_running = self._running
+            self._running = False
+            if was_started and was_running and self._on_thread_exit is not None:
+                try:
+                    self._on_thread_exit(exc)
+                except Exception:
+                    log.exception("on_thread_exit raised")

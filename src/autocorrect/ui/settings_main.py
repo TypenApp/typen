@@ -160,6 +160,7 @@ class SettingsController:
                 "remediation": "Start Typen (it normally launches at login).",
             },
             "is_paused": self._prefs.get_setting("is_paused", "false") == "true",
+            "safe_mode": (self._data_dir / "safe_mode").exists(),
             "active_region": self._prefs.overlay.active_region.name or "EN_GB",
             "custom_word_count": len(self._prefs.list_custom_words()),
             "suggested_word_count": len(self._prefs.list_suggested_words()),

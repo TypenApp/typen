@@ -5,15 +5,23 @@ Wires together:
 - `SQLitePreferenceStore` + `PreferenceMemoryOverlay`
 - `AutocorrectEngine` (Layer 1 spelling, contextual confusion sets, punctuation, capitalisation)
 - `EntitlementManager` (Typen is free software: every feature is always allowed)
-- `InputSessionManager`
-- OS Keyboard/Mouse Hook (`Win32KeyboardMouseHook` / `QuartzEventTapManager`)
-- Safe hook release whenever the user pauses assistance.
+- `InputSessionManager`, driven from exactly one thread by `InputDispatcher`
+- OS Keyboard/Mouse Hook (`Win32KeyboardMouseHook` / `QuartzEventTapManager` / X11)
+- `KillSwitch` (hold Esc 15 s) and the persistent safe-mode marker it writes
+- Hook liveness/health: a hook thread that dies or keeps stalling is released
+  and reported as FAILED instead of silently claiming "Active".
 """
 
 from __future__ import annotations
 
+import json
+import logging
 import sys
+import threading
+import time
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any, Final
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
@@ -21,7 +29,7 @@ from autocorrect.adapters import create_platform_focus_inspector, create_platfor
 from autocorrect.adapters.linux.session_type import LinuxSessionType, detect_linux_session
 from autocorrect.adapters.linux.x11_hook import X11HookError, X11KeyboardMouseHook
 from autocorrect.adapters.macos.quartz_tap import QuartzEventTapManager, QuartzTapError
-from autocorrect.adapters.windows.win32_hook import Win32KeyboardMouseHook
+from autocorrect.adapters.windows.win32_hook import Win32HookError, Win32KeyboardMouseHook
 from autocorrect.ai.api_key_manager import ApiKeyManager
 from autocorrect.ai.local_model_manager import LocalModelManager
 from autocorrect.ai.provider_manager import BYOKProviderManager
@@ -31,7 +39,16 @@ from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.daemon import hook_status
 from autocorrect.daemon.focus_monitor import FocusMonitor
 from autocorrect.daemon.hook_status import HookState, HookStatus
+from autocorrect.daemon.input_dispatcher import InputDispatcher
+from autocorrect.daemon.kill_switch import (
+    PREF_KEY_ENABLED,
+    PREF_KEY_HOLD_SECONDS,
+    KillSwitch,
+    clamp_hold_seconds,
+    create_escape_probe,
+)
 from autocorrect.env_config import load_env_file
+from autocorrect.input.hotkeys import Hotkey, parse_hotkey
 from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
@@ -45,6 +62,22 @@ from autocorrect.productivity.snippet_engine import SnippetEngine
 from autocorrect.updates.application_updater import ApplicationUpdater
 from autocorrect.updates.language_resource_updater import LanguageResourceUpdater
 from autocorrect.updates.model_updater import ModelUpdater
+from autocorrect.version import APP_VERSION as APP_VERSION_STR
+
+log = logging.getLogger(__name__)
+
+SAFE_MODE_FILENAME: Final[str] = "safe_mode"
+HOTKEY_ID_PAUSE: Final[int] = 1
+HOTKEY_ID_SETTINGS: Final[int] = 2
+SAFE_MODE_REMEDIATION: Final[str] = (
+    "Typing assistance was switched off by the emergency stop (Esc held). "
+    "Choose 'Resume typing assistance' in the tray menu, or run with --resume, to switch it back on."
+)
+DEGRADED_REMEDIATION: Final[str] = (
+    "Typing assistance switched itself off because it was slowing down input. "
+    "Choose 'Resume typing assistance' in the tray to try again; if it keeps happening, "
+    "send logs/typen.log with a bug report."
+)
 
 
 class AutoCorrectDaemon:
@@ -68,7 +101,13 @@ class AutoCorrectDaemon:
         self._mac_tap: QuartzEventTapManager | None = None
         self._x11_hook: X11KeyboardMouseHook | None = None
         self._hooks_active: bool = False
+        self._hook_lock = threading.RLock()
         self.hook_status: HookStatus = hook_status.INACTIVE
+        # UI callbacks (set by the launcher/tray). All optional; invoked off the hook threads.
+        self.on_state_changed: Callable[[], None] | None = None
+        self.on_notify: Callable[[str, str], None] | None = None  # (title, message)
+        self.on_open_settings_requested: Callable[[], None] | None = None
+        self.on_quit_requested: Callable[[], None] | None = None
 
         # Embedded Ed25519 *public* root key that verifies signed updates, unless injected.
         self._public_key = public_key or load_root_public_key()
@@ -135,11 +174,28 @@ class AutoCorrectDaemon:
             active_region=self.preference_store.overlay.active_region,
         )
 
-        # 9. Foreground-focus monitor: password fields, terminals, excluded apps, app profiles.
-        self.focus_monitor = FocusMonitor(inspector=self.focus_inspector, on_change=self._on_focus_changed)
+        # 9. Single worker thread that owns the session: hooks, mouse and focus all post to it.
+        self.dispatcher = InputDispatcher(
+            on_key_event=self._handle_key_on_worker,
+            on_mouse_click=self.session.on_mouse_click_or_caret_move,
+            on_focus_changed=self._on_focus_changed,
+            on_overload=self._on_input_unhealthy,
+        )
+
+        # 10. Foreground-focus monitor: password fields, terminals, excluded apps, app profiles.
+        self.focus_monitor = FocusMonitor(
+            inspector=self.focus_inspector, on_change=self.dispatcher.post_focus
+        )
         self._user_domain_packs: set[str] = set()
 
-        # 10. Initialize Authenticated Local IPC Server for out-of-process Settings UI
+        # 11. Emergency stop: hold Esc; polled independently of the hooks.
+        self.kill_switch = KillSwitch(
+            create_escape_probe() if not dry_run_hooks else None,
+            on_trigger=self.emergency_disable,
+            hold_seconds=clamp_hold_seconds(self.preference_store.get_setting(PREF_KEY_HOLD_SECONDS, "15")),
+        )
+
+        # 12. Initialize Authenticated Local IPC Server for out-of-process Settings UI
         self.ipc_server = LocalIPCServer(daemon=self, data_dir=self._data_dir)
 
     @property
@@ -150,11 +206,43 @@ class AutoCorrectDaemon:
     def dry_run_hooks(self) -> bool:
         return self._dry_run_hooks
 
-    def start(self, start_ipc: bool = True) -> EntitlementSnapshot:
+    @property
+    def data_dir(self) -> Path:
+        return self._data_dir
+
+    # ----------------------------------------------------------- safe mode
+
+    @property
+    def safe_mode_path(self) -> Path:
+        return self._data_dir / SAFE_MODE_FILENAME
+
+    @property
+    def in_safe_mode(self) -> bool:
+        return self.safe_mode_path.exists()
+
+    def enter_safe_mode(self, reason: str) -> None:
+        payload = {"reason": reason, "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "version": APP_VERSION_STR}
+        try:
+            self.safe_mode_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        except OSError:
+            log.exception("could not write safe-mode marker")
+
+    def leave_safe_mode(self) -> None:
+        try:
+            self.safe_mode_path.unlink(missing_ok=True)
+        except OSError:
+            log.exception("could not remove safe-mode marker")
+
+    # ------------------------------------------------------------ lifecycle
+
+    def start(self, start_ipc: bool = True, attach_hooks: bool = True) -> EntitlementSnapshot:
         """
-        Start the Local IPC server and attach the OS keyboard hooks.
+        Start the Local IPC server, dispatcher and kill switch, then (unless
+        `attach_hooks=False`, in which case the launcher calls `attach_hooks()`
+        once the tray is visible) the OS keyboard hooks.
         """
         snapshot = self.entitlement_manager.evaluate()
+        self._snapshot = snapshot
         self.local_ai.set_pro_entitled(snapshot.pro_features_enabled)
         # Restore persisted correction preferences and (Pro) domain packs.
         self.apply_global_correction_settings()
@@ -162,17 +250,123 @@ class AutoCorrectDaemon:
         self.set_user_domain_packs({p for p in saved_packs.split(",") if p.strip()})
         if start_ipc:
             self.ipc_server.start()
-        if snapshot.typing_assistance_enabled:
+        self.dispatcher.start()
+        if self.preference_store.get_setting(PREF_KEY_ENABLED, "true") == "true":
+            self.kill_switch.start()
+        if attach_hooks:
+            self.attach_hooks()
+        return snapshot
+
+    def attach_hooks(self) -> HookStatus:
+        """Go live: honour safe mode / entitlement, otherwise install the platform hook."""
+        snapshot = getattr(self, "_snapshot", None) or self.entitlement_manager.evaluate()
+        if self.in_safe_mode:
+            log.warning("safe mode active (%s): not attaching hooks", self.safe_mode_path)
+            self.session.set_paused(True)
+            self.hook_status = HookStatus(
+                HookState.DISABLED,
+                detail="safe-mode marker present",
+                remediation=SAFE_MODE_REMEDIATION,
+            )
+        elif snapshot.typing_assistance_enabled:
             self._attach_os_hooks()
         else:
             self._release_os_hooks()
-        return snapshot
+        return self.hook_status
 
     def stop(self) -> None:
         """Release all OS keyboard/mouse hooks, stop Local IPC server, and close mmap files."""
+        self.kill_switch.stop()
         self._release_os_hooks()
+        self.dispatcher.stop()
         self.ipc_server.stop()
         self.resource_manager.close()
+
+    # ------------------------------------------------------- pause / resume
+
+    def set_paused(self, paused: bool) -> bool:
+        """
+        Pause or resume typing assistance. Resuming also leaves safe mode and
+        re-attaches hooks that were released by the kill switch or the health
+        watchdog, so one tray action always brings the daemon back.
+        """
+        if paused:
+            self.dispatcher.run_sync(lambda: self.session.set_paused(True))
+        else:
+            if self.in_safe_mode:
+                self.leave_safe_mode()
+            self.dispatcher.run_sync(lambda: self.session.set_paused(False))
+            if not self._hooks_active and self.hook_status.state in (
+                HookState.DISABLED,
+                HookState.FAILED,
+                HookState.INACTIVE,
+            ):
+                self.hook_status = hook_status.INACTIVE
+                self._attach_os_hooks()
+        self._notify_state_changed()
+        return self.session.is_paused
+
+    def toggle_pause(self) -> bool:
+        return self.set_paused(not self.session.is_paused)
+
+    def emergency_disable(self, reason: str = "emergency stop") -> None:
+        """
+        Kill switch / `--safe-mode`: release every OS hook, pause, and persist a
+        safe-mode marker so the next start also comes up without hooks.
+        """
+        log.warning("EMERGENCY DISABLE: %s", reason)
+        self.enter_safe_mode(reason)
+        self._release_os_hooks()
+        try:
+            self.dispatcher.run_sync(lambda: self.session.set_paused(True))
+        except Exception:
+            self.session.set_paused(True)
+        self.hook_status = HookStatus(HookState.DISABLED, detail=reason, remediation=SAFE_MODE_REMEDIATION)
+        self._notify(
+            "Typen typing assistance disabled",
+            f"{reason}. Corrections are off until you choose 'Resume typing assistance' in the tray.",
+        )
+        self._notify_state_changed()
+
+    def request_shutdown(self) -> None:
+        """`--stop` / IPC `system.shutdown`: ask the owner (tray loop) to exit."""
+        log.info("shutdown requested")
+        if self.on_quit_requested is not None:
+            threading.Thread(target=self.on_quit_requested, name="autocorrect-quit", daemon=True).start()
+
+    def _notify(self, title: str, message: str) -> None:
+        if self.on_notify is None:
+            return
+        try:
+            self.on_notify(title, message)
+        except Exception:
+            log.exception("on_notify raised")
+
+    def _notify_state_changed(self) -> None:
+        if self.on_state_changed is None:
+            return
+        try:
+            self.on_state_changed()
+        except Exception:
+            log.exception("on_state_changed raised")
+
+    def health_snapshot(self) -> dict[str, Any]:
+        out: dict[str, Any] = {
+            "hook_status": self.hook_status.to_dict(),
+            "hooks_active": self._hooks_active,
+            "is_paused": self.session.is_paused,
+            "dispatcher": self.dispatcher.stats.snapshot(),
+            "dispatcher_queue_depth": self.dispatcher.queue_depth,
+            "kill_switch": {
+                "supported": self.kill_switch.is_supported,
+                "running": self.kill_switch.is_running,
+                "hold_seconds": self.kill_switch.hold_seconds,
+            },
+            "safe_mode": self.in_safe_mode,
+        }
+        if self._win_hook is not None:
+            out["hook"] = self._win_hook.stats.snapshot()
+        return out
 
     # ------------------------------------------------------------------ focus
     def set_user_domain_packs(self, pack_ids: set[str]) -> None:
@@ -234,42 +428,131 @@ class AutoCorrectDaemon:
             aggressiveness=max(0.5, min(1.5, float(prefs.get_setting("aggressiveness", "1.0")))),
         )
 
+    # ------------------------------------------------------------- hotkeys
+
+    def configured_hotkeys(self) -> dict[int, Hotkey]:
+        """Global hotkeys from preferences, keyed by the id the OS hook reports back."""
+        prefs = self.preference_store
+        out: dict[int, Hotkey] = {}
+        pause = parse_hotkey(prefs.get_setting("pause_hotkey", "Ctrl+Alt+P"))
+        if pause is not None:
+            out[HOTKEY_ID_PAUSE] = pause
+        settings = parse_hotkey(prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"))
+        if settings is not None:
+            out[HOTKEY_ID_SETTINGS] = settings
+        return out
+
+    def _on_hotkey(self, hotkey_id: int) -> None:
+        # Called on the hook thread: hand off immediately.
+        if hotkey_id == HOTKEY_ID_PAUSE:
+            threading.Thread(target=self.toggle_pause, name="autocorrect-hotkey-pause", daemon=True).start()
+        elif hotkey_id == HOTKEY_ID_SETTINGS and self.on_open_settings_requested is not None:
+            threading.Thread(
+                target=self.on_open_settings_requested, name="autocorrect-hotkey-settings", daemon=True
+            ).start()
+
+    def reload_hotkeys(self) -> None:
+        """Re-register hotkeys after Settings changed them (Windows re-creates the hook thread)."""
+        if self._hooks_active and self._win_hook is not None:
+            with self._hook_lock:
+                self._release_os_hooks()
+                self._attach_os_hooks()
+            self._notify_state_changed()
+
+    # ------------------------------------------------------- hook lifecycle
+
     def _attach_os_hooks(self) -> None:
-        if self._hooks_active:
-            return
-        self._hooks_active = True
-        if self._dry_run_hooks:
-            self.hook_status = HookStatus(HookState.DRY_RUN, backend="dry-run")
-            return
-        self.focus_monitor.start()
-        try:
-            self.hook_status = self._install_platform_hook()
-        except Exception as exc:  # pragma: no cover - defensive: never take the daemon down
-            self.hook_status = HookStatus(
-                HookState.FAILED,
-                detail=f"{type(exc).__name__}: {exc}",
-                remediation="Restart AutoCorrect. If the problem persists, check the log and report it.",
-            )
-        if self.hook_status.state in (HookState.FAILED, HookState.UNSUPPORTED):
-            # Nothing is listening; keep the daemon (IPC, settings) alive
-            # but do not pretend typing assistance is running.
+        with self._hook_lock:
+            if self._hooks_active:
+                return
+            self._hooks_active = True
+            if self._dry_run_hooks:
+                self.hook_status = HookStatus(HookState.DRY_RUN, backend="dry-run")
+                return
+            self.focus_monitor.start()
+            try:
+                self.hook_status = self._install_platform_hook()
+            except Exception as exc:  # pragma: no cover - defensive: never take the daemon down
+                log.exception("hook installation raised")
+                self.hook_status = HookStatus(
+                    HookState.FAILED,
+                    detail=f"{type(exc).__name__}: {exc}",
+                    remediation="Restart Typen. If the problem persists, send logs/typen.log with a bug report.",
+                )
+            if self.hook_status.state in (HookState.FAILED, HookState.UNSUPPORTED):
+                # Nothing is listening; keep the daemon (IPC, settings) alive
+                # but do not pretend typing assistance is running.
+                self._hooks_active = False
+                self.focus_monitor.stop()
+                log.warning("hook not active: %s / %s", self.hook_status.state.value, self.hook_status.detail)
+            else:
+                log.info("hook active: %s", self.hook_status.backend)
+
+    def _on_hook_thread_exit(self, exc: BaseException | None) -> None:
+        """A hook thread ended. If we did not ask for it, degrade to FAILED instead of lying."""
+        with self._hook_lock:
+            if not self._hooks_active:
+                return  # deliberate stop() in progress
+            detail = f"hook thread exited: {exc!r}" if exc else "hook thread exited unexpectedly"
+            log.error(detail)
             self._hooks_active = False
             self.focus_monitor.stop()
+            self._win_hook = None
+            self._mac_tap = None
+            self._x11_hook = None
+            self.hook_status = HookStatus(
+                HookState.FAILED,
+                backend=self.hook_status.backend,
+                detail=detail,
+                remediation="Choose 'Resume typing assistance' in the tray to reinstall the hook.",
+            )
+        self._notify_state_changed()
+
+    def _on_input_unhealthy(self, reason: str) -> None:
+        """Hook/dispatcher watchdog: input is being slowed down. Release the hooks, keep the daemon."""
+
+        def _degrade() -> None:
+            with self._hook_lock:
+                if not self._hooks_active:
+                    return
+                self._release_os_hooks()
+                self.hook_status = HookStatus(
+                    HookState.FAILED, detail=reason, remediation=DEGRADED_REMEDIATION
+                )
+            self._notify("Typen paused itself", f"{reason}. Resume from the tray when ready.")
+            self._notify_state_changed()
+
+        # Never unhook from a hook or worker thread.
+        threading.Thread(target=_degrade, name="autocorrect-degrade", daemon=True).start()
 
     def _install_platform_hook(self) -> HookStatus:
         """Install the right hook for this OS/session; return its status (never raises for known failures)."""
         if sys.platform == "win32":
             self._win_hook = Win32KeyboardMouseHook(
                 on_key_event=self._dispatch_os_key,
-                on_mouse_click=self.session.on_mouse_click_or_caret_move,
+                on_mouse_click=self.dispatcher.post_mouse_click,
+                hotkeys=self.configured_hotkeys(),
+                on_hotkey=self._on_hotkey,
+                on_thread_exit=self._on_hook_thread_exit,
+                on_unhealthy=self._on_input_unhealthy,
             )
-            self._win_hook.start()
+            try:
+                self._win_hook.start()
+            except Win32HookError as exc:
+                self._win_hook = None
+                return HookStatus(
+                    HookState.FAILED,
+                    backend="win32-ll-hook",
+                    detail=str(exc),
+                    remediation=exc.remediation,
+                )
             return HookStatus(HookState.ACTIVE, backend="win32-ll-hook")
 
         if sys.platform == "darwin":
             self._mac_tap = QuartzEventTapManager(
                 on_key_event=self._dispatch_os_key,
-                on_mouse_click=self.session.on_mouse_click_or_caret_move,
+                on_mouse_click=self.dispatcher.post_mouse_click,
+                on_thread_exit=self._on_hook_thread_exit,
             )
             try:
                 self._mac_tap.start()
@@ -304,7 +587,8 @@ class AutoCorrectDaemon:
                 )
             self._x11_hook = X11KeyboardMouseHook(
                 on_key_event=self._dispatch_os_key_passive,
-                on_mouse_click=self.session.on_mouse_click_or_caret_move,
+                on_mouse_click=self.dispatcher.post_mouse_click,
+                on_thread_exit=self._on_hook_thread_exit,
             )
             try:
                 self._x11_hook.start()
@@ -325,28 +609,38 @@ class AutoCorrectDaemon:
         )
 
     def _release_os_hooks(self) -> None:
-        self._hooks_active = False
-        self.hook_status = hook_status.INACTIVE
-        self.focus_monitor.stop()
-        if self._win_hook is not None:
-            self._win_hook.stop()
-            self._win_hook = None
-        if self._mac_tap is not None:
-            self._mac_tap.stop()
-            self._mac_tap = None
-        if self._x11_hook is not None:
-            self._x11_hook.stop()
-            self._x11_hook = None
+        with self._hook_lock:
+            self._hooks_active = False
+            self.hook_status = hook_status.INACTIVE
+            self.focus_monitor.stop()
+            win, mac, x11 = self._win_hook, self._mac_tap, self._x11_hook
+            self._win_hook = self._mac_tap = self._x11_hook = None
+        # Stop outside the lock: stop() joins the hook thread, which may be inside _on_hook_thread_exit.
+        for hook in (win, mac, x11):
+            if hook is not None:
+                try:
+                    hook.stop()
+                except Exception:
+                    log.exception("hook stop raised")
+
+    # ------------------------------------------------------------ dispatch
 
     def _dispatch_os_key(self, event: KeyEvent) -> KeyAction:
-        """Blocking hooks (Win32 LL hook, Quartz tap) can swallow the delimiter keystroke."""
-        outcome = self.session.handle_key_event(event)
-        return outcome.action
+        """
+        Called on the OS hook thread. Never evaluates anything there: the event
+        is queued for the dispatcher worker and the keystroke is passed through.
+        Corrections therefore run in *passive* mode on every platform (the
+        delimiter has already been delivered and is deleted and re-typed by the
+        replacement plan), exactly as X11 always has.
+        """
+        self.dispatcher.post_key(event)
+        return KeyAction.PASS_THROUGH
 
-    def _dispatch_os_key_passive(self, event: KeyEvent) -> KeyAction:
-        """Passive observers (XRecord) see keys after delivery; plans must re-inject the delimiter."""
-        outcome = self.session.handle_key_event(event, suppress_delimiter_on_replace=False)
-        return outcome.action
+    # XRecord was always passive; it now shares the exact same path.
+    _dispatch_os_key_passive = _dispatch_os_key
+
+    def _handle_key_on_worker(self, event: KeyEvent) -> None:
+        self.session.handle_key_event(event, suppress_delimiter_on_replace=False)
 
 
 def main(argv: list[str] | None = None) -> int:
