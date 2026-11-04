@@ -29,11 +29,30 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: SITE_URL,
   },
-  // summary_large_image uses opengraph-image.png / twitter-image.png from this folder.
+  // summary_large_image uses opengraph-image.png / twitter-image.png from this folder
+  // (static white-tile mark — crawlers do not honour prefers-color-scheme).
   twitter: {
     card: "summary_large_image",
     title: "Typen",
     description: DESCRIPTION,
+  },
+  // Tab favicon follows the OS theme: SVG has an embedded media query; PNG
+  // fallbacks are selected via media= for browsers that prefer raster icons.
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      {
+        url: "/icon-light.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: light)",
+      },
+      {
+        url: "/icon-dark.png",
+        type: "image/png",
+        media: "(prefers-color-scheme: dark)",
+      },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
   other: { "x-typen-version": FULL_VERSION },
 };
