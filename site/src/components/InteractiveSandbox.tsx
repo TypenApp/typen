@@ -117,6 +117,9 @@ export function InteractiveSandbox() {
   const pendingRef = useRef<PendingKey[]>([]);
   const flushQueuedRef = useRef(false);
   const draftRef = useRef("");
+  const animTokenRef = useRef(0);
+
+  const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
   const pushLog = useCallback((kind: LogEntry["kind"], message: string) => {
     setLogs((prev) => [{ id: Date.now() + Math.random(), kind, message }, ...prev.slice(0, 9)]);
@@ -274,7 +277,7 @@ export function InteractiveSandbox() {
   };
 
   /** Send a batch of keys in one request and apply the results in order. */
-  const sendKeys = async (keys: PendingKey[]) => {
+  const sendKeys = async (keys: PendingKey[], opts?: { animate?: boolean }) => {
     if (keys.length === 0) return;
     let data: BatchResponse;
     try {
@@ -286,10 +289,36 @@ export function InteractiveSandbox() {
     }
     const results = data.results ?? [data];
     let reverted = false;
-    results.forEach((r, i) => {
-      if (i < keys.length && applyResult(keys[i], r)) reverted = true;
-    });
-    setLatency(results.reduce((max, r) => Math.max(max, r.latency_ms), 0));
+    if (opts?.animate) {
+      const token = ++animTokenRef.current;
+      for (let i = 0; i < keys.length; i++) {
+        if (animTokenRef.current !== token) break;
+        const r = results[i];
+        if (!r) {
+          applyPassThrough(keys[i].key_name, keys[i].char);
+          continue;
+        }
+        if (r.action === "SUPPRESS_AND_INJECT" && r.plan) {
+          // Brief beat at the word boundary so the typo is visible before the correction snaps in.
+          await sleep(85);
+          if (animTokenRef.current !== token) break;
+          if (applyResult(keys[i], r)) reverted = true;
+          setLatency(r.latency_ms);
+          await sleep(55);
+        } else {
+          if (applyResult(keys[i], r)) reverted = true;
+          setLatency(r.latency_ms);
+          const ch = keys[i].char;
+          const jitter = ((i * 17) % 13) - 6; // subtle human cadence variation (-6..+6 ms)
+          await sleep(Math.max(18, (ch === "." || ch === "," ? 70 : ch === " " ? 45 : 34) + jitter));
+        }
+      }
+    } else {
+      results.forEach((r, i) => {
+        if (i < keys.length && applyResult(keys[i], r)) reverted = true;
+      });
+      setLatency(results.reduce((max, r) => Math.max(max, r.latency_ms), 0));
+    }
     if (reverted) await loadDictionary();
   };
 
@@ -298,7 +327,7 @@ export function InteractiveSandbox() {
     flushQueuedRef.current = false;
     const keys = pendingRef.current;
     pendingRef.current = [];
-    await sendKeys(keys);
+    await sendKeys(keys, { animate: keys.length > 1 });
   };
 
   const queueKey = (keyName: string, ch: string) => {
@@ -345,7 +374,7 @@ export function InteractiveSandbox() {
     queueKey(keyName, ch);
   };
 
-  /** Type a whole text through the engine as one batch (paste, samples). */
+  /** Type a whole text through the engine as one batch, then play back with a typewriter cadence. */
   const typeThroughEngine = async (text: string) => {
     const ed = editorRef.current;
     if (ed) ed.setSelectionRange(ed.value.length, ed.value.length);
@@ -355,7 +384,7 @@ export function InteractiveSandbox() {
       char: ch,
       t: now + i * 40, // a steady 25 keys/s, so timing-based gestures behave as if typed
     }));
-    await sendKeys(keys);
+    await sendKeys(keys, { animate: true });
   };
 
   const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -369,6 +398,7 @@ export function InteractiveSandbox() {
 
   const runSample = (sample: string) => {
     if (mode !== "live") return;
+    animTokenRef.current++;
     setBusy(true);
     enqueue(async () => {
       const ed = editorRef.current;
@@ -379,13 +409,15 @@ export function InteractiveSandbox() {
     }).finally(() => setBusy(false));
   };
 
-  const clear = () =>
+  const clear = () => {
+    animTokenRef.current++;
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
       await call("reset", {});
       ed?.focus();
     });
+  };
 
   const dictionaryAction = (action: "add" | "delete" | "dismiss", word: string) =>
     enqueue(async () => {
