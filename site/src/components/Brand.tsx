@@ -54,12 +54,12 @@ export function BrandMark({ size = 28, className = "" }: { size?: number; classN
   );
 }
 
-/** Wordmark: the mark and the product name, set in JetBrains Mono ExtraBold. */
+/** Wordmark: the mark and the product name, set in Syne ExtraBold. */
 export function Wordmark({ withMark = true, beta = false }: { withMark?: boolean; beta?: boolean }) {
   return (
     <Link href="/" className="group inline-flex items-center gap-2.5" aria-label="Tact home">
       {withMark && <BrandMark size={26} />}
-      <span className="font-mono text-[21px] font-extrabold leading-none tracking-[-0.02em] text-ink">Tact</span>
+      <span className="font-display text-[22px] font-extrabold leading-none tracking-[-0.03em] text-ink">Tact</span>
       {beta && (
         <span className="ml-0.5 rounded-full border border-proof/50 px-1.5 py-px font-mono text-[10px] uppercase tracking-wider text-proof">
           beta

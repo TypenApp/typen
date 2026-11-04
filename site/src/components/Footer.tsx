@@ -72,7 +72,7 @@ export function Footer() {
         <div className="max-w-sm">
           <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Tact home">
             <BrandMark size={24} />
-            <span className="font-mono text-lg font-extrabold tracking-[-0.02em] text-ink">Tact</span>
+            <span className="font-display text-lg font-extrabold tracking-[-0.03em] text-ink">Tact</span>
           </Link>
           <p className="mt-4 text-sm leading-relaxed text-ink-muted">
             Free, open source, system-wide autocorrect. One small background service that fixes typos,

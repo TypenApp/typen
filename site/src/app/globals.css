@@ -124,13 +124,9 @@ samp {
   .btn-ghost {
     @apply btn px-2 text-ink-muted hover:text-ink;
   }
-  /* Pill variant for the floating bar and hero calls to action. */
-  .btn-pill {
-    @apply rounded-full;
-  }
-  /* A round icon-only button: GitHub in the hero, social links in the footer. */
+  /* A square icon-only button: GitHub in the hero, social links in the footer. */
   .icon-btn {
-    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line text-ink-muted transition-colors hover:border-ink-faint hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-line text-ink-muted transition-colors hover:border-ink-faint hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
   }
 
   .link {

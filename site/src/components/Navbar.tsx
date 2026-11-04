@@ -101,7 +101,7 @@ export function Navbar() {
       {/* A floating bar: detached from the top edge, pill-shaped, translucent over the page. */}
       <header className="sticky top-3 z-40 sm:top-4">
         <div className="container-site">
-          <div className="relative rounded-[28px] border border-line bg-paper/80 shadow-[0_8px_30px_-12px_rgb(var(--ink)/0.25)] backdrop-blur-xl">
+          <div className="relative rounded-lg border border-line bg-paper/80 shadow-[0_8px_30px_-12px_rgb(var(--ink)/0.25)] backdrop-blur-xl">
             <div className="flex h-14 items-center justify-between gap-2 pl-3.5 pr-2 sm:h-[60px] sm:pl-5 sm:pr-2.5">
               <Wordmark beta={IS_PRERELEASE} />
 
@@ -112,7 +112,7 @@ export function Navbar() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
+                      className={`rounded px-3.5 py-2 text-sm transition-colors ${
                         isActive ? "bg-paper-2 text-ink" : "text-ink-muted hover:bg-paper-2 hover:text-ink"
                       }`}
                       aria-current={isActive ? "page" : undefined}
@@ -137,7 +137,7 @@ export function Navbar() {
                   </svg>
                 </button>
                 <GitHubStars />
-                <Link href="/download" className="btn-primary btn-pill hidden h-10 px-4 sm:inline-flex">
+                <Link href="/download" className="btn-primary hidden h-10 px-4 sm:inline-flex">
                   Download
                 </Link>
                 <button
@@ -170,7 +170,7 @@ export function Navbar() {
 
             {menuOpen && (
               <nav
-                className="absolute inset-x-0 top-full mt-2 flex flex-col gap-0.5 rounded-[24px] border border-line bg-paper p-2 shadow-[0_16px_40px_-16px_rgb(var(--ink)/0.35)] md:hidden"
+                className="absolute inset-x-0 top-full mt-2 flex flex-col gap-0.5 rounded-lg border border-line bg-paper p-2 shadow-[0_16px_40px_-16px_rgb(var(--ink)/0.35)] md:hidden"
                 aria-label="Mobile"
               >
                 {NAV_LINKS.map((link) => {
@@ -179,7 +179,7 @@ export function Navbar() {
                     <Link
                       key={link.href}
                       href={link.href}
-                      className={`rounded-2xl px-3.5 py-2.5 text-sm ${
+                      className={`rounded px-3.5 py-2.5 text-sm ${
                         isActive ? "bg-paper-2 text-ink" : "text-ink-muted hover:bg-paper-2 hover:text-ink"
                       }`}
                       aria-current={isActive ? "page" : undefined}
@@ -194,11 +194,11 @@ export function Navbar() {
                     setMenuOpen(false);
                     setSearchOpen(true);
                   }}
-                  className="rounded-2xl px-3.5 py-2.5 text-left text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
+                  className="rounded px-3.5 py-2.5 text-left text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
                 >
                   Search
                 </button>
-                <Link href="/download" className="btn-primary btn-pill mt-1 h-10 sm:hidden">
+                <Link href="/download" className="btn-primary mt-1 h-10 sm:hidden">
                   Download
                 </Link>
               </nav>

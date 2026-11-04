@@ -62,7 +62,7 @@ export default function HomePage() {
           href={RELEASE_PAGE_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="group inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-paper-1 py-1.5 pl-3 pr-2.5 text-xs text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+          className="group inline-flex max-w-full items-center gap-2 rounded border border-line bg-paper-1 py-1.5 pl-3 pr-2.5 text-xs text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
         >
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
           <span className="truncate">
@@ -86,11 +86,11 @@ export default function HomePage() {
 
         {/* Calls to action: download, demo, source. */}
         <div className="mt-8 flex flex-wrap items-center gap-2.5 sm:mt-9 sm:gap-3">
-          <Link href="/download" className="btn-primary btn-pill h-12 w-full gap-2.5 px-6 text-[15px] sm:w-auto">
+          <Link href="/download" className="btn-primary h-12 w-full gap-2.5 px-6 text-[15px] sm:w-auto">
             <DownloadIcon size={17} />
             {available.length === 1 ? `Download for ${available[0]}` : "Download Tact"}
           </Link>
-          <a href="#demo" className="btn-secondary btn-pill h-12 gap-2.5 border-line px-5 text-[15px] hover:border-ink-faint">
+          <a href="#demo" className="btn-secondary h-12 gap-2.5 border-line px-5 text-[15px] hover:border-ink-faint">
             <PlayIcon size={13} />
             Try the demo
           </a>

@@ -58,7 +58,7 @@ export function GitHubStars({ className = "" }: { className?: string }) {
       rel="noopener noreferrer"
       aria-label={stars === null ? "Tact on GitHub" : `Tact on GitHub, ${stars.toLocaleString()} stars`}
       title="Star Tact on GitHub"
-      className={`btn-secondary btn-pill h-10 gap-2 border-line px-3.5 text-xs text-ink-muted hover:border-ink-faint hover:text-ink ${className}`}
+      className={`btn-secondary h-10 gap-2 border-line px-3.5 text-xs text-ink-muted hover:border-ink-faint hover:text-ink ${className}`}
     >
       <GitHubIcon size={16} />
       {stars !== null && stars > 0 && (
