@@ -208,8 +208,10 @@ export function Navbar() {
       </header>
 
       {searchOpen && (
+        /* Scrim: always literal black. `ink` flips to white in the dark theme,
+           which would wash the page in a pale haze instead of dimming it. */
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 p-4 pt-24"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/55 p-4 pt-24 backdrop-blur-sm"
           onClick={() => setSearchOpen(false)}
           role="dialog"
           aria-modal="true"
