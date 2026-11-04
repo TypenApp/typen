@@ -7,7 +7,7 @@
   #define MyChannel "beta.1"
 #endif
 #define MyAppName "Tact"
-#define MyAppPublisher "Tact contributors"
+#define MyAppPublisher "Omnii"
 #define MyAppExeName "AutoCorrectDesktop.exe"
 #define MyFullVersion MyAppVersion + "-" + MyChannel
 

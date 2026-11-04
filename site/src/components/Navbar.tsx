@@ -6,8 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { DOC_ARTICLES } from "@/data/docs";
 import { IS_PRERELEASE, PLATFORM_RELEASES } from "@/data/releases";
 import { Wordmark } from "./Brand";
-import { ThemeToggle } from "./ThemeToggle";
-
 interface SearchResultItem {
   title: string;
   subtitle: string;
@@ -132,7 +130,6 @@ export function Navbar() {
               <span>Search</span>
               <kbd className="kbd">Ctrl K</kbd>
             </button>
-            <ThemeToggle />
             <Link href="/download" className="btn-primary hidden h-9 sm:inline-flex">
               Download
             </Link>

@@ -10,6 +10,8 @@ always runs the engine from the same commit as the site.
 Routes (all under /api/demo, see next.config.mjs rewrites):
     GET  health            engine + lexicon version, word count
     POST key               {key_name, char, text?, words?}  -> action + plan
+                           or {keys: [{key_name, char, t?}, ...], text?, words?}
+                           -> same shape for the last key, plus `results` for all
     POST reset | caret     session state control
     GET  dictionary        visitor's custom words + suggested words
     POST dictionary/{add,delete,dismiss}   {word}
@@ -48,7 +50,8 @@ HOST = EngineHost(
     idle_ttl_s=float(os.environ.get("AUTOCORRECT_DEMO_IDLE_TTL_S", str(20 * 60))),
 )
 
-MAX_BODY = 8192
+# A batch of up to 400 keys with timestamps plus 600 chars of priming text.
+MAX_BODY = 48 * 1024
 
 
 class handler(BaseHTTPRequestHandler):  # noqa: N801 - name required by the Vercel Python runtime

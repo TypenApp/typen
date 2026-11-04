@@ -5,8 +5,9 @@
 /*
   Tact — site styles.
   Tokens live in tailwind.config.ts and resolve to the RGB channel variables
-  below. Light theme: black text on white paper. Dark theme (`html.dark`):
-  the same two colours, reversed. This file holds the few primitives every
+  below. Light theme: black text on white paper. Dark theme: the same two
+  colours, reversed, chosen by the device (`prefers-color-scheme`) with no
+  toggle or stored choice. This file holds the few primitives every
   page shares, so the visual grammar is identical everywhere: one container,
   one card, two buttons, one eyebrow, one squiggle.
 */
@@ -32,7 +33,8 @@
   --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23e5341a' stroke-width='1.3'/%3E%3C/svg%3E");
 }
 
-html.dark {
+@media (prefers-color-scheme: dark) {
+  :root {
   color-scheme: dark;
   --ink: 255 255 255;
   --ink-1: 245 245 245;
@@ -50,6 +52,7 @@ html.dark {
   --proof-strong: 255 123 97;
   --proof-soft: 42 18 12;
   --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23ff5a3c' stroke-width='1.3'/%3E%3C/svg%3E");
+  }
 }
 
 html {

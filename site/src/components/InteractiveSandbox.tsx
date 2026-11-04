@@ -15,9 +15,33 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
  * text before the caret and the visitor's dictionary words; a fresh instance
  * primes a new session from them (without re-correcting anything) and answers
  * as if it had been there all along. `session_new: true` tells us that happened.
+ *
+ * Requests are batched: keys typed while a request is in flight are sent
+ * together in the next one, and a paste or sample is a single request. The
+ * engine answers with one result per key. This keeps the demo quick at a few
+ * hundred milliseconds of round trip, and it keeps a fast typist from looking
+ * like a flood to Vercel's automatic DDoS mitigation, which otherwise answers
+ * `fetch` with a JavaScript challenge page (HTTP 403, `X-Vercel-Mitigated:
+ * challenge`) that only a full page load can pass. When that happens anyway we
+ * keep what was typed, say so, and offer a reload that restores the draft.
  */
 
-type Mode = "connecting" | "live" | "offline";
+type Mode = "connecting" | "live" | "offline" | "checkpoint";
+
+interface PendingKey {
+  key_name: string;
+  char: string;
+  /** performance.now() when the key was pressed: lets the engine time the double-Backspace gesture. */
+  t: number;
+}
+
+class CheckpointError extends Error {
+  constructor() {
+    super("security checkpoint");
+  }
+}
+
+const DRAFT_KEY = "tact-demo-draft";
 
 interface LogEntry {
   id: number;
@@ -41,6 +65,10 @@ interface EngineResponse {
   active_undo: string | null;
   word_count: number;
   session_new?: boolean;
+}
+
+interface BatchResponse extends EngineResponse {
+  results?: EngineResponse[];
 }
 
 interface Health {
@@ -86,6 +114,9 @@ export function InteractiveSandbox() {
   const sessionRef = useRef<string>("");
   const wordsRef = useRef<string[]>([]);
   const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingRef = useRef<PendingKey[]>([]);
+  const flushQueuedRef = useRef(false);
+  const draftRef = useRef("");
 
   const pushLog = useCallback((kind: LogEntry["kind"], message: string) => {
     setLogs((prev) => [{ id: Date.now() + Math.random(), kind, message }, ...prev.slice(0, 9)]);
@@ -99,6 +130,9 @@ export function InteractiveSandbox() {
       body: body === undefined ? undefined : JSON.stringify(body),
       cache: "no-store",
     });
+    const mitigated = res.headers.get("x-vercel-mitigated");
+    const isJson = (res.headers.get("content-type") ?? "").includes("json");
+    if (mitigated || (res.status === 403 && !isJson)) throw new CheckpointError();
     if (!res.ok) {
       const err = new Error(`engine ${res.status}`) as Error & { status?: number };
       err.status = res.status;
@@ -122,6 +156,13 @@ export function InteractiveSandbox() {
   const enqueue = useCallback(
     (task: () => Promise<void>) => {
       queueRef.current = queueRef.current.then(task).catch((err: unknown) => {
+        if (err instanceof CheckpointError) {
+          pendingRef.current = [];
+          flushQueuedRef.current = false;
+          draftRef.current = editorRef.current?.value ?? ""; // the panel replaces the field
+          setMode("checkpoint");
+          return;
+        }
         const status = (err as { status?: number })?.status;
         if (status === undefined || status >= 500) {
           setMode("offline");
@@ -154,12 +195,27 @@ export function InteractiveSandbox() {
         if (cancelled) return;
         setHealth(h);
         await call("reset", {});
+        // A draft saved before a checkpoint reload: put it back and let the
+        // engine prime from it, so the visitor continues where they were.
+        let draft = "";
+        try {
+          draft = sessionStorage.getItem(DRAFT_KEY) ?? "";
+          sessionStorage.removeItem(DRAFT_KEY);
+        } catch {
+          /* storage unavailable */
+        }
+        if (draft && editorRef.current) {
+          editorRef.current.value = draft;
+          editorRef.current.setSelectionRange(draft.length, draft.length);
+          await call("caret", { text: draft.slice(-PRIME_TAIL), words: [] });
+        }
         await loadDictionary();
         if (cancelled) return;
         setMode("live");
         pushLog("INFO", `Engine ${h.version} · lexicon ${h.lexicon_version} · ${h.word_count.toLocaleString()} words.`);
-      } catch {
-        if (!cancelled) setMode("offline");
+        if (draft) pushLog("INFO", "Draft restored.");
+      } catch (err) {
+        if (!cancelled) setMode(err instanceof CheckpointError ? "checkpoint" : "offline");
       }
     })();
     return () => {
@@ -198,23 +254,58 @@ export function InteractiveSandbox() {
     ed.setSelectionRange(start + ch.length, start + ch.length);
   };
 
-  const processKey = async (keyName: string, ch: string) => {
-    const data = await call<EngineResponse>("key", { key_name: keyName, char: ch, ...primingContext() });
-    setLatency(data.latency_ms);
+  /** Mirror one engine result on the field, exactly as the OS injector would. */
+  const applyResult = (key: PendingKey, data: EngineResponse): boolean => {
     if (data.action === "SUPPRESS_AND_INJECT" && data.plan) {
       applyPlan(data.plan);
       if (data.reverted_word) {
         pushLog("UNDO", `Kept "${data.reverted_word}" — added to suggestions.`);
-        await loadDictionary();
-      } else {
-        const why = (data.reason ?? "auto").toLowerCase().replace(/_/g, " ");
-        pushLog(
-          "FIXED",
-          `${data.plan.original_full.trim()} → ${data.plan.target_full.trim()}  (${why}, ${data.latency_ms.toFixed(1)} ms)`,
-        );
+        return true;
       }
-    } else {
-      applyPassThrough(keyName, ch);
+      const why = (data.reason ?? "auto").toLowerCase().replace(/_/g, " ");
+      pushLog(
+        "FIXED",
+        `${data.plan.original_full.trim()} → ${data.plan.target_full.trim()}  (${why}, ${data.latency_ms.toFixed(1)} ms)`,
+      );
+      return false;
+    }
+    applyPassThrough(key.key_name, key.char);
+    return false;
+  };
+
+  /** Send a batch of keys in one request and apply the results in order. */
+  const sendKeys = async (keys: PendingKey[]) => {
+    if (keys.length === 0) return;
+    let data: BatchResponse;
+    try {
+      data = await call<BatchResponse>("key", { keys, ...primingContext() });
+    } catch (err) {
+      // Whatever went wrong, the visitor's keystrokes must not vanish.
+      for (const k of keys) applyPassThrough(k.key_name, k.char);
+      throw err;
+    }
+    const results = data.results ?? [data];
+    let reverted = false;
+    results.forEach((r, i) => {
+      if (i < keys.length && applyResult(keys[i], r)) reverted = true;
+    });
+    setLatency(results.reduce((max, r) => Math.max(max, r.latency_ms), 0));
+    if (reverted) await loadDictionary();
+  };
+
+  /** Everything queued since the last request goes out as one batch. */
+  const flushKeys = async () => {
+    flushQueuedRef.current = false;
+    const keys = pendingRef.current;
+    pendingRef.current = [];
+    await sendKeys(keys);
+  };
+
+  const queueKey = (keyName: string, ch: string) => {
+    pendingRef.current.push({ key_name: keyName, char: ch, t: performance.now() });
+    if (!flushQueuedRef.current) {
+      flushQueuedRef.current = true;
+      enqueue(flushKeys);
     }
   };
 
@@ -251,15 +342,20 @@ export function InteractiveSandbox() {
       return;
     }
     e.preventDefault();
-    enqueue(() => processKey(keyName, ch));
+    queueKey(keyName, ch);
   };
 
+  /** Type a whole text through the engine as one batch (paste, samples). */
   const typeThroughEngine = async (text: string) => {
     const ed = editorRef.current;
-    for (const ch of text) {
-      if (ed) ed.setSelectionRange(ed.value.length, ed.value.length);
-      await processKey(ch === " " ? "Space" : ch === "\n" ? "Return" : ch, ch);
-    }
+    if (ed) ed.setSelectionRange(ed.value.length, ed.value.length);
+    const now = performance.now();
+    const keys: PendingKey[] = Array.from(text, (ch, i) => ({
+      key_name: ch === " " ? "Space" : ch === "\n" ? "Return" : ch,
+      char: ch,
+      t: now + i * 40, // a steady 25 keys/s, so timing-based gestures behave as if typed
+    }));
+    await sendKeys(keys);
   };
 
   const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
@@ -313,14 +409,26 @@ export function InteractiveSandbox() {
       ? `Live · engine ${health.version}${latency !== null ? ` · ${latency.toFixed(1)} ms` : ""}`
       : mode === "connecting"
         ? "Waking the engine…"
-        : "Engine unreachable";
+        : mode === "checkpoint"
+          ? "Paused by a security checkpoint"
+          : "Engine unreachable";
+
+  const reloadKeepingDraft = () => {
+    try {
+      const text = draftRef.current || (editorRef.current?.value ?? "");
+      if (text) sessionStorage.setItem(DRAFT_KEY, text);
+    } catch {
+      /* storage unavailable */
+    }
+    window.location.reload();
+  };
 
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
         <p className="text-sm text-ink-muted">
           Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; press{" "}
-          <kbd className="kbd">Backspace</kbd> right after one to keep what you typed.
+          <kbd className="kbd">Backspace</kbd> twice right after one to keep what you typed.
         </p>
         <span className="inline-flex items-center gap-2 font-mono text-[11px] text-ink-faint">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
@@ -328,7 +436,19 @@ export function InteractiveSandbox() {
         </span>
       </div>
 
-      {mode === "offline" ? (
+      {mode === "checkpoint" ? (
+        <div className="p-6">
+          <p className="text-sm text-ink">The host paused the demo for a security check.</p>
+          <p className="mt-2 max-w-prose text-sm text-ink-muted">
+            Vercel, which runs the engine function, briefly mistook this typing session for automated
+            traffic and is asking for a browser check that only a page load can pass. Nothing you typed
+            is lost: reload, and the text comes back with the engine primed from it.
+          </p>
+          <button type="button" className="btn-primary mt-5" onClick={reloadKeepingDraft}>
+            Reload and continue
+          </button>
+        </div>
+      ) : mode === "offline" ? (
         <div className="p-6">
           <p className="text-sm text-ink">The engine function did not answer.</p>
           <p className="mt-2 max-w-prose text-sm text-ink-muted">

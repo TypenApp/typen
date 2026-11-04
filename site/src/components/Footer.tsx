@@ -1,7 +1,6 @@
 import React from "react";
 import Link from "next/link";
 import {
-  DONATE_URL,
   FULL_VERSION,
   GITHUB_REPO_URL,
   LICENSE_NAME,
@@ -46,7 +45,7 @@ export function Footer() {
         <div>
           <div className="flex items-center gap-2.5">
             <BrandMark size={24} />
-            <span className="font-display text-lg font-bold tracking-[-0.03em] text-ink">Tact</span>
+            <span className="font-mono text-lg font-extrabold tracking-[-0.02em] text-ink">Tact</span>
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-muted">
             System-wide autocorrect that runs on your machine and nowhere else.
@@ -86,13 +85,9 @@ export function Footer() {
       <div className="rule">
         <div className="container-site flex flex-col gap-2 py-5 text-xs text-ink-faint sm:flex-row sm:items-center sm:justify-between">
           <p>
-            © {new Date().getFullYear()} Tact contributors. Free and open source under the{" "}
+            © {new Date().getFullYear()} Omnii. Free and open source under the{" "}
             <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="link">
               {LICENSE_NAME} licence
-            </a>
-            ; funded by{" "}
-            <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="link">
-              donations
             </a>
             . The lexicon is built from public-domain sources.
           </p>

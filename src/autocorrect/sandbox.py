@@ -2,7 +2,7 @@
 Controlled Local Sandbox Server (`http://127.0.0.1:8765`).
 Provides a safe, self-contained browser environment (just like `npm run dev` in Node/JS)
 to test the real Python `InputSessionManager`, `AutocorrectEngine`, `SentenceCapitaliser`,
-`TransactionLedger` (double-Backspace undo), Pro Snippets, Domain Packs, and
+`TransactionLedger` (double-Backspace undo), Snippets, Domain Packs, and
 Device-Locked Licensing (`MachineGuid` / `IOPlatformUUID` SHA-256 hash) without
 hooking the global OS keyboard.
 """

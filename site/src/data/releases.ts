@@ -210,7 +210,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
       : undefined,
     firstRun: [
       winSigned
-        ? "Run the installer; Windows shows the publisher as Tact contributors."
+        ? "Run the installer; Windows shows the publisher as Omnii."
         : "If SmartScreen appears, choose More info → Run anyway. Compare the SHA-256 above first if you want to be sure.",
       "A tray icon appears. Start typing in any app — corrections apply when you press Space or punctuation.",
       "Right-click the tray icon → Open Settings… to manage your dictionary, variant and profiles.",

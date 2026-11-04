@@ -17,11 +17,11 @@ VSVersionInfo(
         StringTable(
           '040904B0',
           [
-            StringStruct('CompanyName', 'Tact contributors'),
+            StringStruct('CompanyName', 'Omnii'),
             StringStruct('FileDescription', 'Tact (Beta) — system-wide offline autocorrect'),
             StringStruct('FileVersion', '1.2.0-beta.1'),
             StringStruct('InternalName', 'AutoCorrectDesktop'),
-            StringStruct('LegalCopyright', '© Tact contributors. MIT licence. Qt components (if present) under LGPLv3.'),
+            StringStruct('LegalCopyright', '© Omnii. MIT licence. Qt components (if present) under LGPLv3.'),
             StringStruct('OriginalFilename', 'AutoCorrectDesktop.exe'),
             StringStruct('ProductName', 'Tact'),
             StringStruct('ProductVersion', '1.2.0-beta.1'),

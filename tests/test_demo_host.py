@@ -120,6 +120,75 @@ def test_priming_text_is_bounded(host: EngineHost) -> None:
     assert status == 200 and body["plan"]["target_full"] == "the "
 
 
+def _apply(field: str, key: str, ch: str, result: dict) -> str:
+    plan = result.get("plan")
+    if result["action"] == "SUPPRESS_AND_INJECT" and plan:
+        return field[: max(0, len(field) - plan["backspaces_to_send"])] + plan["text_to_inject"]
+    return field[:-1] if key == "Backspace" else field + ch
+
+
+def _keys(text: str, t0: float = 0.0, gap: float = 40.0) -> list[dict]:
+    """Keys as the page sends them; '\\b' stands for Backspace."""
+    names = {" ": "Space", "\n": "Return", "\b": "Backspace"}
+    return [
+        {"key_name": names.get(ch, ch), "char": "" if ch == "\b" else ch, "t": t0 + i * gap}
+        for i, ch in enumerate(text)
+    ]
+
+
+def test_key_batch_matches_one_key_per_request(host: EngineHost) -> None:
+    """A paste or a burst of typing arrives as one request with one result per key."""
+    text = "i recieved your mesage. its still not woking propaly. "
+    expected = _type(host, "web-serial0000000001", text)
+    assert expected == "I received your message. It's still not working properly. "
+
+    sid = "web-batch00000000001"
+    status, body = host.handle("POST", "key", {"keys": _keys(text), "text": ""}, sid)
+    assert status == 200, body
+    results = body["results"]
+    assert len(results) == len(text)
+    # Top-level fields describe the last key, for clients that read one result.
+    assert body["action"] == results[-1]["action"] and body["plan"] == results[-1]["plan"]
+    field = ""
+    for key, res in zip(_keys(text), results, strict=True):
+        field = _apply(field, key["key_name"], key["char"], res)
+    assert field == expected
+    assert body["session_new"] is True and results[0]["session_new"] is True
+    assert results[1]["session_new"] is False
+
+    # Empty or malformed batches are rejected, oversized ones are truncated, not refused.
+    assert host.handle("POST", "key", {"keys": []}, sid)[0] == 400
+    assert host.handle("POST", "key", {"keys": "nope"}, sid)[0] == 400
+    status, body = host.handle("POST", "key", {"keys": _keys("x " * 300)}, sid)
+    assert status == 200 and len(body["results"]) == 400
+
+
+def test_batch_reconstructs_key_timing_for_double_backspace(host: EngineHost) -> None:
+    """
+    The revert gesture is two Backspaces within two seconds. Client timestamps
+    (`t`) carry the real spacing, so a batch neither fakes a quick double-tap
+    out of two slow presses nor breaks a genuine one.
+    """
+    sid = "web-batchundo0000001"
+    # Quick double-Backspace after "teh " -> "the ": the second press reverts.
+    status, body = host.handle(
+        "POST", "key", {"keys": _keys("teh ") + _keys("\b\b", t0=200.0, gap=150.0)}, sid
+    )
+    results = body["results"]
+    assert results[3]["plan"]["target_full"] == "The "
+    assert results[4]["action"] == "PASS_THROUGH" and results[4]["reverted_word"] is None
+    assert results[5]["action"] == "SUPPRESS_AND_INJECT" and results[5]["reverted_word"] == "teh"
+
+    # Same keys, but three seconds between the presses: no revert.
+    host.handle("POST", "reset", {}, sid)
+    status, body = host.handle(
+        "POST", "key", {"keys": _keys("teh ") + _keys("\b\b", t0=200.0, gap=3000.0)}, sid
+    )
+    results = body["results"]
+    assert results[4]["reverted_word"] is None and results[5]["reverted_word"] is None
+    assert results[5]["action"] == "PASS_THROUGH"
+
+
 def test_work_dir_is_relocatable(tmp_path: Path) -> None:
     h = EngineHost(work_dir=tmp_path / "nested" / "work")
     try:

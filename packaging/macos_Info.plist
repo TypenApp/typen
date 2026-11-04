@@ -39,6 +39,6 @@
     <key>NSAppleEventsUsageDescription</key>
     <string>Tact may ask the frontmost application for its name to apply your per-app correction profiles.</string>
     <key>NSHumanReadableCopyright</key>
-    <string>© Tact contributors. MIT licence.</string>
+    <string>© Omnii. MIT licence.</string>
 </dict>
 </plist>

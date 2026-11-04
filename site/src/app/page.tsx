@@ -34,7 +34,7 @@ const PILLARS = [
   },
   {
     title: "Reversible by design",
-    body: "Every correction is a transaction. Press Backspace straight after one and the original comes back; the word is offered for your dictionary so it never happens again.",
+    body: "Every correction is a transaction. Press Backspace twice straight after one and the original comes back; the word is offered for your dictionary so it never happens again.",
   },
 ];
 

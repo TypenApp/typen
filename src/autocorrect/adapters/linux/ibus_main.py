@@ -135,7 +135,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
             description="Tact input method engine",
             version="0",
             license="Proprietary",
-            author="Tact contributors",
+            author="Omnii",
             homepage="https://autocorrect-desktop.vercel.app",
             command_line=f"{sys.executable} --ibus",
             textdomain="autocorrect",
@@ -147,7 +147,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
                 description="System-wide offline autocorrect as you type",
                 language="en",
                 license="Proprietary",
-                author="Tact contributors",
+                author="Omnii",
                 icon="autocorrect-desktop",
                 layout="default",
             )

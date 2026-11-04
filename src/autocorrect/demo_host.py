@@ -21,6 +21,7 @@ first, so corrections keep their context and nothing already typed is touched.
 
 from __future__ import annotations
 
+import math
 import re
 import threading
 import time
@@ -46,6 +47,8 @@ DEMO_SNIPPETS: tuple[tuple[str, str], ...] = ((";sig", "Best regards, the Tact t
 # only needs the current sentence or two; the client trims at a word boundary.
 MAX_PRIME_TEXT = 600
 MAX_SEED_WORDS = 64
+# Keys accepted in one `key` request (a paste is capped at 300 by the page).
+MAX_BATCH_KEYS = 400
 
 ROUTES: frozenset[str] = frozenset(
     {
@@ -327,38 +330,87 @@ class EngineHost:
                 sess.on_mouse_click_or_caret_move()
                 return 200, self.telemetry(sess, session_new=created)
 
-            # route == "key"
+            # route == "key": one key ({key_name, char}) or a batch ({keys: [...]}).
+            # The page sends every key it queued while the previous request was
+            # in flight as one batch, so a fast typist or a paste costs one
+            # round trip instead of one per character.
             if created:
                 sess.prime_from_text(_clean_text(payload.get("text")))
-            char = str(payload.get("char", ""))[:1]
-            key_name = str(payload.get("key_name", ""))[:32]
-            t0 = time.perf_counter()
-            outcome = sess.handle_key_event(
-                KeyEvent(key_name=key_name, char=char, timestamp_ms=time.time() * 1000.0),
-                suppress_delimiter_on_replace=True,
-            )
-            elapsed_ms = (time.perf_counter() - t0) * 1000.0
-            plan: dict[str, Any] | None = None
-            if outcome.replacement_plan is not None:
-                p = outcome.replacement_plan
-                plan = {
-                    "backspaces_to_send": p.backspaces_to_send,
-                    "text_to_inject": p.text_to_inject,
-                    "original_full": p.original_full,
-                    "target_full": p.target_full,
-                }
-            return 200, self.telemetry(
-                sess,
-                action=outcome.action.value,
-                plan=plan,
-                reason=outcome.decision.reason.value if outcome.decision else None,
-                reverted=outcome.reverted_word,
-                latency_ms=elapsed_ms,
-                session_new=created,
-            )
+            keys = _clean_keys(payload)
+            if not keys:
+                return 400, {"ok": False, "error": "no key"}
+            results = [self._handle_key(sess, k, created and i == 0) for i, k in enumerate(keys)]
+            body = dict(results[-1])
+            body["results"] = results
+            body["session_new"] = created
+            return 200, body
+
+    def _handle_key(self, sess: InputSessionManager, key: _Key, session_new: bool) -> dict[str, Any]:
+        t0 = time.perf_counter()
+        outcome = sess.handle_key_event(
+            KeyEvent(key_name=key.key_name, char=key.char, timestamp_ms=key.timestamp_ms),
+            suppress_delimiter_on_replace=True,
+        )
+        elapsed_ms = (time.perf_counter() - t0) * 1000.0
+        plan: dict[str, Any] | None = None
+        if outcome.replacement_plan is not None:
+            p = outcome.replacement_plan
+            plan = {
+                "backspaces_to_send": p.backspaces_to_send,
+                "text_to_inject": p.text_to_inject,
+                "original_full": p.original_full,
+                "target_full": p.target_full,
+            }
+        return self.telemetry(
+            sess,
+            action=outcome.action.value,
+            plan=plan,
+            reason=outcome.decision.reason.value if outcome.decision else None,
+            reverted=outcome.reverted_word,
+            latency_ms=elapsed_ms,
+            session_new=session_new,
+        )
 
     def close(self) -> None:
         self.pool.close()
+
+
+@dataclass(frozen=True, slots=True)
+class _Key:
+    key_name: str
+    char: str
+    timestamp_ms: float
+
+
+def _clean_keys(payload: dict[str, Any]) -> list[_Key]:
+    """
+    Normalise a single key or a `keys` batch. Each item may carry `t`, the
+    page's monotonic clock in ms; the server rebuilds the real spacing between
+    keys from it (the double-Backspace gesture has a time limit), anchored so
+    the last key is "now".
+    """
+    raw = payload.get("keys")
+    items = raw if isinstance(raw, list) else [payload]
+    items = [i for i in items if isinstance(i, dict) and str(i.get("key_name", ""))][:MAX_BATCH_KEYS]
+    if not items:
+        return []
+    now_ms = time.time() * 1000.0
+    stamps: list[float | None] = []
+    for i in items:
+        t = i.get("t")
+        stamps.append(float(t) if isinstance(t, (int, float)) and math.isfinite(t) else None)
+    last = next((s for s in reversed(stamps) if s is not None), None)
+    out: list[_Key] = []
+    for item, t in zip(items, stamps, strict=True):
+        ts = now_ms if t is None or last is None else now_ms - max(0.0, last - t)
+        out.append(
+            _Key(
+                key_name=str(item.get("key_name", ""))[:32],
+                char=str(item.get("char", ""))[:1],
+                timestamp_ms=ts,
+            )
+        )
+    return out
 
 
 def _dictionary(store: SQLitePreferenceStore) -> dict[str, Any]:
