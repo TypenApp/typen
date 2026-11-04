@@ -4,7 +4,7 @@
   "channel": "beta.6",
   "full_version": "1.2.0-beta.6",
   "release_tag": "v1.2.0-beta.6",
-  "built_at": "2026-11-04T04:51:10Z",
+  "built_at": "2026-11-04T05:03:23Z",
   "resources": {
     "bundle_version": "1.0.9",
     "schema_version": 1,
@@ -79,7 +79,7 @@
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-04T04:50:54Z",
+      "built_at": "2026-11-04T05:03:12Z",
       "full_version": "1.2.0",
       "channel": "stable",
       "code_signed": false,
@@ -87,19 +87,19 @@
         {
           "kind": "portable",
           "file": "Typen-1.2.0-win64-portable.zip",
-          "size_bytes": 40798504,
-          "sha256": "9140c3cd9b94386ab88d0e9bbb31443c9f7ec0bb3c7a977dc7d635cae6886e38"
+          "size_bytes": 40798039,
+          "sha256": "2e80c6255bc56f924b2926d910ef33e16b2f53059fd15fafb7eac0c0b3af4360"
         },
         {
           "kind": "installer",
           "file": "Typen-1.2.0-win64-setup.exe",
-          "size_bytes": 29594180,
-          "sha256": "3313b0440526b4e632ff8be39db61d540292a94bf63283d89b1d61a865530d2b"
+          "size_bytes": 29538184,
+          "sha256": "cc03542cb7422a01ab6a437248c6cfb65341aaf0e114c300f554ff314ea3244a"
         }
       ]
     },
     "macos-arm64": {
-      "built_at": "2026-11-04T04:50:21Z",
+      "built_at": "2026-11-04T05:02:34Z",
       "full_version": "1.2.0-beta.6",
       "channel": "beta.6",
       "code_signed": false,
@@ -107,20 +107,20 @@
         {
           "kind": "installer",
           "file": "Typen-1.2.0-beta.6-macos-arm64.dmg",
-          "size_bytes": 40827943,
-          "sha256": "16fda9c7273b65b1cc9aa01d38c2cbe2bc6d21c38d50e514f40fa7fbc45a716d"
+          "size_bytes": 40826075,
+          "sha256": "0e62ad9420aea40a48698bc88c39f51fbf2019c0a4d47a0d3a10a4718120fd45"
         },
         {
           "kind": "portable",
           "file": "Typen-1.2.0-beta.6-macos-arm64.zip",
-          "size_bytes": 35938083,
-          "sha256": "397b08f5deeae26189b0f242305f0a409d631b8f9d2db6d3796749b485d07e23"
+          "size_bytes": 35936407,
+          "sha256": "e0b4bd3b656b877745a4659cc844f6fbfa87a70f4866092ec9a330cc82c1c019"
         }
       ],
       "notarized": false
     },
     "linux-x86_64": {
-      "built_at": "2026-11-04T04:51:10Z",
+      "built_at": "2026-11-04T05:03:23Z",
       "full_version": "1.2.0-beta.6",
       "channel": "beta.6",
       "code_signed": false,
@@ -128,39 +128,39 @@
         {
           "kind": "portable",
           "file": "Typen-1.2.0-beta.6-linux-x86_64-portable.tar.gz",
-          "size_bytes": 66932291,
-          "sha256": "6fa6a77263fcf9a983ced781de766f9549b6b2bf9da6f79899eaeda832989f2e"
+          "size_bytes": 64901970,
+          "sha256": "74ba10f1adb2e000b783f724046635864bc861e1ae1956ed6489e44963a0b575"
         },
         {
           "kind": "appimage",
           "file": "Typen-1.2.0-beta.6-linux-x86_64.AppImage",
-          "size_bytes": 61970936,
-          "sha256": "fcc8c26c79e898f1246b903825302dc9b7869eeccea43dc666e8937bbd8c2b4b"
+          "size_bytes": 60135928,
+          "sha256": "2510a3b6c88b27b9301615eebc958975c47a44382b5a89423c94815081da901b"
         },
         {
           "kind": "deb",
           "file": "autocorrect-desktop_1.2.0-beta.6_amd64.deb",
-          "size_bytes": 54126738,
-          "sha256": "9b6e782fbe816edbed8625ecbdf01d2e80cd029a17a31ea9180fea87b0daa1c3"
+          "size_bytes": 52572538,
+          "sha256": "203846188a6913ce50cd19dc87c8ea88678e4bb7e74cdcdf4f7d95a1f197caca"
         }
       ]
     }
   },
-  "download_repo": "litlEMPEROR/AutoCorrect",
+  "download_repo": "TypenApp/typen",
   "platform": "win64",
   "code_signed": false,
   "artifacts": [
     {
       "kind": "portable",
       "file": "Typen-1.2.0-win64-portable.zip",
-      "size_bytes": 40798504,
-      "sha256": "9140c3cd9b94386ab88d0e9bbb31443c9f7ec0bb3c7a977dc7d635cae6886e38"
+      "size_bytes": 40798039,
+      "sha256": "2e80c6255bc56f924b2926d910ef33e16b2f53059fd15fafb7eac0c0b3af4360"
     },
     {
       "kind": "installer",
       "file": "Typen-1.2.0-win64-setup.exe",
-      "size_bytes": 29594180,
-      "sha256": "3313b0440526b4e632ff8be39db61d540292a94bf63283d89b1d61a865530d2b"
+      "size_bytes": 29538184,
+      "sha256": "cc03542cb7422a01ab6a437248c6cfb65341aaf0e114c300f554ff314ea3244a"
     }
   ]
 }
