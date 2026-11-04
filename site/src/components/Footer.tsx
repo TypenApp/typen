@@ -43,17 +43,6 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     links: [
       { href: GITHUB_ORG_URL, label: "TypenApp on GitHub", external: true },
       {
-        href: GITHUB_LANGUAGE_DATA_URL,
-        label: "Language data",
-        external: true,
-      },
-      {
-        href: GITHUB_MODEL_RESOURCES_URL,
-        label: "Model resources",
-        external: true,
-      },
-      { href: GITHUB_DOCS_URL, label: "Docs repository", external: true },
-      {
         href: `${GITHUB_REPO_URL}/issues`,
         label: "Report an issue",
         external: true,
