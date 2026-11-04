@@ -256,7 +256,12 @@ def build_language_data_repo(out_dir: Path) -> Path:
             repo_dir / "src" / "autocorrect" / pkg_name,
         )
 
-    for test_name in ("conftest.py", "test_correction_quality.py", "test_engine_quality_heldout.py"):
+    for test_name in (
+        "conftest.py",
+        "test_core_standard.py",
+        "test_correction_quality.py",
+        "test_engine_quality_heldout.py",
+    ):
         src_test = ROOT / "tests" / test_name
         if src_test.exists():
             _copy_file(src_test, repo_dir / "tests" / test_name)
