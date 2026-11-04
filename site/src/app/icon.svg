@@ -11,7 +11,7 @@
   <g transform="translate(0 12)">
     <rect class="tile" width="88" height="64" rx="14"/>
     <text class="glyph" x="19.75" y="36" font-family="Syne, system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="700" font-size="24" letter-spacing="-1">Aa</text>
-    <rect class="glyph" x="60.25" y="33" width="8" height="3" rx="1"/>
+    <rect class="glyph" x="54.25" y="33" width="13.75" height="3" rx="1"/>
     <path d="M20 46 q4 -5 8 0 t8 0 t8 0 t8 0 t8 0 t8 0" fill="none" stroke="#e5341a" stroke-width="3.2" stroke-linecap="round"/>
   </g>
 </svg>

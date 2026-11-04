@@ -7,12 +7,13 @@ import Link from "next/link";
  * ink and the glyphs are paper, so in the light theme it is a black tile with
  * white letters and in the dark theme the reverse.
  *
- * Geometry (viewBox 88×64), measured against Syne Bold at 24px: "Aa" is
- * 37.5 wide, the cursor bar 8, a 3px gap between them, so the group is 48 wide
- * and sits at x=20..68. The glyphs span y≈19 (cap height) to y≈47.6 (bottom
- * of the squiggle), leaving ~17–19px above and below and 20px either side: the
- * mark breathes at least as much horizontally as vertically and is never a
- * square. Same drawing as app/icon.svg.
+ * Geometry (viewBox 88×64), measured against Syne Bold at 24px: "Aa" spans
+ * x≈20..53.4 and the underscore sits flush next to "a" at x=54.25..68 (width
+ * 13.75), so the "Aa_" group is 48 wide and sits at x=20..68. The glyphs span
+ * y≈19 (cap height) to y≈47.6 (bottom of the squiggle), leaving ~17–19px above
+ * and below and 20px either side: the mark breathes at least as much
+ * horizontally as vertically and is never a square. Same drawing as
+ * app/icon.svg.
  */
 export const MARK_WIDTH = 88;
 export const MARK_HEIGHT = 64;
@@ -40,8 +41,8 @@ export function BrandMark({ size = 28, className = "" }: { size?: number; classN
       >
         Aa
       </text>
-      {/* The underscore: a text cursor sitting where the next letter goes. */}
-      <rect x="60.25" y="33" width="8" height="3" rx="1" className="fill-paper" />
+      {/* The underscore: full-width and flush against the lowercase "a". */}
+      <rect x="54.25" y="33" width="13.75" height="3" rx="1" className="fill-paper" />
       {/* Six humps of 8 = 48 wide, from x=20 to x=68: exactly the width of "Aa_". */}
       <path
         d="M20 46 q4 -5 8 0 t8 0 t8 0 t8 0 t8 0 t8 0"
