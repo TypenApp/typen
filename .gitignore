@@ -45,3 +45,6 @@ site/public/downloads/
 *.deb
 *.pkg
 
+.vercel/
+.env*
+
