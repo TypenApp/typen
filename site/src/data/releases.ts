@@ -23,7 +23,7 @@ export const GITHUB_MODEL_RESOURCES_URL = `https://github.com/${GITHUB_MODEL_RES
 export const GITHUB_DOCS_REPO = `${GITHUB_ORG}/docs`;
 export const GITHUB_DOCS_URL = `https://github.com/${GITHUB_DOCS_REPO}`;
 export const LICENSE_NAME = "MIT";
-export const LICENSE_URL = `${GITHUB_REPO_URL}/blob/main/LICENSE`;
+export const LICENSE_URL = `${GITHUB_REPO_URL}/blob/master/LICENSE`;
 /** Where donations go. One link, used everywhere a "support" call to action appears. */
 export const DONATE_URL = "https://github.com/sponsors/TypenApp";
 

@@ -48,7 +48,7 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
         external: true,
       },
       {
-        href: `${GITHUB_ORG_URL}/discussions`,
+        href: `${GITHUB_REPO_URL}/discussions`,
         label: "Discussions",
         external: true,
       },
@@ -107,8 +107,8 @@ export function Footer() {
             service that fixes typos, homophones and punctuation in every
             application — on your machine and nowhere else.
           </p>
-          <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
-            <ul className="flex items-center gap-2">
+          <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3 sm:flex-nowrap">
+            <ul className="flex shrink-0 items-center gap-2">
               {SOCIAL.map((s) => (
                 <li key={s.href}>
                   <a
@@ -133,7 +133,7 @@ export function Footer() {
 
         {/* Link columns: two across on phones, three from sm; on wide screens they
             size to their content and sit against the right edge of the container. */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:flex lg:gap-x-10 xl:gap-x-14">
+        <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:flex lg:gap-x-10 xl:gap-x-12">
           {COLUMNS.map((col) => (
             <nav key={col.heading} aria-label={col.heading}>
               <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-ink-faint">

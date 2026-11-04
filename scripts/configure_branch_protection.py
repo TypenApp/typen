@@ -56,10 +56,8 @@ REPO_STATUS_CHECKS: dict[str, list[str]] = {
     "docs": ["Verify Markdown guides & relative links"],
 }
 
-# Branches protected per repository, in addition to the default branch.
-EXTRA_BRANCHES: dict[str, list[str]] = {
-    "typen": ["refs/heads/master"],
-}
+# Branches protected per repository, in addition to the default branch (`master`).
+EXTRA_BRANCHES: dict[str, list[str]] = {}
 
 
 def get_github_token() -> str:
@@ -146,7 +144,9 @@ def apply_ruleset(client: httpx.Client, org: str, repo_name: str, ruleset: dict[
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--org", default=ORG_DEFAULT)
     parser.add_argument("--require-signatures", action="store_true", help="Also require signed commits")
     parser.add_argument("--dry-run", action="store_true", help="Print rulesets without applying them")

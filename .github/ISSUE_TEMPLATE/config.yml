@@ -1,7 +1,7 @@
 blank_issues_enabled: false
 contact_links:
   - name: Typen Community Discussions
-    url: https://github.com/orgs/TypenApp/discussions
+    url: https://github.com/TypenApp/typen/discussions
     about: Ask questions, share snippets and domain packs, or discuss ideas with the community.
   - name: Global Language Library (TypenApp/language-data)
     url: https://github.com/TypenApp/language-data/issues

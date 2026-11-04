@@ -161,7 +161,7 @@ Start with the official guides on our website or in [`TypenApp/docs`](https://gi
 - **Missed Typos, False Positives, Domain Vocabulary Packs**: [`TypenApp/language-data/issues`](https://github.com/TypenApp/language-data/issues)
 - **Local AI Model Descriptors & Hardware Acceleration**: [`TypenApp/model-resources/issues`](https://github.com/TypenApp/model-resources/issues)
 - **Documentation & Guides**: [`TypenApp/docs/issues`](https://github.com/TypenApp/docs/issues)
-- **Questions, Ideas & Show-and-Tell**: [`TypenApp` Discussions](https://github.com/orgs/TypenApp/discussions)
+- **Questions, Ideas & Show-and-Tell**: [`TypenApp` Discussions](https://github.com/TypenApp/typen/discussions)
 """
     (repo_dir / "SUPPORT.md").write_text(support_md, encoding="utf-8")
 
@@ -394,7 +394,7 @@ MIT. See [`LICENSE`](LICENSE) and [`pipeline/data/external/README.md`](pipeline/
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -724,7 +724,7 @@ MIT. See [`LICENSE`](LICENSE).
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -766,7 +766,7 @@ def build_docs_repo(out_dir: Path) -> Path:
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   pull_request:
 
 jobs:
@@ -886,7 +886,7 @@ def publish_org_repos(
         if git_dir.exists():
             _rmtree(git_dir)
 
-        subprocess.run(["git", "init", "-b", "main"], cwd=repo_dir, check=True, capture_output=True)
+        subprocess.run(["git", "init", "-b", "master"], cwd=repo_dir, check=True, capture_output=True)
         subprocess.run(["git", "config", "user.name", "Omnii"], cwd=repo_dir, check=True)
         subprocess.run(
             ["git", "config", "user.email", "omnii@users.noreply.github.com"], cwd=repo_dir, check=True
@@ -921,25 +921,24 @@ def publish_org_repos(
                     },
                 )
                 create_resp.raise_for_status()
-            else:
-                print(f"Updating metadata for {full_slug}...")
-                patch_resp = client.patch(
-                    f"https://api.github.com/repos/{full_slug}",
-                    json={
-                        "description": spec["description"],
-                        "homepage": spec["homepage"],
-                        "private": False,
-                        "has_issues": True,
-                    },
-                )
-                patch_resp.raise_for_status()
 
-        print(f"Pushing main branch to {remote_url}...")
-        subprocess.run(["git", "push", "-u", "origin", "main", "--force"], cwd=repo_dir, check=True)
-        if repo_name == "typen":
-            subprocess.run(["git", "push", "origin", "main:master", "--force"], cwd=repo_dir, check=True)
+        print(f"Pushing master branch to {remote_url}...")
+        subprocess.run(["git", "push", "-u", "origin", "master", "--force"], cwd=repo_dir, check=True)
 
         with httpx.Client(headers=headers, timeout=30.0) as client:
+            print(f"Updating metadata & default branch (master) for {full_slug}...")
+            patch_resp = client.patch(
+                f"https://api.github.com/repos/{full_slug}",
+                json={
+                    "description": spec["description"],
+                    "homepage": spec["homepage"],
+                    "default_branch": "master",
+                    "private": False,
+                    "has_issues": True,
+                },
+            )
+            patch_resp.raise_for_status()
+            client.delete(f"https://api.github.com/repos/{full_slug}/git/refs/heads/main")
             client.put(
                 f"https://api.github.com/repos/{full_slug}/topics",
                 json={"names": spec["topics"]},

@@ -84,7 +84,7 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
       <div className="rule mt-14 pt-5 text-xs text-ink-faint">
         Spotted an inaccuracy or want to improve this guide?{" "}
         <a
-          href={`${GITHUB_DOCS_URL}/blob/main/${article.slug}.md`}
+          href={`${GITHUB_DOCS_URL}/blob/master/${article.slug}.md`}
           target="_blank"
           rel="noopener noreferrer"
           className="link"

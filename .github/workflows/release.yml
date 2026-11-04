@@ -214,7 +214,7 @@ jobs:
           token: ${{ env.HAS_RELEASES_TOKEN == 'true' && secrets.RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
           # When publishing to another repo the tag does not exist there; create it on its default branch.
-          target_commitish: ${{ env.RELEASES_REPO != github.repository && 'main' || github.sha }}
+          target_commitish: ${{ env.RELEASES_REPO != github.repository && 'master' || github.sha }}
           name: Typen ${{ env.FULL_VERSION }}
           prerelease: true
           generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
@@ -223,7 +223,7 @@ jobs:
       - name: Commit merged manifest to default branch (deploys the site)
         if: needs.prepare.outputs.publish == 'true'
         run: |
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'master' }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/src/data/release-manifest.json
