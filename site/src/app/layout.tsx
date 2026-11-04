@@ -9,7 +9,7 @@ import { FULL_VERSION } from "@/data/releases";
 const sans = Syne({ subsets: ["latin"], display: "swap", variable: "--font-sans" });
 const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--font-mono" });
 
-const SITE_URL = "https://autocorrect-desktop.vercel.app";
+const SITE_URL = "https://typen.org";
 const DESCRIPTION =
   "Typen is a small background service that fixes typos, homophones and punctuation in every application as you type. Offline, under a millisecond per keystroke, free and open source, for Windows, macOS and Linux.";
 
@@ -29,7 +29,12 @@ export const metadata: Metadata = {
     description: DESCRIPTION,
     url: SITE_URL,
   },
-  twitter: { card: "summary", title: "Typen", description: DESCRIPTION },
+  // summary_large_image uses opengraph-image.png / twitter-image.png from this folder.
+  twitter: {
+    card: "summary_large_image",
+    title: "Typen",
+    description: DESCRIPTION,
+  },
   other: { "x-typen-version": FULL_VERSION },
 };
 
