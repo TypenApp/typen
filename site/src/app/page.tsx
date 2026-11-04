@@ -2,11 +2,14 @@ import React from "react";
 import Link from "next/link";
 import { InteractiveSandbox } from "@/components/InteractiveSandbox";
 import { Correction, Section } from "@/components/Page";
+import { ArrowRightIcon, CheckIcon, DownloadIcon, GitHubIcon, PlayIcon } from "@/components/Icons";
 import {
   AVAILABLE_PLATFORMS,
   CODE_SIGNED,
   FULL_VERSION,
+  GITHUB_REPO_URL,
   LEXICON_WORD_COUNT,
+  LICENSE_NAME,
   PLATFORM_RELEASES,
   RELEASE_PAGE_URL,
   UPCOMING_PLATFORMS,
@@ -53,34 +56,70 @@ export default function HomePage() {
   return (
     <div className="pb-8">
       {/* Hero */}
-      <section className="container-site pt-16 sm:pt-24">
-        <p className="eyebrow">
-          {available.length > 0 ? `Public beta · ${joinNames(available)}` : `Public beta · ${joinNames(platforms)}`}
-        </p>
-        <h1 className="display mt-5 max-w-4xl text-5xl leading-[1.02] sm:text-7xl">
+      <section className="container-site pt-12 sm:pt-20">
+        {/* Announcement pill: the current release, linking to its notes. */}
+        <a
+          href={RELEASE_PAGE_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex max-w-full items-center gap-2 rounded-full border border-line bg-paper-1 py-1.5 pl-3 pr-2.5 text-xs text-ink-muted transition-colors hover:border-ink-faint hover:text-ink"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
+          <span className="truncate">
+            Tact {FULL_VERSION} is out
+            {available.length > 0 ? ` for ${joinNames(available)}` : ""}
+          </span>
+          <ArrowRightIcon size={13} className="shrink-0 transition-transform group-hover:translate-x-0.5" />
+        </a>
+
+        <h1 className="display mt-6 max-w-4xl text-[2.6rem] leading-[1.04] sm:text-6xl lg:text-7xl">
           Autocorrect for{" "}
           <span className="typo line-through decoration-ink-faint decoration-[2px]" aria-hidden="true">
             evry
           </span>{" "}
           every app on your desktop.
         </h1>
-        <p className="prose-site mt-7 max-w-2xl text-lg sm:text-xl">
+        <p className="prose-site mt-6 max-w-2xl text-base sm:mt-7 sm:text-xl">
           Tact is one small background service that fixes typos, homophones and punctuation as you type — in
           any application, entirely offline, in under a millisecond per keystroke. Free and open source.
         </p>
-        <div className="mt-9 flex flex-wrap items-center gap-3">
-          <Link href="/download" className="btn-primary h-11 px-5 text-[15px]">
-            {available.length === 1 ? `Download for ${available[0]}` : "Download"}
+
+        {/* Calls to action: download, demo, source. */}
+        <div className="mt-8 flex flex-wrap items-center gap-2.5 sm:mt-9 sm:gap-3">
+          <Link href="/download" className="btn-primary btn-pill h-12 w-full gap-2.5 px-6 text-[15px] sm:w-auto">
+            <DownloadIcon size={17} />
+            {available.length === 1 ? `Download for ${available[0]}` : "Download Tact"}
           </Link>
-          <a href="#demo" className="btn-secondary h-11 px-5 text-[15px]">
-            Try it in the browser
+          <a href="#demo" className="btn-secondary btn-pill h-12 gap-2.5 border-line px-5 text-[15px] hover:border-ink-faint">
+            <PlayIcon size={13} />
+            Try the demo
+          </a>
+          <a
+            href={GITHUB_REPO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Tact on GitHub"
+            title="Source on GitHub"
+            className="icon-btn h-12 w-12"
+          >
+            <GitHubIcon size={20} />
           </a>
         </div>
-        <p className="mt-4 font-mono text-xs text-ink-faint">
-          v{FULL_VERSION}
-          {available.length === 0 && " · first builds publish from the release pipeline"}
-          {upcoming.length > 0 && available.length > 0 && ` · ${joinNames(upcoming)} to follow`}
-        </p>
+
+        <ul className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-faint sm:text-[13px]">
+          {[
+            "100% open source",
+            `${LICENSE_NAME} licensed`,
+            joinNames(platforms),
+            ...(upcoming.length > 0 && available.length > 0 ? [`${joinNames(upcoming)} to follow`] : []),
+            ...(available.length === 0 ? ["First builds publish from the release pipeline"] : []),
+          ].map((item) => (
+            <li key={item} className="inline-flex items-center gap-1.5">
+              <CheckIcon size={13} className="text-ink-muted" />
+              {item}
+            </li>
+          ))}
+        </ul>
 
         <ul className="mt-14 flex flex-wrap gap-x-10 gap-y-3 font-display text-xl text-ink-muted sm:text-2xl">
           {HERO_FIXES.map(([from, to]) => (

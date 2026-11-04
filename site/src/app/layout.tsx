@@ -44,7 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     // Theme follows the device: dark tokens live under a prefers-color-scheme media query in globals.css.
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
-      <body className="flex min-h-screen flex-col antialiased">
+      <body className="flex min-h-screen flex-col pt-3 antialiased sm:pt-4">
         <Navbar />
         <main className="flex-1">{children}</main>
         <Footer />

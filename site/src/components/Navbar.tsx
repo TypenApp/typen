@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { DOC_ARTICLES } from "@/data/docs";
 import { IS_PRERELEASE, PLATFORM_RELEASES } from "@/data/releases";
 import { Wordmark } from "./Brand";
+import { GitHubStars } from "./GitHubStars";
 interface SearchResultItem {
   title: string;
   subtitle: string;
@@ -97,92 +98,113 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md">
-        <div className="container-site flex h-16 items-center justify-between">
-          <div className="flex items-center gap-10">
-            <Wordmark beta={IS_PRERELEASE} />
-            <nav className="hidden items-center gap-7 md:flex" aria-label="Primary">
-              {NAV_LINKS.map((link) => {
-                const isActive = pathname?.startsWith(link.href);
-                return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className={`text-sm transition-colors ${
-                      isActive ? "text-ink" : "text-ink-muted hover:text-ink"
-                    }`}
-                    aria-current={isActive ? "page" : undefined}
-                  >
-                    {link.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
+      {/* A floating bar: detached from the top edge, pill-shaped, translucent over the page. */}
+      <header className="sticky top-3 z-40 sm:top-4">
+        <div className="container-site">
+          <div className="relative rounded-[28px] border border-line bg-paper/80 shadow-[0_8px_30px_-12px_rgb(var(--ink)/0.25)] backdrop-blur-xl">
+            <div className="flex h-14 items-center justify-between gap-2 pl-3.5 pr-2 sm:h-[60px] sm:pl-5 sm:pr-2.5">
+              <Wordmark beta={IS_PRERELEASE} />
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSearchOpen(true)}
-              aria-label="Search"
-              className="btn-secondary hidden h-9 gap-3 px-3 text-xs text-ink-muted sm:inline-flex"
-            >
-              <span>Search</span>
-              <kbd className="kbd">Ctrl K</kbd>
-            </button>
-            <Link href="/download" className="btn-primary hidden h-9 sm:inline-flex">
-              Download
-            </Link>
-            <button
-              type="button"
-              className="btn-ghost h-9 md:hidden"
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((v) => !v)}
-            >
-              <span className="relative block h-3 w-5">
-                <span
-                  className={`absolute left-0 top-0 h-px w-5 bg-current transition-transform ${
-                    menuOpen ? "translate-y-[6px] rotate-45" : ""
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-[6px] h-px w-5 bg-current transition-opacity ${
-                    menuOpen ? "opacity-0" : ""
-                  }`}
-                />
-                <span
-                  className={`absolute left-0 top-3 h-px w-5 bg-current transition-transform ${
-                    menuOpen ? "-translate-y-[6px] -rotate-45" : ""
-                  }`}
-                />
-              </span>
-            </button>
+              <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex" aria-label="Primary">
+                {NAV_LINKS.map((link) => {
+                  const isActive = pathname?.startsWith(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
+                        isActive ? "bg-paper-2 text-ink" : "text-ink-muted hover:bg-paper-2 hover:text-ink"
+                      }`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  aria-label="Search"
+                  className="icon-btn hidden lg:inline-flex"
+                  title="Search (Ctrl K)"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="6.5" />
+                    <path d="m20 20-4.3-4.3" />
+                  </svg>
+                </button>
+                <GitHubStars />
+                <Link href="/download" className="btn-primary btn-pill hidden h-10 px-4 sm:inline-flex">
+                  Download
+                </Link>
+                <button
+                  type="button"
+                  className="icon-btn md:hidden"
+                  aria-label={menuOpen ? "Close menu" : "Open menu"}
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  <span className="relative block h-3 w-4">
+                    <span
+                      className={`absolute left-0 top-0 h-px w-4 bg-current transition-transform ${
+                        menuOpen ? "translate-y-[6px] rotate-45" : ""
+                      }`}
+                    />
+                    <span
+                      className={`absolute left-0 top-[6px] h-px w-4 bg-current transition-opacity ${
+                        menuOpen ? "opacity-0" : ""
+                      }`}
+                    />
+                    <span
+                      className={`absolute left-0 top-3 h-px w-4 bg-current transition-transform ${
+                        menuOpen ? "-translate-y-[6px] -rotate-45" : ""
+                      }`}
+                    />
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {menuOpen && (
+              <nav
+                className="absolute inset-x-0 top-full mt-2 flex flex-col gap-0.5 rounded-[24px] border border-line bg-paper p-2 shadow-[0_16px_40px_-16px_rgb(var(--ink)/0.35)] md:hidden"
+                aria-label="Mobile"
+              >
+                {NAV_LINKS.map((link) => {
+                  const isActive = pathname?.startsWith(link.href);
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={`rounded-2xl px-3.5 py-2.5 text-sm ${
+                        isActive ? "bg-paper-2 text-ink" : "text-ink-muted hover:bg-paper-2 hover:text-ink"
+                      }`}
+                      aria-current={isActive ? "page" : undefined}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setSearchOpen(true);
+                  }}
+                  className="rounded-2xl px-3.5 py-2.5 text-left text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
+                >
+                  Search
+                </button>
+                <Link href="/download" className="btn-primary btn-pill mt-1 h-10 sm:hidden">
+                  Download
+                </Link>
+              </nav>
+            )}
           </div>
         </div>
-        {menuOpen && (
-          <nav className="container-site rule flex flex-col gap-1 py-3 md:hidden" aria-label="Mobile">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded px-2 py-2 text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
-              >
-                {link.label}
-              </Link>
-            ))}
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                setSearchOpen(true);
-              }}
-              className="rounded px-2 py-2 text-left text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
-            >
-              Search
-            </button>
-          </nav>
-        )}
       </header>
 
       {searchOpen && (
