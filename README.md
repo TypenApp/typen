@@ -111,10 +111,13 @@ git tag v1.2.0-beta.4 && git push origin v1.2.0-beta.4
 
 `.github/workflows/release.yml` then builds all three platforms, attaches the
 installers, `SHA256SUMS.txt` and the merged manifest to a GitHub pre-release, and
-commits the merged manifest to `master`. Vercel redeploys the site from that commit;
-every download link points into the release, so the site only ever lists platforms
-and files that were actually built. The publish job can target another repository via
-the `RELEASES_REPO` variable and `RELEASES_TOKEN` secret; by default it publishes here.
+commits the merged manifest to the website's source repository (`SITE_REPO` variable,
+default: the repository running the workflow; pushed over the `SITE_DEPLOY_KEY` write
+deploy key when set, since `GITHUB_TOKEN` cannot bypass a branch ruleset). Vercel
+redeploys the site from that commit; every download link points into the release, so
+the site only ever lists platforms and files that were actually built. The publish job
+can target another repository for the release itself via the `RELEASES_REPO` variable
+and `RELEASES_TOKEN` secret; by default it publishes here.
 
 ### Website live demo
 

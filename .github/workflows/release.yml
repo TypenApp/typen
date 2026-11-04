@@ -3,8 +3,9 @@ name: Release builds
 # One tag (`v<version>-<channel>`, e.g. v1.2.0-beta.3) builds the three platform
 # distributables, signs them when the corresponding secrets are configured,
 # merges the per-platform manifests, attaches everything to a GitHub pre-release
-# and commits the merged manifest to master. That commit is what the website
-# reads: it renders download links as
+# and commits the merged manifest to the website's source repository (variable
+# SITE_REPO, default: this repository). That commit is what the website reads:
+# it renders download links as
 #   https://github.com/<repo>/releases/download/<tag>/<file>
 # so binaries never enter git and the site can never advertise a file that was
 # not actually built and published.
@@ -14,6 +15,8 @@ name: Release builds
 #   macOS   : AC_MAC_CERT_P12_BASE64, AC_MAC_CERT_PASSWORD, AC_SIGN_IDENTITY,
 #             AC_NOTARY_APPLE_ID, AC_NOTARY_TEAM_ID, AC_NOTARY_PASSWORD
 #   Linux   : AC_MINISIGN_KEY_BASE64, AC_MINISIGN_PASSWORD
+#   Site    : SITE_DEPLOY_KEY (write deploy key on SITE_REPO; needed when SITE_REPO
+#             is another repository or this one's default branch has a ruleset)
 
 on:
   push:
@@ -187,9 +190,6 @@ jobs:
       HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.prepare.outputs.publish == 'true' && github.event.repository.default_branch || github.ref }}
-          fetch-depth: 0
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - uses: actions/download-artifact@v4
@@ -220,16 +220,45 @@ jobs:
           generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
           body: ${{ env.RELEASES_REPO != github.repository && format('Typen {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
           files: dist/installer/*
-      - name: Commit merged manifest to default branch (deploys the site)
+      - name: Commit merged manifest to the site's source repository (deploys the site)
         if: needs.prepare.outputs.publish == 'true'
+        # The website is deployed from SITE_REPO (repository variable; defaults to
+        # this repository). When that is another repository, or this one's default
+        # branch is protected by a ruleset (GITHUB_TOKEN cannot bypass one), the
+        # push goes over SSH with the SITE_DEPLOY_KEY secret: a write deploy key
+        # on SITE_REPO, which rulesets let through as a DeployKey bypass actor.
+        env:
+          SITE_REPO: ${{ vars.SITE_REPO || github.repository }}
+          SITE_DEPLOY_KEY: ${{ secrets.SITE_DEPLOY_KEY }}
         run: |
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'master' }}"
+          set -euo pipefail
+          MANIFEST="$PWD/site/src/data/release-manifest.json"
+          if [[ -n "$SITE_DEPLOY_KEY" ]]; then
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
+            printf '%s\n' "$SITE_DEPLOY_KEY" > ~/.ssh/site_deploy_key && chmod 600 ~/.ssh/site_deploy_key
+            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/site_deploy_key -o IdentitiesOnly=yes"
+            REMOTE="git@github.com:${SITE_REPO}.git"
+          else
+            REMOTE="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${SITE_REPO}.git"
+          fi
+          WORK="$RUNNER_TEMP/site-repo"
+          git clone --depth 1 "$REMOTE" "$WORK"
+          cd "$WORK"
+          BRANCH="$(git rev-parse --abbrev-ref HEAD)"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp "$MANIFEST" site/src/data/release-manifest.json
           git add site/src/data/release-manifest.json
-          if git diff --cached --quiet; then echo "manifest unchanged"; exit 0; fi
+          if git diff --cached --quiet; then echo "manifest unchanged in ${SITE_REPO}"; exit 0; fi
           git commit -m "Release ${GITHUB_REF_NAME}: publish site manifest"
+          pushed=false
           for attempt in 1 2 3; do
-            git push origin "HEAD:${DEFAULT_BRANCH}" && break
-            git pull --rebase origin "${DEFAULT_BRANCH}"
+            if git push origin "HEAD:${BRANCH}"; then pushed=true; break; fi
+            git pull --rebase origin "${BRANCH}"
           done
+          if [[ "$pushed" != true ]]; then
+            echo "::error::could not push the merged manifest to ${SITE_REPO}@${BRANCH}; the site will keep showing the previous release"
+            exit 1
+          fi
+          echo "manifest committed to ${SITE_REPO}@${BRANCH}"

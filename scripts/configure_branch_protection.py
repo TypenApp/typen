@@ -37,6 +37,12 @@ RULESET_NAME = "Protected default branch"
 # (1 = Read, 2 = Triage, 3 = Write, 4 = Maintain, 5 = Admin).
 REPOSITORY_ADMIN_ROLE_ID = 5
 
+# Note: workflows running with GITHUB_TOKEN cannot be given bypass (GitHub rejects
+# the Actions app as a bypass actor: "must be part of the ruleset source or
+# owner organization"). The release workflow therefore commits the merged
+# release manifest to the site's source repository over a deploy key
+# (`SITE_DEPLOY_KEY` / `SITE_REPO` on TypenApp/typen), not to this branch.
+
 # Required status-check contexts are the GitHub Actions *job names* from each
 # repository's `.github/workflows/ci.yml`. `.github` has no CI, so it gets no
 # status-check rule until one exists.
@@ -108,22 +114,23 @@ def build_ruleset(repo_name: str, *, require_signatures: bool = False) -> dict[s
         rules.append({"type": "required_signatures"})
 
     include = ["~DEFAULT_BRANCH", *EXTRA_BRANCHES.get(repo_name, [])]
+    # Minimal bypass list, deliberately redundant so the maintainer keeps the
+    # ability to merge indefinitely:
+    #   * Organisation owners (the maintainer is an owner of TypenApp).
+    #   * Repository "Admin" role (actor_id 5) - independent of org role, so a
+    #     future change to org membership cannot silently lock the maintainer
+    #     out of merging. With a single maintainer, "1 required approval"
+    #     can never be satisfied without this bypass (no self-approval).
+    # `bypass_mode: "always"` covers both pull-request merges and pushes.
+    bypass_actors: list[dict[str, Any]] = [
+        {"actor_id": 1, "actor_type": "OrganizationAdmin", "bypass_mode": "always"},
+        {"actor_id": REPOSITORY_ADMIN_ROLE_ID, "actor_type": "RepositoryRole", "bypass_mode": "always"},
+    ]
     return {
         "name": RULESET_NAME,
         "target": "branch",
         "enforcement": "active",
-        # Minimal bypass list, deliberately redundant so the maintainer keeps the
-        # ability to merge indefinitely:
-        #   * Organisation owners (the maintainer is an owner of TypenApp).
-        #   * Repository "Admin" role (actor_id 5) - independent of org role, so a
-        #     future change to org membership cannot silently lock the maintainer
-        #     out of merging. With a single maintainer, "1 required approval"
-        #     can never be satisfied without this bypass (no self-approval).
-        # `bypass_mode: "always"` covers both pull-request merges and pushes.
-        "bypass_actors": [
-            {"actor_id": 1, "actor_type": "OrganizationAdmin", "bypass_mode": "always"},
-            {"actor_id": REPOSITORY_ADMIN_ROLE_ID, "actor_type": "RepositoryRole", "bypass_mode": "always"},
-        ],
+        "bypass_actors": bypass_actors,
         "conditions": {"ref_name": {"include": include, "exclude": []}},
         "rules": rules,
     }
