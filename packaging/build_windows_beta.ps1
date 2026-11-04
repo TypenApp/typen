@@ -1,6 +1,7 @@
 <#
 .SYNOPSIS
-    Build the Tact Windows BETA distributables.
+    Build the Tact Windows distributables (the stable platform build; the file
+    name still carries the release's channel suffix, e.g. 1.2.0-beta.4).
 
 .DESCRIPTION
     1. Generates the application icon.

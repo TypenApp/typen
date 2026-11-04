@@ -1,7 +1,7 @@
 """
 Tests for the unified executable entry point (`autocorrect.launcher`), the tray
 controller's process-spawn contract, and frozen-build resource resolution.
-These guard the behaviours the packaged Windows beta depends on.
+These guard the behaviours the packaged Windows build depends on.
 """
 
 from __future__ import annotations
@@ -22,7 +22,17 @@ def test_launcher_version_flag_reports_channel(capsys: pytest.CaptureFixture[str
     assert exc.value.code == 0
     out = capsys.readouterr().out
     assert launcher.APP_DISPLAY_NAME == "Tact" and "Tact" in out
-    assert launcher.RELEASE_CHANNEL in out
+    assert launcher.VERSION_LABEL in out
+    if sys.platform == "win32":
+        # The Windows build is the stable one: no channel suffix anywhere.
+        assert launcher.RELEASE_CHANNEL == "stable"
+        assert "beta" not in out and "stable" not in out
+        assert launcher.STATUS_PREFIX == "Tact"
+    else:
+        # macOS and Linux are still in public beta and say so.
+        assert launcher.RELEASE_CHANNEL == "beta"
+        assert "-beta" in out
+        assert launcher.STATUS_PREFIX == "Tact (beta)"
 
 
 def test_launcher_headless_check_initialises_every_subsystem(

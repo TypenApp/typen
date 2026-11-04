@@ -1,25 +1,31 @@
 import React from "react";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Check, Dash, PageHeader, Section } from "@/components/Page";
+import { Check, Dash, PageHeader, Section, StatusBadge } from "@/components/Page";
 import {
   AVAILABLE_PLATFORMS,
   BASE_LANGUAGE_BUNDLE,
-  BETA_INCLUDED,
-  BETA_NOT_INCLUDED,
+  BETA_PLATFORMS,
   BUILT_AT_ISO,
   DOMAIN_PACK_RELEASES,
   ED25519_KEY_IS_DEV_KEY,
   ED25519_PUBLIC_KEY_HEX,
   FULL_VERSION,
+  RELEASE_INCLUDED,
+  RELEASE_NOT_INCLUDED,
   RELEASE_PAGE_URL,
   RELEASES_URL,
   RELEASE_TAG,
   SHA256SUMS_URL,
+  STABLE_PLATFORMS,
   UPCOMING_PLATFORMS,
   type DownloadArtifact,
   type PlatformRelease,
 } from "@/data/releases";
+
+const joinNames = (names: string[]) =>
+  names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const metadata: Metadata = {
   title: "Download",
@@ -55,9 +61,18 @@ function PlatformBlock({ platform }: { platform: PlatformRelease }) {
   return (
     <section className="card scroll-mt-24 p-6 sm:p-8" id={platform.id}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="display text-2xl">{platform.osName}</h2>
+        <h2 className="display inline-flex items-center gap-2.5 text-2xl">
+          {platform.osName}
+          {platform.status === "beta" && <StatusBadge status="beta" className="translate-y-px" />}
+        </h2>
         <span className="text-sm text-ink-muted">{platform.architecture}</span>
       </div>
+      {platform.status === "beta" && (
+        <p className="mt-2 text-sm text-ink-faint">
+          Public beta: feature-complete, with less real-world mileage than the Windows build. Reports are welcome
+          on GitHub.
+        </p>
+      )}
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {platform.artifacts.map((a, i) => (
@@ -87,6 +102,8 @@ export default function DownloadPage() {
   const unsigned = AVAILABLE_PLATFORMS.filter((p) => !p.codeSigned).map((p) => p.osName);
   const verifyLines = AVAILABLE_PLATFORMS.filter((p) => p.verifyCommand).map((p) => `# ${p.osName}\n${p.verifyCommand}`);
   const nothingPublished = AVAILABLE_PLATFORMS.length === 0;
+  const stable = STABLE_PLATFORMS.map((p) => p.osName);
+  const beta = BETA_PLATFORMS.map((p) => p.osName);
 
   return (
     <div className="pb-8">
@@ -105,10 +122,12 @@ export default function DownloadPage() {
             </p>
           ) : (
             <p>
-              Public beta for {AVAILABLE_PLATFORMS.map((p) => p.osName).join(", ")}, built {formatDate(BUILT_AT_ISO)}.
+              {stable.length > 0 &&
+                `Stable for ${joinNames(stable)}${beta.length > 0 ? `; public beta for ${joinNames(beta)}` : ""}.`}
+              {stable.length === 0 && `Public beta for ${joinNames(beta)}.`} Built {formatDate(BUILT_AT_ISO)}.
               Includes the full offline engine and every feature; Tact is free and open source.
               {unsigned.length > 0 &&
-                ` The ${unsigned.join(" and ")} build${unsigned.length > 1 ? "s are" : " is"} not yet code-signed.`}
+                ` The ${joinNames(unsigned)} ${plural(unsigned.length, "build is", "builds are")} not yet code-signed.`}
             </p>
           )
         }
@@ -136,7 +155,7 @@ export default function DownloadPage() {
               <div key={p.id} id={p.id} className="card scroll-mt-24 p-5">
                 <div className="flex items-start justify-between gap-3">
                   <p className="font-display text-lg text-ink">{p.osName}</p>
-                  <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+                  <span className="rounded border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
                     {nothingPublished ? "building" : "not in this release"}
                   </span>
                 </div>
@@ -152,12 +171,12 @@ export default function DownloadPage() {
         )}
       </div>
 
-      <Section id="scope" index="01" title="What the beta includes">
+      <Section id="scope" index="01" title="What this release includes">
         <div className="grid gap-10 sm:grid-cols-2">
           <div>
             <p className="eyebrow">Included</p>
             <ul className="mt-4 space-y-2.5">
-              {BETA_INCLUDED.map((i) => (
+              {RELEASE_INCLUDED.map((i) => (
                 <Check key={i}>{i}</Check>
               ))}
             </ul>
@@ -165,7 +184,7 @@ export default function DownloadPage() {
           <div>
             <p className="eyebrow">Not yet</p>
             <ul className="mt-4 space-y-2.5">
-              {BETA_NOT_INCLUDED.map((i) => (
+              {RELEASE_NOT_INCLUDED.map((i) => (
                 <Dash key={i}>{i}</Dash>
               ))}
             </ul>
@@ -238,7 +257,7 @@ export default function DownloadPage() {
             <p className="hash text-ink-muted">{ED25519_PUBLIC_KEY_HEX}</p>
             {ED25519_KEY_IS_DEV_KEY && (
               <p className="mt-2 text-ink-faint">
-                Development key embedded in the beta; it will be rotated before the stable release.
+                Development key embedded in this build; it will be rotated.
               </p>
             )}
           </div>

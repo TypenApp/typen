@@ -29,14 +29,24 @@ from autocorrect import __version__
 from autocorrect.platform_paths import default_data_dir, resolve_data_dir
 
 APP_DISPLAY_NAME: Final[str] = "Tact"
-RELEASE_CHANNEL: Final[str] = "beta"
+# Maturity is a property of the platform build, not of the version: the Windows
+# build has been verified end to end and ships as stable; macOS and Linux are
+# still in public beta and say so in their version string and tray tooltip.
+RELEASE_CHANNEL: Final[str] = "stable" if sys.platform == "win32" else "beta"
+IS_BETA_BUILD: Final[bool] = RELEASE_CHANNEL != "stable"
+#: "1.2.0" on stable builds, "1.2.0-beta" on beta builds.
+VERSION_LABEL: Final[str] = __version__ if not IS_BETA_BUILD else f"{__version__}-{RELEASE_CHANNEL}"
+#: "Tact" on stable builds, "Tact (beta)" on beta builds.
+STATUS_PREFIX: Final[str] = (
+    APP_DISPLAY_NAME if not IS_BETA_BUILD else f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL})"
+)
 DEFAULT_DATA_DIR: Final[Path] = default_data_dir()
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="AutoCorrectDesktop",
-        description=f"{APP_DISPLAY_NAME} {__version__} ({RELEASE_CHANNEL})",
+        description=f"{APP_DISPLAY_NAME} {VERSION_LABEL}",
     )
     parser.add_argument(
         "--data-dir",
@@ -69,9 +79,7 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the IBus engine and register its component on the fly (developer testing)",
     )
-    parser.add_argument(
-        "--version", action="version", version=f"{APP_DISPLAY_NAME} {__version__}-{RELEASE_CHANNEL}"
-    )
+    parser.add_argument("--version", action="version", version=f"{APP_DISPLAY_NAME} {VERSION_LABEL}")
     return parser
 
 
@@ -89,7 +97,7 @@ def _run_headless_check(data_dir: Path) -> int:
         snapshot = daemon.start(start_ipc=False)
         bundle = daemon.resource_manager.active_bundle
         print(
-            f"{APP_DISPLAY_NAME} {__version__}-{RELEASE_CHANNEL} OK | "
+            f"{APP_DISPLAY_NAME} {VERSION_LABEL} OK | "
             f"resources={bundle.bundle_dir} (v{bundle.version}, schema {bundle.schema_version}) | "
             f"entitlement={snapshot.status_message}"
         )
@@ -118,16 +126,16 @@ def _run_daemon(data_dir: Path, with_tray: bool) -> int:
         def status_label() -> str:
             hook = daemon.hook_status
             if not hook.is_active and hook.state.value in ("failed", "unsupported"):
-                return f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL}) — Not correcting: {hook.remediation or hook.detail}"
+                return f"{STATUS_PREFIX} — Not correcting: {hook.remediation or hook.detail}"
             prefix = "Paused" if daemon.session.is_paused else "Active"
-            return f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL}) — {prefix} · {snapshot.status_message}"
+            return f"{STATUS_PREFIX} — {prefix} · {snapshot.status_message}"
 
         def toggle_pause() -> bool:
             daemon.session.set_paused(not daemon.session.is_paused)
             return daemon.session.is_paused
 
         if not with_tray:
-            print(f"{APP_DISPLAY_NAME} {__version__}-{RELEASE_CHANNEL}: {snapshot.status_message}")
+            print(f"{APP_DISPLAY_NAME} {VERSION_LABEL}: {snapshot.status_message}")
             hook = daemon.hook_status
             if hook.is_active:
                 print(f"System-wide keyboard hook active ({hook.backend}). Press Ctrl+C to stop.")

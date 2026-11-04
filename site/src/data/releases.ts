@@ -127,10 +127,24 @@ export interface DownloadArtifact {
 
 export type PlatformId = "windows" | "macos" | "linux";
 
+/**
+ * Maturity of a platform build, independent of the version's release channel.
+ * `stable` builds have been verified end to end on real machines; `beta` builds
+ * are feature-complete but have had less real-world mileage; `coming-soon`
+ * builds were not produced for this version.
+ */
+export type PlatformStatus = "stable" | "beta" | "coming-soon";
+
+export const PLATFORM_STATUS_LABEL: Record<PlatformStatus, string> = {
+  stable: "Stable",
+  beta: "Beta",
+  "coming-soon": "Coming soon",
+};
+
 export interface PlatformRelease {
   id: PlatformId;
   osName: string;
-  status: "beta" | "coming-soon";
+  status: PlatformStatus;
   architecture: string;
   requirements: string[];
   artifacts: DownloadArtifact[];
@@ -196,7 +210,8 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
   {
     id: "windows",
     osName: "Windows",
-    status: windowsArtifacts.length ? "beta" : "coming-soon",
+    // Verified end to end on real machines: the Windows build is the stable one.
+    status: windowsArtifacts.length ? "stable" : "coming-soon",
     architecture: "Windows 10 / 11, 64-bit",
     requirements: [
       "Windows 10 (1903+) or Windows 11, x64",
@@ -261,7 +276,9 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
   },
 ];
 
-export const AVAILABLE_PLATFORMS = PLATFORM_RELEASES.filter((p) => p.status === "beta");
+export const AVAILABLE_PLATFORMS = PLATFORM_RELEASES.filter((p) => p.status !== "coming-soon");
+export const STABLE_PLATFORMS = PLATFORM_RELEASES.filter((p) => p.status === "stable");
+export const BETA_PLATFORMS = PLATFORM_RELEASES.filter((p) => p.status === "beta");
 export const UPCOMING_PLATFORMS = PLATFORM_RELEASES.filter((p) => p.status === "coming-soon");
 
 export const WINDOWS_RELEASE = PLATFORM_RELEASES[0];
@@ -325,22 +342,24 @@ export const BASE_LANGUAGE_BUNDLE = {
   })),
 };
 
-/** Beta scope: what ships, what does not. Rendered verbatim on /download. */
-export const BETA_INCLUDED = [
+/** Release scope: what ships, what does not. Rendered verbatim on /download. */
+export const RELEASE_INCLUDED = [
   "System-wide keyboard hook, spelling, direct typos, homophones, punctuation and capitalisation (Layer 1, offline)",
   `${LEXICON_WORD_COUNT.toLocaleString()}-word English lexicon with EN_GB / EN_US / EN_CA / EN_AU variants`,
   "System tray with Pause/Resume, and the Settings window (10 screens) over authenticated local IPC",
   "Custom dictionary, suggested words, rejected pairs, per-app profiles, domain packs and text-expansion snippets",
   "Every feature, for everyone: no editions, trials or licence keys",
-  ...AVAILABLE_PLATFORMS.filter((p) => p.id !== "windows").map((p) => `${p.osName} build (${p.architecture})`),
+  ...AVAILABLE_PLATFORMS.map(
+    (p) => `${p.osName} build, ${PLATFORM_STATUS_LABEL[p.status].toLowerCase()} (${p.architecture})`
+  ),
 ];
 
-export const BETA_NOT_INCLUDED = [
+export const RELEASE_NOT_INCLUDED = [
   ...(winSigned ? [] : ["Windows code signing (SmartScreen warning on first run)"]),
   // Only call a platform "not included" once something else *is* included;
   // before the first publish of a version every platform is simply still building.
   ...(AVAILABLE_PLATFORMS.length > 0 ? UPCOMING_PLATFORMS.map((p) => `${p.osName} build`) : []),
   "Local AI (Layer 2) models and BYOK cloud AI (Layer 3) — the screens exist, model downloads are not published",
-  "Qt (PySide6) Settings UI — the beta ships the lightweight native fallback window",
+  "Qt (PySide6) Settings UI — the current builds ship the lightweight native fallback window",
   "Automatic application updates — reinstall over the top to upgrade",
 ];

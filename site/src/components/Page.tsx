@@ -85,3 +85,28 @@ export function Dash({ children }: { children: React.ReactNode }) {
     </li>
   );
 }
+
+/**
+ * Small uppercase tag for a platform's maturity. `beta` is drawn in the proof
+ * red so it reads as a caution; `stable` and `coming-soon` stay quiet.
+ */
+export function StatusBadge({
+  status,
+  className = "",
+}: {
+  status: "stable" | "beta" | "coming-soon";
+  className?: string;
+}) {
+  const tone =
+    status === "beta"
+      ? "border-proof/50 text-proof"
+      : "border-line text-ink-faint";
+  const label = status === "coming-soon" ? "coming soon" : status;
+  return (
+    <span
+      className={`inline-flex items-center rounded border px-1.5 py-px font-mono text-[10px] uppercase tracking-wider ${tone} ${className}`}
+    >
+      {label}
+    </span>
+  );
+}

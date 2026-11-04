@@ -13,7 +13,9 @@
 
 [Setup]
 AppId={{8D4F62C1-4B9E-497A-9F3E-71B8C2094E1A}
-AppName={#MyAppName} (Beta)
+; The Windows build is the stable one (macOS and Linux are still in beta), so the
+; product name carries no channel tag. Upgrades key on AppId, not AppName.
+AppName={#MyAppName}
 AppVersion={#MyFullVersion}
 AppVerName={#MyAppName} {#MyFullVersion}
 AppPublisher={#MyAppPublisher}

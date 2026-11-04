@@ -1,10 +1,11 @@
 import React from "react";
 import Link from "next/link";
 import { InteractiveSandbox } from "@/components/InteractiveSandbox";
-import { Correction, Section } from "@/components/Page";
+import { Correction, Section, StatusBadge } from "@/components/Page";
 import { ArrowRightIcon, CheckIcon, DownloadIcon, GitHubIcon, PlayIcon } from "@/components/Icons";
 import {
   AVAILABLE_PLATFORMS,
+  BETA_PLATFORMS,
   CODE_SIGNED,
   FULL_VERSION,
   GITHUB_REPO_URL,
@@ -12,11 +13,13 @@ import {
   LICENSE_NAME,
   PLATFORM_RELEASES,
   RELEASE_PAGE_URL,
+  STABLE_PLATFORMS,
   UPCOMING_PLATFORMS,
 } from "@/data/releases";
 
 const joinNames = (names: string[]) =>
   names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 const HERO_FIXES: Array<[string, string]> = [
   ["recieve", "receive"],
@@ -50,6 +53,8 @@ const LAYERS = [
 
 export default function HomePage() {
   const available = AVAILABLE_PLATFORMS.map((p) => p.osName);
+  const stable = STABLE_PLATFORMS.map((p) => p.osName);
+  const beta = BETA_PLATFORMS.map((p) => p.osName);
   const upcoming = UPCOMING_PLATFORMS.map((p) => p.osName);
   const platforms = PLATFORM_RELEASES.map((p) => p.osName);
 
@@ -110,15 +115,24 @@ export default function HomePage() {
           {[
             "100% open source",
             `${LICENSE_NAME} licensed`,
-            joinNames(platforms),
+            ...(stable.length > 0 ? [joinNames(stable)] : []),
             ...(upcoming.length > 0 && available.length > 0 ? [`${joinNames(upcoming)} to follow`] : []),
-            ...(available.length === 0 ? ["First builds publish from the release pipeline"] : []),
+            ...(available.length === 0
+              ? [joinNames(platforms), "First builds publish from the release pipeline"]
+              : []),
           ].map((item) => (
             <li key={item} className="inline-flex items-center gap-1.5">
               <CheckIcon size={13} className="text-ink-muted" />
               {item}
             </li>
           ))}
+          {beta.length > 0 && (
+            <li className="inline-flex items-center gap-1.5">
+              <CheckIcon size={13} className="text-ink-muted" />
+              {joinNames(beta)}
+              <StatusBadge status="beta" />
+            </li>
+          )}
         </ul>
 
         <ul className="mt-14 flex flex-wrap gap-x-10 gap-y-3 font-display text-xl text-ink-muted sm:text-2xl">
@@ -193,13 +207,16 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* Beta note */}
-      <Section index="05" title="About the beta">
+      {/* Platform status: which builds are stable and which are still in beta. */}
+      <Section index="05" title="Platform status">
         <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-start">
           <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
-            {available.length > 0
-              ? `The ${joinNames(available)} build${available.length > 1 ? "s are" : " is"} feature-complete for offline correction and customisation.`
-              : `Builds for ${joinNames(platforms)} are produced by the release pipeline and attached to a GitHub release; the download page lists exactly what has been published.`}
+            {available.length === 0 &&
+              `Builds for ${joinNames(platforms)} are produced by the release pipeline and attached to a GitHub release; the download page lists exactly what has been published.`}
+            {stable.length > 0 &&
+              `The ${joinNames(stable)} ${plural(stable.length, "build is", "builds are")} stable: verified end to end on real machines, and the ${plural(stable.length, "one", "ones")} we recommend.`}
+            {beta.length > 0 &&
+              ` The ${joinNames(beta)} ${plural(beta.length, "build is", "builds are")} in public beta — feature-complete for offline correction and customisation, with less real-world mileage so far.`}
             {!CODE_SIGNED && " Installers are not code-signed yet, so your OS will warn on first run — verify the SHA-256 instead."}{" "}
             Local AI features are not bundled.
           </p>

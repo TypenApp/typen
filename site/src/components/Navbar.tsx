@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { DOC_ARTICLES } from "@/data/docs";
-import { IS_PRERELEASE, PLATFORM_RELEASES } from "@/data/releases";
+import { PLATFORM_RELEASES, PLATFORM_STATUS_LABEL } from "@/data/releases";
 import { Wordmark } from "./Brand";
 import { GitHubStars } from "./GitHubStars";
 interface SearchResultItem {
@@ -51,9 +51,9 @@ export function Navbar() {
       items.push({
         title: `Download for ${p.osName}`,
         subtitle:
-          p.status === "beta"
-            ? p.artifacts.map((a) => a.filename).join(" · ")
-            : "Not built for this release yet",
+          p.status === "coming-soon"
+            ? "Not built for this release yet"
+            : `${PLATFORM_STATUS_LABEL[p.status]} · ${p.artifacts.map((a) => a.filename).join(" · ")}`,
         href: "/download",
         category: "Download",
       });
@@ -103,7 +103,7 @@ export function Navbar() {
         <div className="container-site">
           <div className="relative rounded-lg border border-line bg-paper/80 shadow-[0_8px_30px_-12px_rgb(var(--ink)/0.25)] backdrop-blur-xl">
             <div className="flex h-14 items-center justify-between gap-2 pl-3.5 pr-2 sm:h-[60px] sm:pl-5 sm:pr-2.5">
-              <Wordmark beta={IS_PRERELEASE} />
+              <Wordmark />
 
               <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex" aria-label="Primary">
                 {NAV_LINKS.map((link) => {
