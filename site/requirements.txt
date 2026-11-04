@@ -1,0 +1,3 @@
+# Python dependencies of the live-demo function (api/demo.py).
+# The engine itself is vendored into api/_vendor at install time.
+rapidfuzz>=3.6.0

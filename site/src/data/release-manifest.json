@@ -1,0 +1,166 @@
+{
+  "product": "Typen",
+  "version": "1.2.0",
+  "channel": "beta.6",
+  "full_version": "1.2.0-beta.6",
+  "release_tag": "v1.2.0-beta.6",
+  "built_at": "2026-11-04T05:03:23Z",
+  "resources": {
+    "bundle_version": "1.0.9",
+    "schema_version": 1,
+    "word_count": 166475,
+    "released_at": "2026-11-02T00:00:00Z",
+    "artifacts": {
+      "lexicon.bin": "f6a5f1a7398e7eb262a0e023f65b76ec05d88d1a294a5689cc52dd06e7bd46f2",
+      "lexicon_meta.bin": "85c3e61b3207ce21881cd7e79664b139379a48b48764c09bd24f71c349a41147",
+      "symspell_idx.bin": "36fe5f9aa7773bfb8cd66aa73e03bd0fd621cf9fc546c51ae49405a6bd7675b4",
+      "direct_typos.bin": "a07d1946d33a4f9d2e81a08d1d6b1792752ecf9c35476de128803351b1f8bb18",
+      "context_ngram.bin": "8b36032f29f5a1e60c868a309428eaac158c5809f6cefff9bfc34aac16f8266a",
+      "abbreviations.bin": "54b9e6554c260935aa471e3ba15a26620475c90f2d27d5a957a5fa3e4c5f5692",
+      "exact_casing.json": "be304603df9644e5ce2b9023414fe4447a725648c067dc624993adfe10df84b2",
+      "confusion_sets.json": "c2cb06c0be0e8a709131ba554b91e8bbca20797a7369b66eee0ccd639f74b9c4"
+    }
+  },
+  "packs": [
+    {
+      "id": "academic",
+      "version": "1.0.1",
+      "file": "academic.pack.json",
+      "size_bytes": 716,
+      "sha256": "00aa723e93092ce8cd6489234ee9fb5484e32dce8395bc24b22089029e0ff9e3",
+      "word_count": 5,
+      "direct_typo_count": 2
+    },
+    {
+      "id": "business",
+      "version": "1.0.1",
+      "file": "business.pack.json",
+      "size_bytes": 820,
+      "sha256": "7f73728ebb32b47648a6fc1454d1db51ae140abd65e3802a5f2d22623c87da7f",
+      "word_count": 6,
+      "direct_typo_count": 2
+    },
+    {
+      "id": "finance",
+      "version": "1.0.2",
+      "file": "finance.pack.json",
+      "size_bytes": 829,
+      "sha256": "8274c2c6a23a37be1cccb942a31ae5e67c61cb50c109171c10dbf241fcb1483c",
+      "word_count": 6,
+      "direct_typo_count": 2
+    },
+    {
+      "id": "law",
+      "version": "1.0.1",
+      "file": "law.pack.json",
+      "size_bytes": 708,
+      "sha256": "60ec5292c9d77630a074c262b66e153025a09b1ac95bfe8d6195b317c2d2ba5c",
+      "word_count": 5,
+      "direct_typo_count": 2
+    },
+    {
+      "id": "medicine",
+      "version": "1.0.2",
+      "file": "medicine.pack.json",
+      "size_bytes": 724,
+      "sha256": "31dd3b75540d0e657001b32e98bda00f8721ae68c4d5087ac083ac5b176fd396",
+      "word_count": 5,
+      "direct_typo_count": 2
+    },
+    {
+      "id": "programming",
+      "version": "1.0.3",
+      "file": "programming.pack.json",
+      "size_bytes": 1380,
+      "sha256": "e248d157dde613be77909394eb769565bc1bf44efaeabec468a00f804eeaac75",
+      "word_count": 11,
+      "direct_typo_count": 3
+    }
+  ],
+  "platforms": {
+    "win64": {
+      "built_at": "2026-11-04T05:03:12Z",
+      "full_version": "1.2.0",
+      "channel": "stable",
+      "code_signed": false,
+      "artifacts": [
+        {
+          "kind": "portable",
+          "file": "Typen-1.2.0-win64-portable.zip",
+          "size_bytes": 40798039,
+          "sha256": "2e80c6255bc56f924b2926d910ef33e16b2f53059fd15fafb7eac0c0b3af4360"
+        },
+        {
+          "kind": "installer",
+          "file": "Typen-1.2.0-win64-setup.exe",
+          "size_bytes": 29538184,
+          "sha256": "cc03542cb7422a01ab6a437248c6cfb65341aaf0e114c300f554ff314ea3244a"
+        }
+      ]
+    },
+    "macos-arm64": {
+      "built_at": "2026-11-04T05:02:34Z",
+      "full_version": "1.2.0-beta.6",
+      "channel": "beta.6",
+      "code_signed": false,
+      "artifacts": [
+        {
+          "kind": "installer",
+          "file": "Typen-1.2.0-beta.6-macos-arm64.dmg",
+          "size_bytes": 40826075,
+          "sha256": "0e62ad9420aea40a48698bc88c39f51fbf2019c0a4d47a0d3a10a4718120fd45"
+        },
+        {
+          "kind": "portable",
+          "file": "Typen-1.2.0-beta.6-macos-arm64.zip",
+          "size_bytes": 35936407,
+          "sha256": "e0b4bd3b656b877745a4659cc844f6fbfa87a70f4866092ec9a330cc82c1c019"
+        }
+      ],
+      "notarized": false
+    },
+    "linux-x86_64": {
+      "built_at": "2026-11-04T05:03:23Z",
+      "full_version": "1.2.0-beta.6",
+      "channel": "beta.6",
+      "code_signed": false,
+      "artifacts": [
+        {
+          "kind": "portable",
+          "file": "Typen-1.2.0-beta.6-linux-x86_64-portable.tar.gz",
+          "size_bytes": 64901970,
+          "sha256": "74ba10f1adb2e000b783f724046635864bc861e1ae1956ed6489e44963a0b575"
+        },
+        {
+          "kind": "appimage",
+          "file": "Typen-1.2.0-beta.6-linux-x86_64.AppImage",
+          "size_bytes": 60135928,
+          "sha256": "2510a3b6c88b27b9301615eebc958975c47a44382b5a89423c94815081da901b"
+        },
+        {
+          "kind": "deb",
+          "file": "autocorrect-desktop_1.2.0-beta.6_amd64.deb",
+          "size_bytes": 52572538,
+          "sha256": "203846188a6913ce50cd19dc87c8ea88678e4bb7e74cdcdf4f7d95a1f197caca"
+        }
+      ]
+    }
+  },
+  "download_repo": "TypenApp/typen",
+  "platform": "win64",
+  "code_signed": false,
+  "artifacts": [
+    {
+      "kind": "portable",
+      "file": "Typen-1.2.0-win64-portable.zip",
+      "size_bytes": 40798039,
+      "sha256": "2e80c6255bc56f924b2926d910ef33e16b2f53059fd15fafb7eac0c0b3af4360"
+    },
+    {
+      "kind": "installer",
+      "file": "Typen-1.2.0-win64-setup.exe",
+      "size_bytes": 29538184,
+      "sha256": "cc03542cb7422a01ab6a437248c6cfb65341aaf0e114c300f554ff314ea3244a"
+    }
+  ]
+}

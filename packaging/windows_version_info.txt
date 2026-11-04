@@ -1,0 +1,37 @@
+# UTF-8
+# PyInstaller Windows VERSIONINFO resource for AutoCorrectDesktop.exe.
+# The Windows build is the stable one (macOS and Linux are still in beta), so the
+# resource carries no pre-release flag or channel tag.
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers=(1, 2, 0, 1),
+    prodvers=(1, 2, 0, 1),
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo(
+      [
+        StringTable(
+          '040904B0',
+          [
+            StringStruct('CompanyName', 'Omnii'),
+            StringStruct('FileDescription', 'Typen — system-wide offline autocorrect'),
+            StringStruct('FileVersion', '1.2.0'),
+            StringStruct('InternalName', 'AutoCorrectDesktop'),
+            StringStruct('LegalCopyright', '© Omnii. MIT licence. Qt components (if present) under LGPLv3.'),
+            StringStruct('OriginalFilename', 'AutoCorrectDesktop.exe'),
+            StringStruct('ProductName', 'Typen'),
+            StringStruct('ProductVersion', '1.2.0'),
+            StringStruct('Comments', 'Free and open source. Nothing you type leaves your computer.')
+          ]
+        )
+      ]
+    ),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])])
+  ]
+)

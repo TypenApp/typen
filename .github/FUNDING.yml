@@ -1,0 +1,4 @@
+# GitHub Sponsors configuration for TypenApp
+# Displays the "Sponsor" button across all TypenApp repositories.
+github: [TypenApp, litlEMPEROR]
+custom: ["https://autocorrect-desktop.vercel.app/donate"]

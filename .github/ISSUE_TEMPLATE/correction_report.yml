@@ -1,0 +1,48 @@
+name: Correction Report (Missed Typo / False Positive)
+description: Report a misspelling Typen missed or a valid word/phrase Typen should not have changed.
+title: "[Lexicon]: "
+labels: ["lexicon", "quality"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Every accepted correction report becomes a permanent regression case in `tests/test_engine_quality_heldout.py` and [`TypenApp/language-data`](https://github.com/TypenApp/language-data).
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Issue Type
+      options:
+        - Missed typo (Typen did not correct a misspelling)
+        - False positive (Typen wrongly changed a valid word or phrase)
+        - Homophone / contextual confusion (e.g. their/there/they're, affect/effect)
+        - Casing / punctuation issue
+        - Domain pack term request (programming, medicine, finance, law, business, academic)
+    validations:
+      required: true
+  - type: dropdown
+    id: variant
+    attributes:
+      label: Active English Variant
+      options:
+        - EN_GB (British English)
+        - EN_US (American English)
+        - EN_CA (Canadian English)
+        - EN_AU (Australian English)
+        - UNIVERSAL
+    validations:
+      required: true
+  - type: input
+    id: typed_text
+    attributes:
+      label: Exact Text Typed
+      description: Include 1-2 surrounding words if context matters.
+      placeholder: "e.g. I recieved the package"
+    validations:
+      required: true
+  - type: input
+    id: actual_ vs_expected
+    attributes:
+      label: Actual Output vs. Expected Output
+      placeholder: "Actual: 'I recieved' -> Expected: 'I received'"
+    validations:
+      required: true
