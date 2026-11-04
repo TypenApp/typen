@@ -89,7 +89,9 @@ type ManifestPack = {
 
 type ManifestPlatform = {
   built_at: string;
+  /** This platform's own version: plain for the stable Windows build, suffixed for betas. */
   full_version: string;
+  channel?: string;
   code_signed: boolean;
   notarized?: boolean;
   signature_scheme?: string | null;
@@ -99,8 +101,10 @@ type ManifestPlatform = {
 type ReleaseManifest = {
   product: string;
   version: string;
+  /** Channel of the GitHub Release the files are attached to (e.g. "beta.4"), not of any one platform. */
   channel: string;
   full_version: string;
+  release_tag?: string;
   built_at: string;
   resources: {
     bundle_version: string;
@@ -119,13 +123,15 @@ type ReleaseManifest = {
 
 const RELEASE = manifest as unknown as ReleaseManifest;
 
+/** The product version (1.2.0). The stable Windows build carries exactly this. */
 export const APP_VERSION = RELEASE.version;
 export const RELEASE_CHANNEL = RELEASE.channel; // e.g. "beta.3"
-export const FULL_VERSION = RELEASE.full_version; // e.g. "1.2.0-beta.3"
+/** Version string of the GitHub Release the files are published under (1.2.0-beta.3). */
+export const FULL_VERSION = RELEASE.full_version;
 export const IS_PRERELEASE = RELEASE.channel.toLowerCase() !== "stable";
 export const BUILT_AT_ISO = RELEASE.built_at;
-/** Git tag of the GitHub Release that holds this version's files. */
-export const RELEASE_TAG = `v${FULL_VERSION}`;
+/** Git tag of the GitHub Release that holds every platform's files. */
+export const RELEASE_TAG = RELEASE.release_tag ?? `v${FULL_VERSION}`;
 export const RELEASE_PAGE_URL = `${DOWNLOAD_REPO_URL}/releases/tag/${RELEASE_TAG}`;
 export const RELEASES_URL = `${DOWNLOAD_REPO_URL}/releases`;
 /** Direct download URL of a file attached to this version's GitHub Release. */
@@ -187,6 +193,8 @@ export interface PlatformRelease {
   id: PlatformId;
   osName: string;
   status: PlatformStatus;
+  /** What this platform's files are versioned as: "1.2.0" for the stable build, "1.2.0-beta.4" for a beta. */
+  version: string;
   architecture: string;
   requirements: string[];
   artifacts: DownloadArtifact[];
@@ -237,6 +245,10 @@ function anySigned(platforms: string[], key: "code_signed" | "notarized"): boole
   return platforms.some((p) => Boolean(RELEASE.platforms[p]?.[key]));
 }
 
+function versionOf(platforms: string[]): string {
+  return platforms.map((p) => RELEASE.platforms[p]?.full_version).find(Boolean) ?? APP_VERSION;
+}
+
 const WIN_PLATFORMS = ["win64"];
 const MAC_PLATFORMS = ["macos-arm64", "macos-x64"];
 const LINUX_PLATFORMS = ["linux-x86_64", "linux-aarch64"];
@@ -254,6 +266,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     osName: "Windows",
     // Verified end to end on real machines: the Windows build is the stable one.
     status: windowsArtifacts.length ? "stable" : "coming-soon",
+    version: versionOf(WIN_PLATFORMS),
     architecture: "Windows 10 / 11, 64-bit",
     requirements: [
       "Windows 10 (1903+) or Windows 11, x64",
@@ -277,6 +290,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     id: "macos",
     osName: "macOS",
     status: macArtifacts.length ? "beta" : "coming-soon",
+    version: versionOf(MAC_PLATFORMS),
     architecture: "macOS 12+, Apple Silicon & Intel",
     requirements: [
       "macOS 12 Monterey or later",
@@ -301,6 +315,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     id: "linux",
     osName: "Linux",
     status: linuxArtifacts.length ? "beta" : "coming-soon",
+    version: versionOf(LINUX_PLATFORMS),
     architecture: "x86_64 · X11 sessions, or Wayland via the IBus engine",
     requirements: [
       "X11: an Xorg session with the RECORD and XTEST extensions (default on all major distros)",

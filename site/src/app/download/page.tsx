@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Check, Dash, PageHeader, Section, StatusBadge } from "@/components/Page";
 import {
+  APP_VERSION,
   AVAILABLE_PLATFORMS,
   BASE_LANGUAGE_BUNDLE,
   BETA_PLATFORMS,
@@ -11,7 +12,6 @@ import {
   DOWNLOAD_REPO,
   ED25519_KEY_IS_DEV_KEY,
   ED25519_PUBLIC_KEY_HEX,
-  FULL_VERSION,
   GITHUB_LANGUAGE_DATA_URL,
   GITHUB_ORG_URL,
   ORG_REPOSITORIES,
@@ -33,7 +33,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const metadata: Metadata = {
   title: "Download",
-  description: `Typen ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
+  description: `Typen ${APP_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
 };
 
 function formatDate(iso: string): string {
@@ -67,6 +67,7 @@ function PlatformBlock({ platform }: { platform: PlatformRelease }) {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="display inline-flex items-center gap-2.5 text-2xl">
           {platform.osName}
+          <span className="font-mono text-sm font-normal text-ink-faint">{platform.version}</span>
           {platform.status === "beta" && <StatusBadge status="beta" className="translate-y-px" />}
         </h2>
         <span className="text-sm text-ink-muted">{platform.architecture}</span>
@@ -113,7 +114,7 @@ export default function DownloadPage() {
     <div className="pb-8">
       <PageHeader
         eyebrow={`Download · ${RELEASE_TAG}`}
-        title={<>Typen {FULL_VERSION}</>}
+        title={<>Typen {APP_VERSION}</>}
         lede={
           nothingPublished ? (
             <p>

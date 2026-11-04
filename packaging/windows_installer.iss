@@ -1,15 +1,21 @@
 ; Inno Setup Installer Script for Typen (Windows 10 & Windows 11)
-; Build: ISCC.exe /DMyAppVersion=1.2.0 /DMyChannel=beta.1 packaging\windows_installer.iss
+; Build: ISCC.exe /DMyAppVersion=1.2.0 /DMyChannel=stable packaging\windows_installer.iss
+; MyChannel "stable" (the Windows build) yields plain 1.2.0; anything else is a
+; pre-release suffix (beta.1 -> 1.2.0-beta.1).
 #ifndef MyAppVersion
   #define MyAppVersion "1.2.0"
 #endif
 #ifndef MyChannel
-  #define MyChannel "beta.1"
+  #define MyChannel "stable"
 #endif
 #define MyAppName "Typen"
 #define MyAppPublisher "Omnii"
 #define MyAppExeName "AutoCorrectDesktop.exe"
-#define MyFullVersion MyAppVersion + "-" + MyChannel
+#if MyChannel == "stable"
+  #define MyFullVersion MyAppVersion
+#else
+  #define MyFullVersion MyAppVersion + "-" + MyChannel
+#endif
 
 [Setup]
 AppId={{8D4F62C1-4B9E-497A-9F3E-71B8C2094E1A}

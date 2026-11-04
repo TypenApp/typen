@@ -90,16 +90,19 @@ in a development `.env` overrides the embedded key for testing against a staging
 ## Building release artifacts
 
 ```powershell
-pwsh packaging/build_windows_beta.ps1 -Channel beta.4     # .exe installer + portable .zip
+pwsh packaging/build_windows_beta.ps1 -Channel beta.4     # Typen-1.2.0-win64-setup.exe + portable .zip
 ```
 ```bash
-packaging/build_macos_beta.sh --channel beta.4            # Typen.app in .dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
+packaging/build_macos_beta.sh --channel beta.4            # Typen-1.2.0-beta.4-macos-*.dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
 packaging/build_linux_beta.sh --channel beta.4            # tar.gz + AppImage + .deb (minisign if AC_MINISIGN_KEY set)
 ```
 
-Each script leaves its artifacts in `dist/installer/` with a
-`release-manifest-<platform>.json`, and runs `pipeline/merge_release_manifests.py`
-to refresh `site/src/data/release-manifest.json`. **Binaries are never committed.**
+The channel names the GitHub Release (`v1.2.0-beta.4`) that hosts every
+platform's files. Windows is the stable platform, so its files and version are
+plain `1.2.0`; the macOS and Linux betas are `1.2.0-beta.4`. Each script leaves
+its artifacts in `dist/installer/` with a `release-manifest-<platform>.json`, and
+runs `pipeline/merge_release_manifests.py` to refresh
+`site/src/data/release-manifest.json`. **Binaries are never committed.**
 To publish, push a tag:
 
 ```bash

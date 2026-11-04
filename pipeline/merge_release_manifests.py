@@ -15,11 +15,18 @@ This tool combines them:
 
     {
       "product": ..., "version": ..., "channel": ..., "full_version": ...,
+      "release_tag": "v1.2.0-beta.4",
       "built_at": <latest>, "resources": {..., "artifacts": {name: sha256}},
       "packs": [...],
       "platforms": { "win64": {...}, "macos-arm64": {...}, "linux-x86_64": {...} },
       # legacy top-level mirror of the win64 entry (platform, code_signed, artifacts)
     }
+
+Platforms do not share one version string: the Windows build is stable and is
+versioned plainly (1.2.0, channel "stable"), while macOS and Linux are betas
+(1.2.0-beta.4). All of them are attached to the one GitHub Release named by
+`release_tag`, which is what the site's download links use; the top-level
+`channel` / `full_version` describe that release.
 
 Only the platforms whose manifests are present are listed, so the site can
 never advertise a build that was not actually produced.
@@ -47,10 +54,34 @@ def _load(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
+def _channel_of(full_version: str, version: str) -> str:
+    """'1.2.0-beta.4' -> 'beta.4'; a plain '1.2.0' is the stable channel."""
+    suffix = full_version[len(version) + 1 :] if full_version.startswith(f"{version}-") else ""
+    return suffix or "stable"
+
+
+def _release_tag(manifests: dict[str, dict[str, Any]]) -> str:
+    """
+    The GitHub Release every platform's files are attached to. Builds that
+    record it must agree; older manifests without it (all from the same
+    pre-release train) fall back to v<full_version>.
+    """
+    tags = {str(m["release_tag"]) for m in manifests.values() if m.get("release_tag")}
+    if len(tags) > 1:
+        raise SystemExit(f"platform builds disagree on the release tag: {sorted(tags)}")
+    if tags:
+        return tags.pop()
+    versions = {str(m["full_version"]) for m in manifests.values()}
+    if len(versions) > 1:
+        raise SystemExit(f"platform builds disagree on version and record no release tag: {sorted(versions)}")
+    return f"v{versions.pop()}"
+
+
 def _platform_entry(m: dict[str, Any]) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "built_at": m["built_at"],
         "full_version": m["full_version"],
+        "channel": m.get("channel") or _channel_of(m["full_version"], m["version"]),
         "code_signed": bool(m.get("code_signed", False)),
         "artifacts": m.get("artifacts", []),
     }
@@ -90,9 +121,11 @@ def merge(
         key=lambda kv: (PLATFORM_ORDER.index(kv[0]) if kv[0] in PLATFORM_ORDER else 99, kv[0]),
     )
     newest = max(manifests.values(), key=lambda m: m["built_at"])
-    versions = {m["full_version"] for m in manifests.values()}
-    if len(versions) > 1:
-        sys.stderr.write(f"warning: platform builds disagree on version: {sorted(versions)}\n")
+    app_versions = {str(m["version"]) for m in manifests.values()}
+    if len(app_versions) > 1:
+        sys.stderr.write(f"warning: platform builds disagree on the app version: {sorted(app_versions)}\n")
+    release_tag = _release_tag(manifests)
+    release_version = release_tag[1:] if release_tag.startswith("v") else release_tag
 
     resources = dict(newest.get("resources", {}))
     if resources_manifest.exists():
@@ -108,8 +141,10 @@ def merge(
     merged: dict[str, Any] = {
         "product": newest["product"],
         "version": newest["version"],
-        "channel": newest["channel"],
-        "full_version": newest["full_version"],
+        # The release these builds are published under (its tag), not any one platform's version.
+        "channel": _channel_of(release_version, str(newest["version"])),
+        "full_version": release_version,
+        "release_tag": release_tag,
         "built_at": newest["built_at"],
         "resources": resources,
         "packs": newest.get("packs", []),

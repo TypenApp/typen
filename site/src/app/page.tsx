@@ -7,7 +7,7 @@ import {
   AVAILABLE_PLATFORMS,
   BETA_PLATFORMS,
   CODE_SIGNED,
-  FULL_VERSION,
+  APP_VERSION,
   GITHUB_REPO_URL,
   LEXICON_WORD_COUNT,
   LICENSE_NAME,
@@ -71,7 +71,7 @@ export default function HomePage() {
         >
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
           <span className="truncate">
-            Typen {FULL_VERSION} is out
+            Typen {APP_VERSION} is out
             {available.length > 0 ? ` for ${joinNames(available)}` : ""}
           </span>
           <ArrowRightIcon size={13} className="shrink-0 transition-transform group-hover:translate-x-0.5" />

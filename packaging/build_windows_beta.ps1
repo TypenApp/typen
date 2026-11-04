@@ -1,7 +1,9 @@
 <#
 .SYNOPSIS
-    Build the Typen Windows distributables (the stable platform build; the file
-    name still carries the release's channel suffix, e.g. 1.2.0-beta.4).
+    Build the Typen Windows distributables. Windows is the stable platform, so
+    its files are versioned plainly (Typen-1.2.0-win64-setup.exe); the -Channel
+    suffix only names the GitHub Release (v1.2.0-beta.4) that hosts them
+    alongside the macOS and Linux betas.
 
 .DESCRIPTION
     1. Generates the application icon.
@@ -16,7 +18,8 @@
        installers to a GitHub Release, which the site links to.
 
 .PARAMETER Channel
-    Pre-release channel suffix, e.g. "beta.1". Default: beta.1
+    Suffix of the release tag this build is published under, e.g. "beta.3"
+    (tag v<version>-beta.3). Not part of the Windows file names or version.
 
 .EXAMPLE
     pwsh packaging/build_windows_beta.ps1 -Channel beta.1
@@ -82,12 +85,15 @@ $Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 Set-Location $Root
 
 $Version = (python -c "import sys; sys.path.insert(0,'src'); from autocorrect.version import APP_VERSION; print(APP_VERSION)").Trim()
-$FullVersion = "$Version-$Channel"
+# The Windows build is stable: its version and file names carry no channel
+# suffix. The tag of the GitHub Release that hosts it still does.
+$FullVersion = $Version
+$ReleaseTag = "v$Version-$Channel"
 $DistDir = Join-Path $Root "dist"
 $AppDir = Join-Path $DistDir "AutoCorrectDesktop"
 $OutDir = Join-Path $DistDir "installer"
 
-Write-Host "==> Typen $FullVersion (win64)" -ForegroundColor Cyan
+Write-Host "==> Typen $FullVersion (win64, release $ReleaseTag)" -ForegroundColor Cyan
 
 # 0. Tooling
 python -c "import PyInstaller" 2>$null
@@ -132,7 +138,7 @@ if (-not $SkipInstaller) {
         "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
     ) | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($iscc) {
-        & $iscc /Q "/DMyAppVersion=$Version" "/DMyChannel=$Channel" (Join-Path $PSScriptRoot "windows_installer.iss")
+        & $iscc /Q "/DMyAppVersion=$Version" "/DMyChannel=stable" (Join-Path $PSScriptRoot "windows_installer.iss")
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
         if ($CodeSigned) { [void](Invoke-Sign $SetupPath) }
     } else {
@@ -146,8 +152,9 @@ $resManifest = Get-Content (Join-Path $Root "resources\en_base\manifest.json") -
 $manifest = [ordered]@{
     product   = "Typen"
     version   = $Version
-    channel   = $Channel
+    channel   = "stable"
     full_version = $FullVersion
+    release_tag = $ReleaseTag
     platform  = "win64"
     built_at  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     code_signed = $CodeSigned
@@ -199,5 +206,5 @@ if (-not $SkipPublish) {
     python -m pipeline.merge_release_manifests --downloads $OutDir
     if ($LASTEXITCODE -ne 0) { throw "merge_release_manifests failed" }
     Write-Host "==> Artifacts in $OutDir; site manifest updated." -ForegroundColor Green
-    Write-Host "    To publish: git tag v$FullVersion && git push origin v$FullVersion" -ForegroundColor Green
+    Write-Host "    To publish: git tag $ReleaseTag && git push origin $ReleaseTag" -ForegroundColor Green
 }

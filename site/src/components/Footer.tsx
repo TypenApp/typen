@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import {
   DONATE_URL,
-  FULL_VERSION,
+  APP_VERSION,
   GITHUB_DOCS_URL,
   GITHUB_LANGUAGE_DATA_URL,
   GITHUB_MODEL_RESOURCES_URL,
@@ -125,7 +125,7 @@ export function Footer() {
               ))}
             </ul>
             <p className="whitespace-nowrap font-mono text-[11px] text-ink-faint">
-              v{FULL_VERSION} · lexicon {RESOURCE_BUNDLE_VERSION} ·{" "}
+              v{APP_VERSION} · lexicon {RESOURCE_BUNDLE_VERSION} ·{" "}
               {LEXICON_WORD_COUNT.toLocaleString()} words
             </p>
           </div>

@@ -203,6 +203,7 @@ for p in sorted((root / "resources/en_base/packs").glob("*.pack.json")):
                   "sha256": sha(p), "word_count": len(pj.get("words", {})), "direct_typo_count": len(pj.get("direct_typos", {}))})
     sums.append(f"{sha(p)}  packs/{p.name}")
 manifest = {"product": "Typen", "version": version, "channel": channel, "full_version": f"{version}-{channel}",
+            "release_tag": f"v{version}-{channel}",
             "platform": platform, "built_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "code_signed": signed == "true", "signature_scheme": "minisign" if signed == "true" else None,
             "resources": {"bundle_version": res["version"], "schema_version": res["schema_version"], "word_count": res["word_count"]},
