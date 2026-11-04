@@ -120,9 +120,10 @@ export function Footer() {
         </div>
       </div>
 
-      {/* Legal bar */}
-      <div className="rule">
-        <div className="container-site flex flex-col gap-4 py-6 text-xs text-ink-faint sm:flex-row sm:items-start sm:justify-between">
+      {/* Legal bar. The divider is inset to the content width, so it floats clear
+          of both viewport edges rather than running across the whole page. */}
+      <div className="container-site">
+        <div className="rule flex flex-col gap-4 py-6 text-xs text-ink-faint sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-xl space-y-1.5">
             <p>
               © {new Date().getFullYear()} Omnii. Tact is free and open source under the {LICENSE_NAME} licence.
