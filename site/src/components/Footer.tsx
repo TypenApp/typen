@@ -42,19 +42,38 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
     heading: "Community",
     links: [
       { href: GITHUB_ORG_URL, label: "TypenApp on GitHub", external: true },
-      { href: GITHUB_REPO_URL, label: "App source (typen)", external: true },
-      { href: GITHUB_LANGUAGE_DATA_URL, label: "Language data", external: true },
-      { href: GITHUB_MODEL_RESOURCES_URL, label: "Model resources", external: true },
+      {
+        href: GITHUB_LANGUAGE_DATA_URL,
+        label: "Language data",
+        external: true,
+      },
+      {
+        href: GITHUB_MODEL_RESOURCES_URL,
+        label: "Model resources",
+        external: true,
+      },
       { href: GITHUB_DOCS_URL, label: "Docs repository", external: true },
-      { href: `${GITHUB_REPO_URL}/issues`, label: "Report an issue", external: true },
-      { href: `${GITHUB_ORG_URL}/discussions`, label: "Discussions", external: true },
+      {
+        href: `${GITHUB_REPO_URL}/issues`,
+        label: "Report an issue",
+        external: true,
+      },
+      {
+        href: `${GITHUB_ORG_URL}/discussions`,
+        label: "Discussions",
+        external: true,
+      },
       { href: RELEASES_URL, label: "All releases", external: true },
     ],
   },
 ];
 
 const SOCIAL: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: GITHUB_ORG_URL, label: "TypenApp on GitHub", icon: <GitHubIcon size={17} /> },
+  {
+    href: GITHUB_ORG_URL,
+    label: "TypenApp on GitHub",
+    icon: <GitHubIcon size={17} />,
+  },
   { href: DONATE_URL, label: "Sponsor Typen", icon: <HeartIcon size={17} /> },
   { href: RELEASES_URL, label: "Releases", icon: <DownloadIcon size={17} /> },
 ];
@@ -62,7 +81,12 @@ const SOCIAL: { href: string; label: string; icon: React.ReactNode }[] = [
 function FooterAnchor({ link }: { link: FooterLink }) {
   const cls = "text-[15px] text-ink-muted transition-colors hover:text-ink";
   return link.external ? (
-    <a href={link.href} target="_blank" rel="noopener noreferrer" className={cls}>
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cls}
+    >
       {link.label}
     </a>
   ) : (
@@ -79,13 +103,20 @@ export function Footer() {
       <div className="container-site grid gap-x-8 gap-y-12 py-14 sm:py-16 lg:grid-cols-[minmax(0,1fr)_auto]">
         {/* Brand column */}
         <div className="max-w-lg">
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Typen home">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2.5"
+            aria-label="Typen home"
+          >
             <BrandMark size={26} />
-            <span className="font-display text-xl font-extrabold tracking-[-0.03em] text-ink">Typen</span>
+            <span className="font-display text-xl font-extrabold tracking-[-0.03em] text-ink">
+              Typen
+            </span>
           </Link>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-muted">
-            Free, open source, system-wide autocorrect. One small background service that fixes typos,
-            homophones and punctuation in every application — on your machine and nowhere else.
+            Free, open source, system-wide autocorrect. One small background
+            service that fixes typos, homophones and punctuation in every
+            application — on your machine and nowhere else.
           </p>
           <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">
             <ul className="flex items-center gap-2">
@@ -105,7 +136,8 @@ export function Footer() {
               ))}
             </ul>
             <p className="whitespace-nowrap font-mono text-[11px] text-ink-faint">
-              v{FULL_VERSION} · lexicon {RESOURCE_BUNDLE_VERSION} · {LEXICON_WORD_COUNT.toLocaleString()} words
+              v{FULL_VERSION} · lexicon {RESOURCE_BUNDLE_VERSION} ·{" "}
+              {LEXICON_WORD_COUNT.toLocaleString()} words
             </p>
           </div>
         </div>
@@ -115,7 +147,9 @@ export function Footer() {
         <div className="grid grid-cols-2 gap-x-6 gap-y-12 sm:grid-cols-3 lg:flex lg:gap-x-10 xl:gap-x-14">
           {COLUMNS.map((col) => (
             <nav key={col.heading} aria-label={col.heading}>
-              <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-ink-faint">{col.heading}</p>
+              <p className="text-[13px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+                {col.heading}
+              </p>
               <ul className="mt-5 space-y-3.5">
                 {col.links.map((l) => (
                   <li key={l.href}>
@@ -134,23 +168,40 @@ export function Footer() {
         <div className="rule flex flex-col gap-4 py-6 text-xs text-ink-faint sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-xl space-y-1.5">
             <p>
-              © {new Date().getFullYear()} Omnii. Typen is free and open source under the {LICENSE_NAME} licence.
+              © {new Date().getFullYear()} Omnii. Typen is free and open source
+              under the {LICENSE_NAME} licence.
             </p>
-            <p>The lexicon is built from public-domain sources, and nothing you type leaves your computer.</p>
+            <p>
+              The lexicon is built from public-domain sources, and nothing you
+              type leaves your computer.
+            </p>
           </div>
           <ul className="flex flex-wrap items-center gap-x-5 gap-y-1 sm:pt-px">
             <li>
-              <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-ink">
+              <a
+                href={LICENSE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-ink"
+              >
                 {LICENSE_NAME} licence
               </a>
             </li>
             <li>
-              <Link href="/docs/security-privacy" className="transition-colors hover:text-ink">
+              <Link
+                href="/docs/security-privacy"
+                className="transition-colors hover:text-ink"
+              >
                 Security
               </Link>
             </li>
             <li>
-              <a href={GITHUB_ORG_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-ink">
+              <a
+                href={GITHUB_ORG_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="transition-colors hover:text-ink"
+              >
                 GitHub
               </a>
             </li>
