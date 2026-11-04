@@ -27,20 +27,20 @@ export const DOC_ARTICLES: DocArticle[] = [
     shortTitle: "Getting Started",
     category: "Foundation",
     summary:
-      "Install the beta on Windows, macOS or Linux, understand the tray service and Settings window, grant the OS permissions each platform needs, and verify your 14-day full-featured Pro trial.",
+      "Install the beta on Windows, macOS or Linux, understand the tray service and Settings window, grant the OS permissions each platform needs, and check that corrections are live.",
     readingTime: "4 min read",
     sections: [
       {
         id: "architecture-overview",
-        heading: "How AutoCorrect Desktop Works",
+        heading: "How Tact Works",
         paragraphs: [
-          "AutoCorrect Desktop is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (AutoCorrectDesktop.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the beta ships the lightweight native fallback window.",
+          "Tact is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (AutoCorrectDesktop.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the beta ships the lightweight native fallback window.",
           "When you close the Settings window, the UI process terminates completely (0% UI CPU and 0 MB GUI RAM), while the background daemon continues correcting typos across every native and web application on your machine.",
         ],
         bullets: [
           "100% Offline Core: Zero cloud dependency for everyday spelling, grammar, homophone, and punctuation corrections.",
           "166,000+-Word Memory-Mapped Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.",
-          "14-Day Full Pro Trial: Automatically starts on first launch with no credit card required.",
+          "Free and open source: every feature is available to everyone; there is no trial, licence key or account.",
         ],
       },
       {
@@ -55,14 +55,14 @@ export const DOC_ARTICLES: DocArticle[] = [
           language: "powershell",
           title: "Verify and launch from PowerShell",
           code: `# 1. Verify the download
-Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
+Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
 # ...and compare with SHA256SUMS.txt on the GitHub release
 
 # 2. Start the background service (tray icon)
-& "$env:LOCALAPPDATA\\Programs\\AutoCorrect Desktop\\AutoCorrectDesktop.exe"
+& "$env:LOCALAPPDATA\\Programs\\Tact\\AutoCorrectDesktop.exe"
 
 # 3. Open the Settings window (connects to the service over a Named Pipe)
-& "$env:LOCALAPPDATA\\Programs\\AutoCorrect Desktop\\AutoCorrectDesktop.exe" --settings
+& "$env:LOCALAPPDATA\\Programs\\Tact\\AutoCorrectDesktop.exe" --settings
 
 # Optional: print a one-line health check and exit
 & "...\\AutoCorrectDesktop.exe" --headless-check`,
@@ -72,8 +72,8 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
         id: "macos-setup",
         heading: "macOS 12+ Setup (Input Monitoring & Accessibility)",
         paragraphs: [
-          "Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag AutoCorrect Desktop to /Applications. Because AutoCorrect listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
-          "On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings and your licence remain available.",
+          "Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag Tact to /Applications. Because Tact listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
+          "On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings remains available.",
           "Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/AutoCorrect.",
         ],
       },
@@ -83,7 +83,7 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
         paragraphs: [
           "Check the Downloads page for availability: Linux artifacts (.deb, AppImage, portable tar.gz) are listed there only once they have been published, each with a minisign signature. Data lives in $XDG_DATA_HOME/autocorrect (default ~/.local/share/autocorrect) and launch at login uses an XDG autostart entry.",
           "X11 sessions: the service uses the XRecord extension to observe keys and XTest to type corrections; window class and title (EWMH _NET_ACTIVE_WINDOW / WM_CLASS) identify password managers, polkit and keyring prompts, and terminals. Because XRecord observes keys after delivery, the delimiter you typed is deleted and re-typed together with the corrected word.",
-          "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (AutoCorrect)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
+          "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (Tact)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
         ],
       },
     ],
@@ -130,7 +130,7 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
         heading: "Retroactive Two-Word Homophone & Subject-Verb Repair",
         paragraphs: [
           "Some confusions cannot be resolved until the following word is completed. When you type 'your ' followed by 'welcome ', the engine evaluates the two-word bigram at the second word boundary and atomically transforms 'your welcome ' into 'you're welcome ' (preserving initial capitalisation).",
-          "Standard-tier contextual grammar also repairs subject-verb agreement and plural determiners in real time: 'Raw eggs is best.' -> 'Raw eggs are best.', 'The dogs was barking.' -> 'The dogs were barking.', and 'I should of went home.' -> 'I should have gone home.' while guarding against false positives like 'One of the raw eggs is cracked.' or 'Physics is hard'.",
+          "Contextual grammar also repairs subject-verb agreement and plural determiners in real time: 'Raw eggs is best.' -> 'Raw eggs are best.', 'The dogs was barking.' -> 'The dogs were barking.', and 'I should of went home.' -> 'I should have gone home.' while guarding against false positives like 'One of the raw eggs is cracked.' or 'Physics is hard'.",
         ],
       },
       {
@@ -168,33 +168,33 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
           "The left navigation rail provides instant access to all 10 customisation domains:",
         ],
         bullets: [
-          "1. Overview: Live system hook status, Pause/Resume toggle, active English variant, mmap lexicon word count, edition badge, and privacy-preserving LocalInsightsStore counters.",
+          "1. Overview: Live system hook status, Pause/Resume toggle, active English variant, mmap lexicon word count, and privacy-preserving LocalInsightsStore counters.",
           "2. General: Launch at OS login (Windows Run registry key / macOS LaunchAgents plist), global hotkeys (Ctrl+Shift+R rewrite, Ctrl+Alt+P pause), and One-Click Privacy Wipe.",
           "3. Dictionary: Search, add, and delete custom words; review Suggested Words captured from double-Backspace reverts; and bulk Import/Export via CSV or portable JSON.",
-          "4. Languages: Switch between EN_GB (British), EN_US (American), EN_CA (Canadian), EN_AU (Australian), and UNIVERSAL English, and toggle the 6 Pro Domain Vocabulary Packs.",
+          "4. Languages: Switch between EN_GB (British), EN_US (American), EN_CA (Canadian), EN_AU (Australian), and UNIVERSAL English, and toggle the 6 Domain Vocabulary Packs.",
           "5. Corrections: Tune the Aggressiveness slider (0.50 to 1.50), toggle punctuation assistance, double-space period, and auto-capitalisation, and manage Rejected Pairs (Never Correct) and Preferred Variants (Always Prefer).",
-          "6. Pro Intelligence: Inspect Layer 2 Local AI hardware acceleration (DirectML / CoreML / AVX2) and configure Layer 3 BYOK Cloud AI keys, Local-Only Lockdown, and daily/monthly USD spend caps.",
+          "6. Intelligence: Inspect Layer 2 Local AI hardware acceleration (DirectML / CoreML / AVX2) and configure Layer 3 BYOK Cloud AI keys, Local-Only Lockdown, and daily/monthly USD spend caps.",
           "7. Profiles: Configure per-application profiles (e.g. code.exe vs winword.exe) with custom aggressiveness, punctuation, and domain packs.",
-          "8. Text Expansion: Create and edit Pro snippets (;sig, @@email) with dynamic {{date}} and {{time}} macros.",
+          "8. Text Expansion: Create and edit snippets (;sig, @@email) with dynamic {{date}} and {{time}} macros.",
           "9. Updates: Independently manage Desktop App updates, Zstandard delta Language Intelligence updates (with one-click Rollback to Last Known Good), and Local AI Model downloads.",
-          "10. Licence: View offline Ed25519 certificate status, Device Lock SHA-256 fingerprint, 12-month update entitlement window, seat deactivation, and BACHS checkout/renewal quotes.",
+          "10. About: Version, MIT licence, link to the source and a button to support the project with a donation.",
         ],
       },
       {
         id: "lgplv3-compliance",
         heading: "Qt 6 / PySide6-Essentials LGPLv3 Compliance Architecture",
         paragraphs: [
-          "AutoCorrect Desktop depends exclusively on PySide6-Essentials (QtCore, QtGui, QtQml, QtQuick, QtQuickControls2, QtQuickLayouts, QtQuickDialogs, QtSvg) under the GNU Lesser General Public License v3 (LGPLv3).",
+          "Tact depends exclusively on PySide6-Essentials (QtCore, QtGui, QtQml, QtQuick, QtQuickControls2, QtQuickLayouts, QtQuickDialogs, QtSvg) under the GNU Lesser General Public License v3 (LGPLv3).",
           "GPLv3-only modules (such as QtCharts, QtGraphs, QtQuick3D, and QtVirtualKeyboard) are strictly excluded and verified at both runtime and build time via src/autocorrect/ui/lgpl_compliance.py. Packaging uses one-folder (never one-file) mode so any Qt shared libraries (.dll / .dylib / .so) remain user-replaceable on disk. The current Windows beta does not bundle Qt at all; it ships the native fallback Settings window.",
         ],
       },
     ],
   },
   {
-    slug: "pro-productivity",
-    title: "Pro Productivity: Snippets, Domain Packs & App Profiles",
-    shortTitle: "Pro Productivity",
-    category: "Pro Features",
+    slug: "productivity",
+    title: "Productivity: Snippets, Domain Packs & App Profiles",
+    shortTitle: "Productivity",
+    category: "Features",
     summary:
       "Expand text snippets with dynamic date/time macros, enable the 6 specialized domain vocabulary packs, and tailor typing behaviour per application.",
     readingTime: "5 min read",
@@ -212,7 +212,7 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
           code: `[
   {
     "trigger": ";sig",
-    "expansion": "Best regards,\\nAutoCorrect Engineering Team",
+    "expansion": "Best regards,\\nthe Tact team",
     "description": "Standard email sign-off"
   },
   {
@@ -249,9 +249,9 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
   },
   {
     slug: "ai-intelligence",
-    title: "Pro AI: Layer 2 Local Models & Layer 3 BYOK Cloud AI",
+    title: "AI: Layer 2 Local Models & Layer 3 BYOK Cloud AI",
     shortTitle: "Local & BYOK AI",
-    category: "Pro Features",
+    category: "Features",
     summary:
       "Hardware-aware local ONNX/GGUF sentence analysis (400ms Pause Pill & Ctrl+Shift+R hotkey) and consent-gated BYOK Cloud AI with hard USD spending limits.",
     readingTime: "6 min read",
@@ -260,12 +260,12 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
         id: "three-layer-intelligence",
         heading: "The 3-Layer Intelligence Hierarchy",
         paragraphs: [
-          "AutoCorrect strictly separates real-time keystroke correction from heavy neural inference so typing latency never degrades:",
+          "Tact strictly separates real-time keystroke correction from heavy neural inference so typing latency never degrades:",
         ],
         bullets: [
           "Layer 1 (Always-On, < 0.4ms): Deterministic mmap Lexicon + SymSpell + Trigram Context Model + Confusion Sets.",
-          "Layer 2 (Pro Local AI, On-Device): Hardware-aware quantized ONNX/GGUF sentence grammar engine triggered ONLY after a >= 400ms pause at a sentence boundary (non-focus-stealing Pause Pill) or via explicit Ctrl+Shift+R hotkey.",
-          "Layer 3 (Pro BYOK Cloud AI, Explicit Invocation Only): Direct HTTPS calls to OpenAI, Anthropic, Gemini, or custom OpenAI-compatible endpoints using your own API key stored in OS Keyring.",
+          "Layer 2 (Local AI, On-Device): Hardware-aware quantized ONNX/GGUF sentence grammar engine triggered ONLY after a >= 400ms pause at a sentence boundary (non-focus-stealing Pause Pill) or via explicit Ctrl+Shift+R hotkey.",
+          "Layer 3 (BYOK Cloud AI, Explicit Invocation Only): Direct HTTPS calls to OpenAI, Anthropic, Gemini, or custom OpenAI-compatible endpoints using your own API key stored in OS Keyring.",
         ],
       },
       {
@@ -297,14 +297,14 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
     shortTitle: "Security & Privacy",
     category: "Security",
     summary:
-      "How AutoCorrect guarantees zero keystroke logging, automatic password field exclusion, Ed25519 manifest verification, and atomic Zstandard delta updates.",
+      "How Tact guarantees zero keystroke logging, automatic password field exclusion, Ed25519 manifest verification, and atomic Zstandard delta updates.",
     readingTime: "5 min read",
     sections: [
       {
         id: "zero-keylogging-guarantee",
         heading: "Zero Keystroke Logging & Ephemeral Memory Buffers",
         paragraphs: [
-          "AutoCorrect is architected so that your typed documents, messages, and passwords can never be reconstructed from disk. SQLitePreferenceStore (preferences.sqlite3) stores only your explicit custom dictionary words, rejected correction pairs, preferred variants, and aggregate counters.",
+          "Tact is architected so that your typed documents, messages, and passwords can never be reconstructed from disk. SQLitePreferenceStore (preferences.sqlite3) stores only your explicit custom dictionary words, rejected correction pairs, preferred variants, and aggregate counters.",
           "The active word buffer holds at most the single word currently being typed, and the context ring buffer holds at most 5 integer word IDs—both flushed immediately on every window switch or mouse click.",
         ],
       },
@@ -331,46 +331,46 @@ Get-FileHash .\\AutoCorrect-Desktop-<version>-win64-setup.exe -Algorithm SHA256
     ],
   },
   {
-    slug: "licensing",
-    title: "Perpetual Licensing, Device Lock & BACHS Payment Architecture",
-    shortTitle: "Licensing & Payments",
-    category: "Commercial",
+    slug: "open-source",
+    title: "Open Source, Free for Everyone, Funded by Donations",
+    shortTitle: "Open Source & Donations",
+    category: "Project",
     summary:
-      "Understand the 4 commercial entitlements, offline Ed25519 licence certificates, SHA-256 device locking, and the 9-step BACHS checkout lifecycle.",
-    readingTime: "5 min read",
+      "Tact is MIT-licensed with a single edition and no trial, licence key or activation. How the project is funded, what changed from the earlier commercial betas, and how to contribute.",
+    readingTime: "3 min read",
     sections: [
       {
-        id: "perpetual-plus-updates",
-        heading: "Perpetual Usage + 12-Month Update Entitlement",
+        id: "one-edition",
+        heading: "One Edition, Nothing Locked",
         paragraphs: [
-          "AutoCorrect rejects mandatory SaaS subscriptions for desktop utilities. Every Standard ($14.99) or Pro ($34.99) purchase grants four distinct entitlements encoded in a locally stored, Ed25519-signed certificate (entitlement.lic):",
-        ],
-        bullets: [
-          "1. Product Edition Entitlement: STANDARD or PRO.",
-          "2. Platform Entitlement: WINDOWS (STANDARD-WIN / PRO-WIN) or MACOS (STANDARD-MAC / PRO-MAC).",
-          "3. Perpetual Usage Right: Your installed application build and language resources continue working 100% offline forever—even years after your update window ends.",
-          "4. 12-Month Update Window (updates_expire_at): Full access to new app releases, emerging vocabulary bundles, and AI model updates for 1 year, with optional 30% discounted renewals and critical security patches always permitted.",
+          "Tact has exactly one build and it contains everything: the offline correction engine, every English variant and domain vocabulary pack, per-application profiles, text-expansion snippets, local insights, and the Local AI and BYOK Cloud AI screens. There is no trial, no licence certificate, no device lock and no account.",
+          "Internally the daemon, the IPC server and the Settings controller still ask a single EntitlementManager whether a feature is allowed. In Tact that object always answers yes; it is kept only so a fork that wants gating has exactly one class to replace.",
         ],
       },
       {
-        id: "device-locking",
-        heading: "Privacy-Preserving Hardware Device Lock (SHA-256)",
+        id: "funding",
+        heading: "Donations Only",
         paragraphs: [
-          "To bind a licence seat to your machine without collecting hardware serial numbers in plaintext, activation_manager.py reads the OS machine identifier (Windows HKLM\\SOFTWARE\\Microsoft\\Cryptography\\MachineGuid, macOS IOPlatformUUID, or Linux /etc/machine-id) and computes a salted SHA-256 digest (compute_local_device_id_hash).",
-          "You can deactivate your current device seat at any time from the Licence screen (LicenceService.deactivate_current_device) to transfer your licence to a new computer.",
+          "The project has no paid tier and never will. It is funded by donations through GitHub Sponsors, which pay for code-signing certificates, CI minutes for three platforms, hosting for the site and live demo, and the time that goes into lexicon curation and bug fixes. Donating changes nothing in the app.",
+          "Earlier betas (1.2.0-beta.3 and before) shipped Standard and Pro licences, a 14-day trial and a payment integration. All of that code has been removed from the repository, not merely disabled. Anyone who bought a licence simply has the same Tact as everyone else now, with nothing to activate.",
         ],
       },
       {
-        id: "bachs-checkout-flow",
-        heading: "9-Step BACHS Payment & Webhook Verification Lifecycle",
+        id: "licence-and-contributing",
+        heading: "MIT Licence & Contributing",
         paragraphs: [
-          "Purchases, 30% update renewals, and Standard-to-Pro cross-grades are processed through BACHS (BachsPaymentAdapter in src/autocorrect/payments/bachs_adapter.py):",
+          "The source is published under the MIT licence: you may read, build, modify and redistribute it, including commercially, as long as the copyright notice is preserved. Bundled third-party components (SCOWL/ESDB word lists, Qt / PySide6-Essentials under LGPLv3, PyInstaller, Python libraries) keep their own licences, listed in LICENSE.",
+          "The most useful contributions are correction reports: a misspelling the engine misses, or a correction it should not have made. Those become held-out test cases in tests/test_engine_quality_heldout.py, whose thresholds are only ever raised. Platform testing, packaging fixes and pull requests are equally welcome.",
         ],
-        bullets: [
-          "Steps 1–3: CheckoutManager calculates the exact server-side quote (applying 30% renewal or cross-grade credit via product_cart[].pricing override) and creates an idempotent BACHS checkout session.",
-          "Steps 4–6: Customer completes hosted checkout in USD, NGN, GHS, or KES; BACHS delivers a webhook verified via webhooks.construct_event (X-Bachs-Signature-V2) over raw request bytes.",
-          "Steps 7–9: PurchaseVerificationService validates amount, currency, and reference, signs the Ed25519 SignedLicenceCertificate, and the desktop app persists entitlement.lic for 100% offline verification.",
-        ],
+        codeBlock: {
+          language: "bash",
+          title: "Build from source",
+          code: `git clone https://github.com/litlEMPEROR/AutoCorrect.git && cd AutoCorrect
+python -m venv .venv && . .venv/bin/activate
+pip install -e ".[dev,ui]"
+pytest
+python -m autocorrect.launcher --headless-check`,
+        },
       },
     ],
   },
@@ -417,7 +417,7 @@ autocorrect-pipeline build --version 1.0.9 --out-dir ./build/en_1.0.9`,
         heading: "Testing Safely with autocorrect-sandbox",
         paragraphs: [
           "During development or evaluation, autocorrect-sandbox starts a local HTTP server on 127.0.0.1:8765 connected to the real Python InputSessionManager and AutocorrectEngine with dry_run_hooks=True.",
-          "Every keystroke in the browser textarea is serialized and evaluated against the mmap lexicon, displaying live telemetry for Active Word Buffer, Caret State, Sentence Capitaliser, Undo Transaction Slot, evaluation latency in milliseconds, and Device Lock SHA-256.",
+          "Every keystroke in the browser textarea is serialized and evaluated against the mmap lexicon, displaying live telemetry for Active Word Buffer, Caret State, Sentence Capitaliser, Undo Transaction Slot, and evaluation latency in milliseconds.",
           "The same code powers the demo on this website. The site never simulates corrections: /api/demo is a Python serverless function that imports the engine and the en_base resources vendored from the same commit, and every visitor gets an isolated session (own word buffer, undo ledger and custom dictionary) keyed by an X-Session-Id header. Because a request may land on a fresh instance, each keystroke also carries the text before the caret and the visitor's dictionary words, from which a new instance primes an equivalent session without re-correcting anything. During local development `next dev` proxies /api/demo to autocorrect-sandbox on 127.0.0.1:8765 instead.",
         ],
       },

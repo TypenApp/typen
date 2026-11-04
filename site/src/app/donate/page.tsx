@@ -1,194 +1,112 @@
-"use client";
-
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { Check, Dash, PageHeader, Section } from "@/components/Page";
-import { PRICING_BY_CURRENCY, type CurrencyPricing } from "@/data/releases";
+import { DONATE_URL, GITHUB_REPO_URL, LICENSE_NAME, LICENSE_URL } from "@/data/releases";
 
-type Scenario = "NEW" | "RENEWAL" | "CROSSGRADE";
-
-const SCENARIOS: Array<{ id: Scenario; label: string; note: string }> = [
-  { id: "NEW", label: "New licence", note: "Perpetual licence with 12 months of updates." },
-  {
-    id: "RENEWAL",
-    label: "Renew updates",
-    note: "Another 12 months of updates at 30% off. Your existing licence keeps working either way.",
-  },
-  {
-    id: "CROSSGRADE",
-    label: "Standard → Pro",
-    note: "Pay only the difference to move an existing Standard licence to Pro.",
-  },
+const EVERYONE_GETS = [
+  "Offline spelling, homophone, punctuation and capitalisation correction in every application",
+  "English variants: EN_GB, EN_US, EN_CA, EN_AU, and the domain vocabulary packs",
+  "Custom dictionary, suggested words, CSV / JSON backup, Backspace-to-undo",
+  "Per-application profiles and text-expansion snippets with date / time macros",
+  "Local AI and bring-your-own-key cloud AI (as they are published)",
+  "Every update, for as long as the project exists",
 ];
 
-const STANDARD_FEATURES = [
-  "Offline spelling, homophone, punctuation and capitalisation correction",
-  "English variants: EN_GB, EN_US, EN_CA, EN_AU",
-  "Custom dictionary, suggested words, CSV / JSON backup",
-  "Backspace-to-undo on every correction",
-  "12 months of app and lexicon updates",
-];
-
-const PRO_FEATURES = [
-  "Everything in Standard",
-  "Domain vocabulary packs",
-  "Per-application profiles",
-  "Text-expansion snippets with date / time macros",
-  "Local AI and bring-your-own-key cloud AI (when published)",
-  "Local typing insights",
+const WHAT_IT_PAYS_FOR = [
+  "Code-signing certificates for Windows and macOS, so installers stop triggering warnings",
+  "CI minutes for three platforms on every release",
+  "Hosting for the website and the live demo engine",
+  "Time: lexicon curation, bug fixes and the next platform",
 ];
 
 const FAQ: Array<[string, string]> = [
   [
-    "What does “perpetual” mean here?",
-    "The version you buy keeps working forever, on the device it is bound to. Buying includes 12 months of updates; after that you can keep using what you have or renew at 30% off.",
+    "Is anything locked behind a donation?",
+    "No. Tact has one edition and it is the whole thing. Donating changes nothing in the app; it only decides how much time can go into it.",
   ],
   [
-    "How is a licence delivered?",
-    "As an offline Ed25519 certificate bound to a hash of your device. The app verifies it locally; there is no account and no activation server to go down.",
+    "Was it always free?",
+    "No. Earlier betas had Standard and Pro licences and a 14-day trial. That machinery has been removed entirely; if you bought a licence, you now simply have the same Tact as everyone else, with nothing to activate.",
   ],
   [
-    "Is the trial limited?",
-    "No. Every download runs Pro for 14 days with nothing disabled. When the trial ends you drop to the free Standard preview until you add a licence.",
+    "Which licence is the code under?",
+    `${LICENSE_NAME}. You can read, build, modify and redistribute it. The lexicon is compiled from public-domain and permissively licensed word lists.`,
   ],
   [
-    "Can I move it to a new computer?",
-    "Yes — reissue it from your order. A licence is for one platform; Windows, macOS and Linux are separate purchases.",
+    "Can I help without money?",
+    "Yes: report a misspelling the engine misses or a correction it should not have made, test a platform, or send a pull request. The repository is public.",
   ],
 ];
 
-function Toggle<T extends string>({
-  value,
-  options,
-  onChange,
-  label,
-}: {
-  value: T;
-  options: Array<{ id: T; label: string }>;
-  onChange: (v: T) => void;
-  label: string;
-}) {
+export default function DonatePage() {
   return (
-    <div className="inline-flex rounded-lg border border-line p-0.5" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.id}
-          type="button"
-          role="radio"
-          aria-checked={value === o.id}
-          onClick={() => onChange(o.id)}
-          className={`rounded px-3 py-1.5 text-sm transition ${
-            value === o.id ? "bg-ink-3 text-paper" : "text-paper-muted hover:text-paper"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-export default function PricingPage() {
-  const [currency, setCurrency] = useState<CurrencyPricing["code"]>("USD");
-  const [scenario, setScenario] = useState<Scenario>("NEW");
-  const p = PRICING_BY_CURRENCY[currency];
-
-  const standardPrice = scenario === "RENEWAL" ? p.standardRenewal30PctOff : p.standardPrice;
-  const proPrice =
-    scenario === "RENEWAL" ? p.proRenewal30PctOff : scenario === "CROSSGRADE" ? p.crossGradeStandardToPro : p.proPrice;
-
-  return (
-    <div className="pb-8">
+    <>
       <PageHeader
-        eyebrow="Pricing"
-        title="Pay once. Keep it."
+        eyebrow="Donate"
+        title={
+          <>
+            Free for everyone.
+            <br />
+            Funded by whoever wants to.
+          </>
+        }
         lede={
           <p>
-            A perpetual licence for one platform with 12 months of updates. Every download starts with a free
-            14-day trial of Pro — no account needed. Licences are offline certificates; nothing phones home.
+            Tact is open source under the {LICENSE_NAME} licence and has no paid tier, trial or licence key. If it saves
+            you time, a donation keeps the lexicon, the builds and the signing going.
           </p>
         }
-      />
-
-      <div className="container-site">
-        <div className="flex flex-wrap items-center gap-3">
-          <Toggle
-            label="Currency"
-            value={currency}
-            onChange={setCurrency}
-            options={(Object.keys(PRICING_BY_CURRENCY) as CurrencyPricing["code"][]).map((c) => ({ id: c, label: c }))}
-          />
-          <Toggle label="Scenario" value={scenario} onChange={setScenario} options={SCENARIOS} />
+      >
+        <div className="mt-8 flex flex-wrap items-center gap-3">
+          <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
+            Donate <span aria-hidden="true">↗</span>
+          </a>
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+            Source on GitHub <span aria-hidden="true">↗</span>
+          </a>
         </div>
-        <p className="mt-3 text-sm text-paper-faint">{SCENARIOS.find((s) => s.id === scenario)?.note}</p>
+      </PageHeader>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          <div className="card p-7">
-            <p className="eyebrow">Standard</p>
-            <p className="display mt-4 text-4xl">
-              {scenario === "CROSSGRADE" ? (
-                <span className="text-xl text-paper-faint">Not applicable</span>
-              ) : (
-                <>
-                  <span className="text-2xl text-paper-muted">{p.symbol}</span>
-                  {standardPrice}
-                </>
-              )}
-            </p>
-            <p className="mt-1 font-mono text-xs text-paper-faint">one-time · {p.label}</p>
-            <ul className="mt-7 space-y-2.5">
-              {STANDARD_FEATURES.map((f) => (
-                <Dash key={f}>{f}</Dash>
-              ))}
-            </ul>
-          </div>
+      <Section index="01" title="What everyone gets" aside="No editions, no gates">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {EVERYONE_GETS.map((f) => (
+            <Check key={f}>{f}</Check>
+          ))}
+        </ul>
+      </Section>
 
-          <div className="card relative border-line-strong p-7">
-            <span className="absolute right-5 top-5 rounded-full border border-proof/50 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-proof">
-              Trial edition
-            </span>
-            <p className="eyebrow">Pro</p>
-            <p className="display mt-4 text-4xl">
-              <span className="text-2xl text-paper-muted">{p.symbol}</span>
-              {proPrice}
-            </p>
-            <p className="mt-1 font-mono text-xs text-paper-faint">one-time · {p.label}</p>
-            <ul className="mt-7 space-y-2.5">
-              {PRO_FEATURES.map((f) => (
-                <Check key={f}>{f}</Check>
-              ))}
-            </ul>
-          </div>
-        </div>
+      <Section index="02" title="What donations pay for">
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {WHAT_IT_PAYS_FOR.map((f) => (
+            <Dash key={f}>{f}</Dash>
+          ))}
+        </ul>
+        <p className="mt-8 text-sm text-ink-muted">
+          Donations are handled by GitHub Sponsors; Tact never sees card details and never stores anything about you.
+        </p>
+      </Section>
 
-        <div className="card mt-6 flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
-          <p className="max-w-xl text-sm leading-relaxed text-paper-muted">
-            Purchasing opens when the beta ends. Until then, download the beta and use every Pro feature free
-            for 14 days.
-          </p>
-          <Link href="/download" className="btn-primary shrink-0">
-            Download the beta
-          </Link>
-        </div>
-      </div>
-
-      <Section index="01" title="Questions">
-        <dl className="grid gap-x-10 gap-y-8 md:grid-cols-2">
+      <Section index="03" title="Questions">
+        <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
           {FAQ.map(([q, a]) => (
             <div key={q}>
-              <dt className="font-display text-lg text-paper">{q}</dt>
-              <dd className="mt-2 text-sm leading-relaxed text-paper-muted">{a}</dd>
+              <dt className="font-medium text-ink">{q}</dt>
+              <dd className="mt-2 text-sm leading-relaxed text-ink-muted">{a}</dd>
             </div>
           ))}
         </dl>
-        <p className="mt-10 text-sm text-paper-faint">
-          Technical detail on licences, device binding and payments is in the{" "}
-          <Link href="/docs/licensing" className="link">
-            licensing documentation
+        <p className="mt-10 text-sm text-ink-muted">
+          Licence text:{" "}
+          <a href={LICENSE_URL} target="_blank" rel="noopener noreferrer" className="link">
+            LICENSE on GitHub
+          </a>
+          . Ready to try it?{" "}
+          <Link href="/download" className="link">
+            Download Tact
           </Link>
           .
         </p>
       </Section>
-    </div>
+    </>
   );
 }

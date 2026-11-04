@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 /*
-  AutoCorrect — site styles.
+  Tact — site styles.
   Tokens live in tailwind.config.ts. This file holds the few primitives every
   page shares, so the visual grammar is identical everywhere: one container,
-  one card, two buttons, one eyebrow, one squiggle.
+  one card, two buttons, one eyebrow, one squiggle. Black text, white paper.
 */
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   /* The proofreader's squiggle, drawn as an SVG so it scales with the font. */
-  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23ff5a3c' stroke-width='1.3'/%3E%3C/svg%3E");
+  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23e5341a' stroke-width='1.3'/%3E%3C/svg%3E");
 }
 
 html {
@@ -21,10 +21,10 @@ html {
 }
 
 body {
-  background-color: theme("colors.ink.DEFAULT");
-  color: theme("colors.paper.DEFAULT");
+  background-color: theme("colors.paper.DEFAULT");
+  color: theme("colors.ink.DEFAULT");
   font-family: theme("fontFamily.sans");
-  font-feature-settings: "cv11", "ss01", "liga";
+  font-feature-settings: "liga", "kern";
   overflow-x: hidden;
 }
 
@@ -35,9 +35,10 @@ samp {
   font-family: theme("fontFamily.mono");
 }
 
+/* Selection is literal inverse video: white text on black. */
 ::selection {
-  background: theme("colors.proof.DEFAULT");
-  color: theme("colors.proof.ink");
+  background: theme("colors.ink.DEFAULT");
+  color: theme("colors.paper.DEFAULT");
 }
 
 ::-webkit-scrollbar {
@@ -45,11 +46,11 @@ samp {
   height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: theme("colors.ink.DEFAULT");
+  background: theme("colors.paper.DEFAULT");
 }
 ::-webkit-scrollbar-thumb {
   background: theme("colors.line.strong");
-  border: 2px solid theme("colors.ink.DEFAULT");
+  border: 2px solid theme("colors.paper.DEFAULT");
   border-radius: 6px;
 }
 
@@ -58,40 +59,40 @@ samp {
     @apply mx-auto w-full max-w-site px-5 sm:px-8;
   }
 
-  /* Headline type: display serif, tight tracking, large but calm. */
+  /* Headline type: Syne at its heavier end, tight tracking, large but calm. */
   .display {
-    @apply font-display font-normal tracking-[-0.01em] text-paper;
+    @apply font-display font-semibold tracking-[-0.03em] text-ink;
   }
 
   /* Numbered mono eyebrow used above every section: "01 — Try it". */
   .eyebrow {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-paper-faint;
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint;
   }
 
   .card {
-    @apply rounded-lg border border-line bg-ink-1;
+    @apply rounded-lg border border-line bg-paper;
   }
 
   .btn {
-    @apply inline-flex h-10 items-center justify-center gap-2 rounded px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-ink disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-paper text-ink hover:bg-white;
+    @apply btn bg-ink text-paper hover:bg-ink-3;
   }
   .btn-secondary {
-    @apply btn border border-line-strong bg-transparent text-paper hover:border-paper-faint hover:bg-ink-2;
+    @apply btn border border-ink bg-transparent text-ink hover:bg-paper-2;
   }
   .btn-ghost {
-    @apply btn px-2 text-paper-muted hover:text-paper;
+    @apply btn px-2 text-ink-muted hover:text-ink;
   }
 
   .link {
-    @apply text-paper underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-proof;
+    @apply text-ink underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-proof;
   }
 
   /* A word the engine would flag: muted text with the squiggle under it. */
   .typo {
-    @apply text-paper-muted;
+    @apply text-ink-muted;
     background-image: var(--squiggle);
     background-repeat: repeat-x;
     background-position: 0 100%;
@@ -105,15 +106,15 @@ samp {
   }
 
   .hash {
-    @apply break-all font-mono text-[11px] leading-relaxed text-paper-faint;
+    @apply break-all font-mono text-[11px] leading-relaxed text-ink-faint;
   }
 
   .field {
-    @apply w-full rounded border border-line bg-ink px-3 py-2 text-sm text-paper placeholder-paper-faint transition-colors focus:border-paper-faint focus:outline-none disabled:opacity-60;
+    @apply w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-ink-faint transition-colors focus:border-ink focus:outline-none disabled:opacity-60;
   }
 
   .kbd {
-    @apply rounded border border-line-strong bg-ink-2 px-1.5 py-0.5 font-mono text-[10px] text-paper-muted;
+    @apply rounded border border-line-strong bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-muted;
   }
 
   .rule {
@@ -121,9 +122,9 @@ samp {
   }
 
   .prose-site p {
-    @apply leading-relaxed text-paper-muted;
+    @apply leading-relaxed text-ink-muted;
   }
   .prose-site strong {
-    @apply font-medium text-paper;
+    @apply font-medium text-ink;
   }
 }

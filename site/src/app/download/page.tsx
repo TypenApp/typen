@@ -23,7 +23,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Download",
-  description: `AutoCorrect Desktop ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
+  description: `Tact ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
 };
 
 function formatDate(iso: string): string {
@@ -32,13 +32,13 @@ function formatDate(iso: string): string {
 
 function ArtifactCard({ artifact, primary }: { artifact: DownloadArtifact; primary: boolean }) {
   return (
-    <div className="rounded-lg border border-line bg-ink p-5">
-      <p className="font-display text-lg text-paper">{artifact.label}</p>
-      <p className="mt-1 text-sm text-paper-muted">{artifact.description}</p>
+    <div className="rounded-lg border border-line bg-paper p-5">
+      <p className="font-display text-lg text-ink">{artifact.label}</p>
+      <p className="mt-1 text-sm text-ink-muted">{artifact.description}</p>
       <a href={artifact.url} className={`${primary ? "btn-primary" : "btn-secondary"} mt-4 w-full`}>
         Download · {artifact.sizeFormatted}
       </a>
-      <p className="mt-3 font-mono text-xs text-paper-muted">{artifact.filename}</p>
+      <p className="mt-3 font-mono text-xs text-ink-muted">{artifact.filename}</p>
       <p className="hash mt-1">sha256 {artifact.sha256}</p>
       {artifact.signatureUrl && (
         <p className="mt-1 text-xs">
@@ -56,7 +56,7 @@ function PlatformBlock({ platform }: { platform: PlatformRelease }) {
     <section className="card scroll-mt-24 p-6 sm:p-8" id={platform.id}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="display text-2xl">{platform.osName}</h2>
-        <span className="text-sm text-paper-muted">{platform.architecture}</span>
+        <span className="text-sm text-ink-muted">{platform.architecture}</span>
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
@@ -73,7 +73,7 @@ function PlatformBlock({ platform }: { platform: PlatformRelease }) {
 
       <div className="rule mt-6 pt-5">
         <p className="eyebrow">First run</p>
-        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-paper-muted">
+        <ol className="mt-3 list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-ink-muted">
           {platform.firstRun.map((step) => (
             <li key={step}>{step}</li>
           ))}
@@ -92,7 +92,7 @@ export default function DownloadPage() {
     <div className="pb-8">
       <PageHeader
         eyebrow={`Download · ${RELEASE_TAG}`}
-        title={<>AutoCorrect Desktop {FULL_VERSION}</>}
+        title={<>Tact {FULL_VERSION}</>}
         lede={
           nothingPublished ? (
             <p>
@@ -106,14 +106,14 @@ export default function DownloadPage() {
           ) : (
             <p>
               Public beta for {AVAILABLE_PLATFORMS.map((p) => p.osName).join(", ")}, built {formatDate(BUILT_AT_ISO)}.
-              Includes the full offline engine and a 14-day trial of every feature.
+              Includes the full offline engine and every feature; Tact is free and open source.
               {unsigned.length > 0 &&
                 ` The ${unsigned.join(" and ")} build${unsigned.length > 1 ? "s are" : " is"} not yet code-signed.`}
             </p>
           )
         }
       >
-        <p className="mt-6 font-mono text-xs text-paper-faint">
+        <p className="mt-6 font-mono text-xs text-ink-faint">
           Files are served from{" "}
           <a href={RELEASE_PAGE_URL} className="link" target="_blank" rel="noopener noreferrer">
             github.com/…/releases/{RELEASE_TAG}
@@ -135,12 +135,12 @@ export default function DownloadPage() {
             {UPCOMING_PLATFORMS.map((p) => (
               <div key={p.id} id={p.id} className="card scroll-mt-24 p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="font-display text-lg text-paper">{p.osName}</p>
-                  <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-paper-faint">
+                  <p className="font-display text-lg text-ink">{p.osName}</p>
+                  <span className="rounded-full border border-line px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-ink-faint">
                     {nothingPublished ? "building" : "not in this release"}
                   </span>
                 </div>
-                <p className="mt-1 text-sm text-paper-muted">{p.architecture}</p>
+                <p className="mt-1 text-sm text-ink-muted">{p.architecture}</p>
                 <ul className="mt-4 space-y-1.5">
                   {p.requirements.slice(0, 2).map((r) => (
                     <Dash key={r}>{r}</Dash>
@@ -173,18 +173,18 @@ export default function DownloadPage() {
         </div>
       </Section>
 
-      <Section id="packs" index="02" title="Domain vocabulary packs" aside="Bundled with the app · Pro">
-        <p className="max-w-2xl text-sm leading-relaxed text-paper-muted">
+      <Section id="packs" index="02" title="Domain vocabulary packs" aside="Bundled with the app">
+        <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
           Small seed vocabularies that protect field-specific terms from correction and fix the common typos of
-          each field. Enable them per variant or per application in Settings (Pro, or during the trial).
+          each field. Enable them per variant or per application in Settings.
         </p>
         {DOMAIN_PACK_RELEASES.length > 0 ? (
           <div className="card mt-6 divide-y divide-line">
             {DOMAIN_PACK_RELEASES.map((pack) => (
               <div key={pack.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 text-sm">
                 <div className="flex flex-wrap items-baseline gap-x-3">
-                  <span className="text-paper">{pack.name}</span>
-                  <span className="text-paper-faint">
+                  <span className="text-ink">{pack.name}</span>
+                  <span className="text-ink-faint">
                     v{pack.version} · {pack.wordCount} terms · {pack.directTypoCount} typo rules
                   </span>
                 </div>
@@ -195,36 +195,36 @@ export default function DownloadPage() {
             ))}
           </div>
         ) : (
-          <p className="mt-6 text-sm text-paper-faint">
+          <p className="mt-6 text-sm text-ink-faint">
             Pack files are attached to the GitHub release alongside the installers once this version is built.
           </p>
         )}
       </Section>
 
       <Section id="verify" index="03" title="Verify a download">
-        <p className="max-w-2xl text-sm leading-relaxed text-paper-muted">
+        <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
           Compare the file hash against the value shown next to each download. Every published hash is also in{" "}
           <a href={SHA256SUMS_URL} className="link">
             SHA256SUMS.txt
           </a>{" "}
           on the release.
         </p>
-        <pre className="card mt-5 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-paper-muted">
+        <pre className="card mt-5 overflow-x-auto p-4 font-mono text-xs leading-relaxed text-ink-muted">
           {verifyLines.length > 0
             ? verifyLines.join("\n\n")
             : "# Windows\nGet-FileHash .\\<file> -Algorithm SHA256\n\n# macOS\nshasum -a 256 <file>\n\n# Linux\nsha256sum <file>"}
         </pre>
 
         <details className="mt-6 text-sm">
-          <summary className="cursor-pointer text-paper-muted hover:text-paper">
+          <summary className="cursor-pointer text-ink-muted hover:text-ink">
             Bundled language resources ({BASE_LANGUAGE_BUNDLE.id} {BASE_LANGUAGE_BUNDLE.version})
           </summary>
           <div className="card mt-3 divide-y divide-line">
             {BASE_LANGUAGE_BUNDLE.artifacts.map((a) => (
               <div key={a.name} className="grid gap-1 px-5 py-3 sm:grid-cols-[180px_1fr]">
-                <span className="font-mono text-xs text-paper">{a.name}</span>
+                <span className="font-mono text-xs text-ink">{a.name}</span>
                 <div>
-                  <p className="text-paper-muted">{a.description}</p>
+                  <p className="text-ink-muted">{a.description}</p>
                   <p className="hash mt-0.5">{a.sha256}</p>
                 </div>
               </div>
@@ -233,18 +233,18 @@ export default function DownloadPage() {
         </details>
 
         <details className="mt-3 text-sm">
-          <summary className="cursor-pointer text-paper-muted hover:text-paper">Licence signing key (Ed25519)</summary>
+          <summary className="cursor-pointer text-ink-muted hover:text-ink">Update signing key (Ed25519)</summary>
           <div className="card mt-3 p-5">
-            <p className="hash text-paper-muted">{ED25519_PUBLIC_KEY_HEX}</p>
+            <p className="hash text-ink-muted">{ED25519_PUBLIC_KEY_HEX}</p>
             {ED25519_KEY_IS_DEV_KEY && (
-              <p className="mt-2 text-paper-faint">
+              <p className="mt-2 text-ink-faint">
                 Development key embedded in the beta; it will be rotated before the stable release.
               </p>
             )}
           </div>
         </details>
 
-        <p className="mt-10 text-sm text-paper-faint">
+        <p className="mt-10 text-sm text-ink-faint">
           Having trouble? Start with the{" "}
           <Link href="/docs/getting-started" className="link">
             getting-started guide

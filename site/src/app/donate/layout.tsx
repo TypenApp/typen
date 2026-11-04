@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Donate",
   description:
-    "Perpetual Standard and Pro licences for AutoCorrect Desktop with 12 months of updates. Every download starts with a free 14-day Pro trial.",
+    "Tact is free and open source, with no paid tier. If it saves you time, a donation keeps the lexicon, builds and signing going.",
 };
 
-export default function PricingLayout({ children }: { children: React.ReactNode }) {
+export default function DonateLayout({ children }: { children: React.ReactNode }) {
   return children;
 }

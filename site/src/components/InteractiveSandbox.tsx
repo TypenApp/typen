@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
@@ -307,7 +307,7 @@ export function InteractiveSandbox() {
 
   // --- render ------------------------------------------------------------------
   const dot =
-    mode === "live" ? "bg-emerald-400" : mode === "connecting" ? "animate-pulse bg-paper-faint" : "bg-proof";
+    mode === "live" ? "bg-emerald-400" : mode === "connecting" ? "animate-pulse bg-ink-faint" : "bg-proof";
   const statusText =
     mode === "live" && health
       ? `Live · engine ${health.version}${latency !== null ? ` · ${latency.toFixed(1)} ms` : ""}`
@@ -318,11 +318,11 @@ export function InteractiveSandbox() {
   return (
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
-        <p className="text-sm text-paper-muted">
+        <p className="text-sm text-ink-muted">
           Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; press{" "}
           <kbd className="kbd">Backspace</kbd> right after one to keep what you typed.
         </p>
-        <span className="inline-flex items-center gap-2 font-mono text-[11px] text-paper-faint">
+        <span className="inline-flex items-center gap-2 font-mono text-[11px] text-ink-faint">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
           {statusText}
         </span>
@@ -330,8 +330,8 @@ export function InteractiveSandbox() {
 
       {mode === "offline" ? (
         <div className="p-6">
-          <p className="text-sm text-paper">The engine function did not answer.</p>
-          <p className="mt-2 max-w-prose text-sm text-paper-muted">
+          <p className="text-sm text-ink">The engine function did not answer.</p>
+          <p className="mt-2 max-w-prose text-sm text-ink-muted">
             This demo runs the real engine as a serverless function, not a browser imitation, so when
             the function cannot be reached there is nothing honest to show in its place. A cold start
             can take a few seconds on the first visit; try once more.
@@ -357,7 +357,7 @@ export function InteractiveSandbox() {
               disabled={mode !== "live"}
               placeholder={mode === "live" ? "dont forget teh milk" : "Connecting…"}
               aria-label="Live demo editor"
-              className="field min-h-[9.5rem] resize-none p-4 font-display text-xl leading-relaxed"
+              className="field min-h-[9.5rem] resize-none p-4 font-mono text-base leading-relaxed sm:text-lg"
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="eyebrow mr-1">Try</span>
@@ -367,7 +367,7 @@ export function InteractiveSandbox() {
                   type="button"
                   disabled={mode !== "live" || busy}
                   onClick={() => runSample(s.text)}
-                  className="rounded border border-line px-2.5 py-1 font-mono text-xs text-paper-muted transition hover:border-paper-faint hover:text-paper disabled:opacity-50"
+                  className="rounded border border-line px-2.5 py-1 font-mono text-xs text-ink-muted transition hover:border-ink-faint hover:text-ink disabled:opacity-50"
                 >
                   {s.label}
                 </button>
@@ -382,13 +382,13 @@ export function InteractiveSandbox() {
               </button>
             </div>
 
-            <ol className="mt-4 max-h-32 space-y-1.5 overflow-y-auto font-mono text-xs text-paper-muted" aria-live="polite">
-              {logs.length === 0 && <li className="text-paper-faint">Ready.</li>}
+            <ol className="mt-4 max-h-32 space-y-1.5 overflow-y-auto font-mono text-xs text-ink-muted" aria-live="polite">
+              {logs.length === 0 && <li className="text-ink-faint">Ready.</li>}
               {logs.map((log) => (
                 <li key={log.id} className="flex gap-3">
                   <span
                     className={`w-10 shrink-0 ${
-                      log.kind === "ERROR" ? "text-proof" : log.kind === "FIXED" ? "text-proof-strong" : "text-paper-faint"
+                      log.kind === "ERROR" ? "text-proof" : log.kind === "FIXED" ? "text-proof-strong" : "text-ink-faint"
                     }`}
                   >
                     {log.kind}
@@ -401,7 +401,7 @@ export function InteractiveSandbox() {
 
           <aside className="text-sm">
             <p className="eyebrow">Your words</p>
-            <p className="mt-2 text-xs text-paper-faint">Anything here is never corrected. Lives only in this session.</p>
+            <p className="mt-2 text-xs text-ink-faint">Anything here is never corrected. Lives only in this session.</p>
             <div className="mt-3 flex gap-2">
               <input
                 type="text"
@@ -424,13 +424,13 @@ export function InteractiveSandbox() {
               {dictionary.words.map((word) => (
                 <span
                   key={word}
-                  className="inline-flex items-center gap-1.5 rounded border border-line px-2 py-0.5 font-mono text-xs text-paper"
+                  className="inline-flex items-center gap-1.5 rounded border border-line px-2 py-0.5 font-mono text-xs text-ink"
                 >
                   {word}
                   <button
                     type="button"
                     onClick={() => dictionaryAction("delete", word)}
-                    className="text-paper-faint hover:text-paper"
+                    className="text-ink-faint hover:text-ink"
                     aria-label={`Remove ${word}`}
                   >
                     ×
@@ -448,7 +448,7 @@ export function InteractiveSandbox() {
                       <button
                         type="button"
                         onClick={() => dictionaryAction("add", item.word)}
-                        className="rounded border border-dashed border-line-strong px-2 py-0.5 font-mono text-xs text-paper-muted hover:border-paper-faint hover:text-paper"
+                        className="rounded border border-dashed border-line-strong px-2 py-0.5 font-mono text-xs text-ink-muted hover:border-ink-faint hover:text-ink"
                         title={item.corrected_to ? `Was corrected to ${item.corrected_to}. Click to keep.` : "Click to keep."}
                       >
                         + {item.word}
@@ -456,7 +456,7 @@ export function InteractiveSandbox() {
                       <button
                         type="button"
                         onClick={() => dictionaryAction("dismiss", item.word)}
-                        className="text-xs text-paper-faint hover:text-paper"
+                        className="text-xs text-ink-faint hover:text-ink"
                         aria-label={`Dismiss ${item.word}`}
                       >
                         ×

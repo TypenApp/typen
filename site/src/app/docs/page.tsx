@@ -43,18 +43,18 @@ export default function DocsIndexPage() {
           <li key={doc.slug}>
             <Link href={`/docs/${doc.slug}`} className="group grid gap-2 py-6 sm:grid-cols-[56px_160px_1fr] sm:gap-6">
               <span className="eyebrow pt-1.5">{String(i + 1).padStart(2, "0")}</span>
-              <span className="pt-1 text-xs text-paper-faint">{doc.category}</span>
+              <span className="pt-1 text-xs text-ink-faint">{doc.category}</span>
               <span className="min-w-0">
-                <span className="block font-display text-xl text-paper transition-colors group-hover:text-proof-strong">
+                <span className="block font-display text-xl text-ink transition-colors group-hover:text-proof-strong">
                   {doc.title}
                 </span>
-                <span className="mt-1.5 block text-sm leading-relaxed text-paper-muted">{doc.summary}</span>
-                <span className="mt-2 block font-mono text-[11px] text-paper-faint">{doc.readingTime}</span>
+                <span className="mt-1.5 block text-sm leading-relaxed text-ink-muted">{doc.summary}</span>
+                <span className="mt-2 block font-mono text-[11px] text-ink-faint">{doc.readingTime}</span>
               </span>
             </Link>
           </li>
         ))}
-        {docs.length === 0 && <li className="py-8 text-sm text-paper-faint">No guides match “{filter}”.</li>}
+        {docs.length === 0 && <li className="py-8 text-sm text-ink-faint">No guides match “{filter}”.</li>}
       </ol>
     </div>
   );

@@ -16,7 +16,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
           <nav className="sticky top-24 text-sm" aria-label="Documentation">
             <Link
               href="/docs"
-              className={`block py-1.5 ${pathname === "/docs" ? "text-paper" : "text-paper-muted hover:text-paper"}`}
+              className={`block py-1.5 ${pathname === "/docs" ? "text-ink" : "text-ink-muted hover:text-ink"}`}
             >
               Overview
             </Link>
@@ -33,8 +33,8 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
                           href={href}
                           className={`-ml-px block border-l py-1.5 pl-4 transition-colors ${
                             active
-                              ? "border-proof text-paper"
-                              : "border-transparent text-paper-muted hover:border-line-strong hover:text-paper"
+                              ? "border-proof text-ink"
+                              : "border-transparent text-ink-muted hover:border-line-strong hover:text-ink"
                           }`}
                           aria-current={active ? "page" : undefined}
                         >

@@ -11,13 +11,16 @@
  */
 import manifest from "./release-manifest.json";
 
-/** The source repository. */
+/** The source repository. Tact is MIT-licensed and funded by donations only. */
 export const GITHUB_REPO = "litlEMPEROR/AutoCorrect";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+export const LICENSE_NAME = "MIT";
+export const LICENSE_URL = `${GITHUB_REPO_URL}/blob/master/LICENSE`;
+/** Where donations go. One link, used everywhere a "support" call to action appears. */
+export const DONATE_URL = "https://github.com/sponsors/litlEMPEROR";
 /**
  * The repository whose GitHub Release hosts the downloadable files. The publish
- * job records it in the manifest (`--download-repo`), so a private source repo can
- * publish to a public releases-only repo without touching the site.
+ * job records it in the manifest (`--download-repo`); by default it is the source repo.
  */
 export const DOWNLOAD_REPO: string = (manifest as { download_repo?: string }).download_repo ?? GITHUB_REPO;
 export const DOWNLOAD_REPO_URL = `https://github.com/${DOWNLOAD_REPO}`;
@@ -95,8 +98,8 @@ export const BINARY_SCHEMA_VERSION = RELEASE.resources.schema_version;
 export const LEXICON_WORD_COUNT = RELEASE.resources.word_count;
 
 /**
- * Ed25519 public root key that the desktop app uses to verify licence
- * certificates, resource manifests and release descriptors. Must match
+ * Ed25519 public root key that the desktop app uses to verify signed
+ * resource manifests and release descriptors (updates). Must match
  * `ROOT_PUBLIC_KEY_HEX` in `src/autocorrect/licensing/root_key.py`.
  * The private half lives only on the signing machine.
  */
@@ -207,7 +210,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
       : undefined,
     firstRun: [
       winSigned
-        ? "Run the installer; Windows shows the publisher as AutoCorrect Engineering."
+        ? "Run the installer; Windows shows the publisher as Tact contributors."
         : "If SmartScreen appears, choose More info → Run anyway. Compare the SHA-256 above first if you want to be sure.",
       "A tray icon appears. Start typing in any app — corrections apply when you press Space or punctuation.",
       "Right-click the tray icon → Open Settings… to manage your dictionary, variant and profiles.",
@@ -232,7 +235,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     notarized: macNotarized,
     verifyCommand: macArtifacts[0] ? `shasum -a 256 ${macArtifacts[0].filename}` : undefined,
     firstRun: [
-      "Open the .dmg and drag AutoCorrect Desktop to Applications.",
+      "Open the .dmg and drag Tact to Applications.",
       "On first launch macOS asks for Input Monitoring, then Accessibility. Enable both and relaunch.",
       "A menu-bar icon appears. Corrections apply when you press Space or punctuation.",
     ],
@@ -244,7 +247,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     architecture: "x86_64 · X11 sessions, or Wayland via the IBus engine",
     requirements: [
       "X11: an Xorg session with the RECORD and XTEST extensions (default on all major distros)",
-      "Wayland: ibus, python3-gi and gir1.2-ibus-1.0; select “English (AutoCorrect)” as an input source",
+      "Wayland: ibus, python3-gi and gir1.2-ibus-1.0; select “English (Tact)” as an input source",
       "Artifacts are minisign-signed; see the .minisig next to each download",
     ],
     artifacts: linuxArtifacts,
@@ -253,7 +256,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     firstRun: [
       "Install the .deb (sudo apt install ./autocorrect-desktop_*.deb) or chmod +x the AppImage and run it.",
       "On X11 a tray icon appears and corrections start immediately.",
-      "On Wayland open Settings → Keyboard → Input Sources, add “English (AutoCorrect)” and switch to it.",
+      "On Wayland open Settings → Keyboard → Input Sources, add “English (Tact)” and switch to it.",
     ],
   },
 ];
@@ -327,8 +330,8 @@ export const BETA_INCLUDED = [
   "System-wide keyboard hook, spelling, direct typos, homophones, punctuation and capitalisation (Layer 1, offline)",
   `${LEXICON_WORD_COUNT.toLocaleString()}-word English lexicon with EN_GB / EN_US / EN_CA / EN_AU variants`,
   "System tray with Pause/Resume, and the Settings window (10 screens) over authenticated local IPC",
-  "Custom dictionary, suggested words, rejected pairs (Standard); per-app profiles, domain packs and text-expansion snippets (Pro)",
-  "14-day full trial; offline Ed25519 licence certificates",
+  "Custom dictionary, suggested words, rejected pairs, per-app profiles, domain packs and text-expansion snippets",
+  "Every feature, for everyone: no editions, trials or licence keys",
   ...AVAILABLE_PLATFORMS.filter((p) => p.id !== "windows").map((p) => `${p.osName} build (${p.architecture})`),
 ];
 
@@ -341,57 +344,3 @@ export const BETA_NOT_INCLUDED = [
   "Qt (PySide6) Settings UI — the beta ships the lightweight native fallback window",
   "Automatic application updates — reinstall over the top to upgrade",
 ];
-
-export interface CurrencyPricing {
-  code: "USD" | "NGN" | "GHS" | "KES";
-  symbol: string;
-  label: string;
-  standardPrice: string;
-  proPrice: string;
-  standardRenewal30PctOff: string;
-  proRenewal30PctOff: string;
-  crossGradeStandardToPro: string;
-}
-
-export const PRICING_BY_CURRENCY: Record<CurrencyPricing["code"], CurrencyPricing> = {
-  USD: {
-    code: "USD",
-    symbol: "$",
-    label: "US Dollar",
-    standardPrice: "14.99",
-    proPrice: "34.99",
-    standardRenewal30PctOff: "10.49",
-    proRenewal30PctOff: "24.49",
-    crossGradeStandardToPro: "20.00",
-  },
-  NGN: {
-    code: "NGN",
-    symbol: "₦",
-    label: "Nigerian Naira",
-    standardPrice: "22,500.00",
-    proPrice: "52,500.00",
-    standardRenewal30PctOff: "15,750.00",
-    proRenewal30PctOff: "36,750.00",
-    crossGradeStandardToPro: "30,000.00",
-  },
-  GHS: {
-    code: "GHS",
-    symbol: "GH₵",
-    label: "Ghanaian Cedi",
-    standardPrice: "225.00",
-    proPrice: "525.00",
-    standardRenewal30PctOff: "157.50",
-    proRenewal30PctOff: "367.50",
-    crossGradeStandardToPro: "300.00",
-  },
-  KES: {
-    code: "KES",
-    symbol: "KSh ",
-    label: "Kenyan Shilling",
-    standardPrice: "1,950.00",
-    proPrice: "4,550.00",
-    standardRenewal30PctOff: "1,365.00",
-    proRenewal30PctOff: "3,185.00",
-    crossGradeStandardToPro: "2,600.00",
-  },
-};

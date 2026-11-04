@@ -1,14 +1,16 @@
 import type { Config } from "tailwindcss";
 
 /**
- * AutoCorrect design tokens.
+ * Tact design tokens.
  *
- * Identity: "the squiggle, resolved" — the one symbol every spell-checker shares
- * is the wavy red line under a typo. The site is set in ink (warm near-black)
- * with paper-white text; the proofreader's red is reserved for the squiggle
- * motif, status, links and focus. Serif display for headlines (an editorial,
- * writing-tool voice), Inter for interface text, JetBrains Mono for anything
- * technical (hashes, keys, commands).
+ * Identity: text on paper. Literal black (#000) ink on literal white (#fff)
+ * paper; greys exist only for secondary text and hairlines. The one accent is
+ * the proofreader's red squiggle — the symbol every spell-checker shares — used
+ * for the motif, status, links and focus. Syne (variable) for all headline and
+ * interface text; JetBrains Mono for anything technical and for the live demo's
+ * text input.
+ *
+ * `ink-*` are foreground colours, `paper-*` are surfaces.
  */
 const config: Config = {
   content: [
@@ -19,31 +21,34 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["var(--font-sans)", "Inter", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       colors: {
         ink: {
-          DEFAULT: "#0e0d0c",
-          1: "#151311",
-          2: "#1c1916",
-          3: "#242019",
-        },
-        line: {
-          DEFAULT: "#2b2622",
-          strong: "#3b352f",
+          DEFAULT: "#000000",
+          1: "#0a0a0a",
+          2: "#171717",
+          3: "#262626",
+          muted: "#595959",
+          faint: "#8a8a8a",
         },
         paper: {
-          DEFAULT: "#f3efe8",
-          muted: "#a79f94",
-          faint: "#6f6860",
+          DEFAULT: "#ffffff",
+          1: "#fafafa",
+          2: "#f4f4f4",
+          3: "#ececec",
+        },
+        line: {
+          DEFAULT: "#e4e4e4",
+          strong: "#c9c9c9",
         },
         proof: {
-          DEFAULT: "#ff5a3c",
-          strong: "#ff7b61",
-          soft: "#3a1a14",
-          ink: "#1a0b07",
+          DEFAULT: "#e5341a",
+          strong: "#c42a12",
+          soft: "#fdece8",
+          ink: "#ffffff",
         },
       },
       borderRadius: {

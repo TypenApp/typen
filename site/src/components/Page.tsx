@@ -2,7 +2,7 @@ import React from "react";
 
 /**
  * Shared page grammar. Every page opens with a PageHeader and is built from
- * numbered Sections, so Download, Pricing and Docs read as one site.
+ * numbered Sections, so Download, Donate and Docs read as one site.
  */
 
 export function PageHeader({
@@ -48,7 +48,7 @@ export function Section({
           {index && <span className="eyebrow mr-4 align-middle">{index}</span>}
           {title}
         </h2>
-        {aside && <div className="text-sm text-paper-muted">{aside}</div>}
+        {aside && <div className="text-sm text-ink-muted">{aside}</div>}
       </div>
       <div className="mt-8">{children}</div>
     </section>
@@ -60,17 +60,17 @@ export function Correction({ from, to, className = "" }: { from: string; to: str
   return (
     <span className={`inline-flex flex-wrap items-baseline gap-x-2 ${className}`}>
       <span className="typo">{from}</span>
-      <span aria-hidden="true" className="text-paper-faint">
+      <span aria-hidden="true" className="text-ink-faint">
         →
       </span>
-      <span className="text-paper">{to}</span>
+      <span className="text-ink">{to}</span>
     </span>
   );
 }
 
 export function Check({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex gap-3 text-sm leading-relaxed text-paper-muted">
+    <li className="flex gap-3 text-sm leading-relaxed text-ink-muted">
       <span aria-hidden="true" className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-proof" />
       <span>{children}</span>
     </li>
@@ -79,7 +79,7 @@ export function Check({ children }: { children: React.ReactNode }) {
 
 export function Dash({ children }: { children: React.ReactNode }) {
   return (
-    <li className="flex gap-3 text-sm leading-relaxed text-paper-muted">
+    <li className="flex gap-3 text-sm leading-relaxed text-ink-muted">
       <span aria-hidden="true" className="mt-[10px] h-px w-3 shrink-0 bg-line-strong" />
       <span>{children}</span>
     </li>

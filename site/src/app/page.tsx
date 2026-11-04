@@ -59,14 +59,14 @@ export default function HomePage() {
         </p>
         <h1 className="display mt-5 max-w-4xl text-5xl leading-[1.02] sm:text-7xl">
           Autocorrect for{" "}
-          <span className="typo line-through decoration-paper-faint decoration-[2px]" aria-hidden="true">
+          <span className="typo line-through decoration-ink-faint decoration-[2px]" aria-hidden="true">
             evry
           </span>{" "}
           every app on your desktop.
         </h1>
         <p className="prose-site mt-7 max-w-2xl text-lg sm:text-xl">
-          One small background service fixes typos, homophones and punctuation as you type — in any
-          application, entirely offline, in under a millisecond per keystroke.
+          Tact is one small background service that fixes typos, homophones and punctuation as you type — in
+          any application, entirely offline, in under a millisecond per keystroke. Free and open source.
         </p>
         <div className="mt-9 flex flex-wrap items-center gap-3">
           <Link href="/download" className="btn-primary h-11 px-5 text-[15px]">
@@ -76,13 +76,13 @@ export default function HomePage() {
             Try it in the browser
           </a>
         </div>
-        <p className="mt-4 font-mono text-xs text-paper-faint">
+        <p className="mt-4 font-mono text-xs text-ink-faint">
           v{FULL_VERSION}
           {available.length === 0 && " · first builds publish from the release pipeline"}
           {upcoming.length > 0 && available.length > 0 && ` · ${joinNames(upcoming)} to follow`}
         </p>
 
-        <ul className="mt-14 flex flex-wrap gap-x-10 gap-y-3 font-display text-xl text-paper-muted sm:text-2xl">
+        <ul className="mt-14 flex flex-wrap gap-x-10 gap-y-3 font-display text-xl text-ink-muted sm:text-2xl">
           {HERO_FIXES.map(([from, to]) => (
             <li key={from}>
               <Correction from={from} to={to} />
@@ -106,8 +106,8 @@ export default function HomePage() {
         <div className="grid gap-x-10 gap-y-10 sm:grid-cols-3">
           {PILLARS.map((p) => (
             <div key={p.title}>
-              <h3 className="font-display text-xl text-paper">{p.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-paper-muted">{p.body}</p>
+              <h3 className="font-display text-xl text-ink">{p.title}</h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-muted">{p.body}</p>
             </div>
           ))}
         </div>
@@ -118,17 +118,18 @@ export default function HomePage() {
         <div className="card divide-y divide-line">
           {LAYERS.map(([name, body]) => (
             <div key={name} className="grid gap-2 px-6 py-5 sm:grid-cols-[180px_1fr]">
-              <span className="font-display text-lg text-paper">{name}</span>
-              <p className="text-sm leading-relaxed text-paper-muted">{body}</p>
+              <span className="font-display text-lg text-ink">{name}</span>
+              <p className="text-sm leading-relaxed text-ink-muted">{body}</p>
             </div>
           ))}
         </div>
-        <p className="mt-5 text-sm text-paper-faint">
-          Pro adds domain vocabulary packs, per-application profiles and text snippets.{" "}
-          <Link href="/pricing" className="link">
-            Compare editions
-          </Link>
-          .
+        <p className="mt-5 text-sm text-ink-faint">
+          Domain vocabulary packs, per-application profiles and text snippets are included too. Tact is free and
+          open source;{" "}
+          <Link href="/donate" className="link">
+            donations
+          </Link>{" "}
+          keep it going.
         </p>
       </Section>
 
@@ -137,14 +138,14 @@ export default function HomePage() {
         <div className="grid gap-6 md:grid-cols-2">
           <div className="card p-6">
             <p className="eyebrow">Background service</p>
-            <p className="mt-3 text-sm leading-relaxed text-paper-muted">
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
               Lives in the tray, owns the keyboard hook and the lexicon, and uses about 60 MB of memory.
               Pause or quit it any time. Password fields and excluded applications are never touched.
             </p>
           </div>
           <div className="card p-6">
             <p className="eyebrow">Settings window</p>
-            <p className="mt-3 text-sm leading-relaxed text-paper-muted">
+            <p className="mt-3 text-sm leading-relaxed text-ink-muted">
               Opens on demand and talks to the service over an authenticated local pipe. Your dictionary,
               English variant, sensitivity, per-app profiles and snippets live there. Close it and nothing
               stays resident.
@@ -156,7 +157,7 @@ export default function HomePage() {
       {/* Beta note */}
       <Section index="05" title="About the beta">
         <div className="grid gap-8 md:grid-cols-[1fr_auto] md:items-start">
-          <p className="max-w-2xl text-sm leading-relaxed text-paper-muted">
+          <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
             {available.length > 0
               ? `The ${joinNames(available)} build${available.length > 1 ? "s are" : " is"} feature-complete for offline correction and customisation.`
               : `Builds for ${joinNames(platforms)} are produced by the release pipeline and attached to a GitHub release; the download page lists exactly what has been published.`}

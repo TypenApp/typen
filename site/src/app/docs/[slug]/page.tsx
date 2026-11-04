@@ -30,15 +30,15 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
         {article.category} · {article.readingTime}
       </p>
       <h1 className="display mt-4 text-3xl leading-tight sm:text-4xl">{article.title}</h1>
-      <p className="mt-4 text-lg leading-relaxed text-paper-muted">{article.summary}</p>
+      <p className="mt-4 text-lg leading-relaxed text-ink-muted">{article.summary}</p>
 
       <nav className="card mt-8 p-5 text-sm" aria-label="On this page">
         <p className="eyebrow">On this page</p>
         <ol className="mt-3 space-y-1.5">
           {article.sections.map((sec, k) => (
             <li key={sec.id} className="flex gap-3">
-              <span className="font-mono text-[11px] text-paper-faint">{String(k + 1).padStart(2, "0")}</span>
-              <a href={`#${sec.id}`} className="text-paper-muted hover:text-paper">
+              <span className="font-mono text-[11px] text-ink-faint">{String(k + 1).padStart(2, "0")}</span>
+              <a href={`#${sec.id}`} className="text-ink-muted hover:text-ink">
                 {sec.heading}
               </a>
             </li>
@@ -53,7 +53,7 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
               <span className="eyebrow mr-3 align-middle">{String(k + 1).padStart(2, "0")}</span>
               {sec.heading}
             </h2>
-            <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-paper-muted">
+            <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-ink-muted">
               {sec.paragraphs.map((p, j) => (
                 <p key={j}>{p}</p>
               ))}
@@ -67,11 +67,11 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
             )}
             {sec.codeBlock && (
               <div className="card mt-5 overflow-hidden">
-                <div className="flex items-center justify-between border-b border-line px-4 py-2 font-mono text-[11px] text-paper-faint">
+                <div className="flex items-center justify-between border-b border-line px-4 py-2 font-mono text-[11px] text-ink-faint">
                   <span>{sec.codeBlock.title}</span>
                   <span>{sec.codeBlock.language}</span>
                 </div>
-                <pre className="overflow-x-auto p-4 text-xs leading-relaxed text-paper">
+                <pre className="overflow-x-auto p-4 text-xs leading-relaxed text-ink">
                   <code>{sec.codeBlock.code}</code>
                 </pre>
               </div>
@@ -82,14 +82,14 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
 
       <div className="rule mt-16 flex justify-between gap-4 pt-6 text-sm">
         {prev ? (
-          <Link href={`/docs/${prev.slug}`} className="text-paper-muted hover:text-paper">
+          <Link href={`/docs/${prev.slug}`} className="text-ink-muted hover:text-ink">
             ← {prev.shortTitle}
           </Link>
         ) : (
           <span />
         )}
         {next && (
-          <Link href={`/docs/${next.slug}`} className="text-right text-paper-muted hover:text-paper">
+          <Link href={`/docs/${next.slug}`} className="text-right text-ink-muted hover:text-ink">
             {next.shortTitle} →
           </Link>
         )}

@@ -17,7 +17,7 @@ interface SearchResultItem {
 const NAV_LINKS = [
   { href: "/download", label: "Download" },
   { href: "/docs", label: "Docs" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/donate", label: "Donate" },
 ];
 
 export function Navbar() {
@@ -59,10 +59,10 @@ export function Navbar() {
       });
     }
     items.push({
-      title: "Pricing",
-      subtitle: "Standard and Pro perpetual licences · USD, NGN, GHS, KES",
-      href: "/pricing",
-      category: "Pricing",
+      title: "Donate",
+      subtitle: "Free and open source · funded by donations only",
+      href: "/donate",
+      category: "Donate",
     });
     for (const doc of DOC_ARTICLES) {
       items.push({
@@ -98,7 +98,7 @@ export function Navbar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-line bg-ink/85 backdrop-blur-md">
+      <header className="sticky top-0 z-40 border-b border-line bg-paper/85 backdrop-blur-md">
         <div className="container-site flex h-16 items-center justify-between">
           <div className="flex items-center gap-10">
             <Wordmark beta={IS_PRERELEASE} />
@@ -110,7 +110,7 @@ export function Navbar() {
                     key={link.href}
                     href={link.href}
                     className={`text-sm transition-colors ${
-                      isActive ? "text-paper" : "text-paper-muted hover:text-paper"
+                      isActive ? "text-ink" : "text-ink-muted hover:text-ink"
                     }`}
                     aria-current={isActive ? "page" : undefined}
                   >
@@ -126,7 +126,7 @@ export function Navbar() {
               type="button"
               onClick={() => setSearchOpen(true)}
               aria-label="Search"
-              className="btn-secondary hidden h-9 gap-3 px-3 text-xs text-paper-muted sm:inline-flex"
+              className="btn-secondary hidden h-9 gap-3 px-3 text-xs text-ink-muted sm:inline-flex"
             >
               <span>Search</span>
               <kbd className="kbd">Ctrl K</kbd>
@@ -167,7 +167,7 @@ export function Navbar() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="rounded px-2 py-2 text-sm text-paper-muted hover:bg-ink-2 hover:text-paper"
+                className="rounded px-2 py-2 text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
               >
                 {link.label}
               </Link>
@@ -178,7 +178,7 @@ export function Navbar() {
                 setMenuOpen(false);
                 setSearchOpen(true);
               }}
-              className="rounded px-2 py-2 text-left text-sm text-paper-muted hover:bg-ink-2 hover:text-paper"
+              className="rounded px-2 py-2 text-left text-sm text-ink-muted hover:bg-paper-2 hover:text-ink"
             >
               Search
             </button>
@@ -188,7 +188,7 @@ export function Navbar() {
 
       {searchOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 p-4 pt-24"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-ink/40 p-4 pt-24"
           onClick={() => setSearchOpen(false)}
           role="dialog"
           aria-modal="true"
@@ -202,13 +202,13 @@ export function Navbar() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search docs and downloads…"
-                className="w-full bg-transparent text-sm text-paper placeholder-paper-faint outline-none"
+                className="w-full bg-transparent text-sm text-ink placeholder-ink-faint outline-none"
               />
               <kbd className="kbd">Esc</kbd>
             </div>
             <div className="max-h-96 overflow-y-auto p-2">
               {filteredResults.length === 0 ? (
-                <p className="py-8 text-center text-sm text-paper-faint">No results for “{query}”.</p>
+                <p className="py-8 text-center text-sm text-ink-faint">No results for “{query}”.</p>
               ) : (
                 filteredResults.map((item) => (
                   <button
@@ -218,13 +218,13 @@ export function Navbar() {
                       setSearchOpen(false);
                       router.push(item.href);
                     }}
-                    className="flex w-full flex-col items-start rounded px-3 py-2.5 text-left transition hover:bg-ink-2"
+                    className="flex w-full flex-col items-start rounded px-3 py-2.5 text-left transition hover:bg-paper-2"
                   >
                     <div className="flex w-full items-center justify-between gap-3">
-                      <span className="text-sm text-paper">{item.title}</span>
+                      <span className="text-sm text-ink">{item.title}</span>
                       <span className="eyebrow shrink-0 tracking-normal">{item.category}</span>
                     </div>
-                    <p className="mt-0.5 line-clamp-1 text-xs text-paper-faint">{item.subtitle}</p>
+                    <p className="mt-0.5 line-clamp-1 text-xs text-ink-faint">{item.subtitle}</p>
                   </button>
                 ))
               )}
