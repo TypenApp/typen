@@ -30,8 +30,7 @@ from autocorrect.ipc.protocol import (
     compute_default_ipc_address,
     create_and_persist_auth_token,
 )
-from autocorrect.licensing.signed_licence import Edition, current_platform_sku
-from autocorrect.payments.upgrade_pricing import UpgradePricingCalculator
+from autocorrect.licensing.entitlement_manager import DONATE_URL
 from autocorrect.productivity.app_profiles import ApplicationProfile
 from autocorrect.version import APP_RELEASE_TIMESTAMP, APP_VERSION, BINARY_SCHEMA_VERSION
 
@@ -269,9 +268,9 @@ class LocalIPCServer:
             )
 
     def _require_pro(self, feature: str) -> None:
-        """Raise unless the current entitlement unlocks Pro features."""
+        """Feature gate seam. Tact is free software, so the entitlement manager always allows."""
         if not self._daemon.entitlement_manager.is_pro_enabled():
-            raise PermissionError(f"{feature} require a Pro Edition licence (or the active 14-day trial).")
+            raise PermissionError(f"{feature} are not available in this build.")
 
     def _dispatch(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
         d = self._daemon
@@ -754,50 +753,18 @@ class LocalIPCServer:
             d.resource_updater.rollback_to_last_known_good()
             return self._dispatch("updates.get_state", {})
 
-        # --- 10. Licence, Device Lock & Pricing ------------------------------
-        if method == "licence.get_state":
+        # --- 10. About & Support --------------------------------------------
+        if method == "about.get_state":
             snap = d.entitlement_manager.evaluate()
-            cert = d.entitlement_manager.active_certificate
-            calc = UpgradePricingCalculator(d.pricing_config)
-            std_quote = calc.calculate_quote(current_platform_sku(Edition.STANDARD), existing_cert=cert)
-            pro_quote = calc.calculate_quote(current_platform_sku(Edition.PRO), existing_cert=cert)
             return {
                 "mode": snap.mode,
                 "status_message": snap.status_message,
                 "typing_assistance_enabled": snap.typing_assistance_enabled,
                 "pro_features_enabled": snap.pro_features_enabled,
-                "can_download_new_updates": snap.can_download_new_updates,
-                "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
-                "device_id_hash": d.device_id_hash,
-                "certificate": (cert.to_unsigned_dict() if cert is not None else None),
-                "pricing": {
-                    "currency": d.pricing_config.primary_currency,
-                    "standard_quote_usd": std_quote.final_amount_str,
-                    "standard_upgrade_type": std_quote.upgrade_type.value,
-                    "pro_quote_usd": pro_quote.final_amount_str,
-                    "pro_upgrade_type": pro_quote.upgrade_type.value,
-                    "renewal_discount_pct": int(d.pricing_config.renewal_discount_fraction * 100),
-                    "regional_standard": {
-                        k: f"{v:.2f}" for k, v in d.pricing_config.standard_regional_prices.items()
-                    },
-                    "regional_pro": {k: f"{v:.2f}" for k, v in d.pricing_config.pro_regional_prices.items()},
-                },
+                "app_version": APP_VERSION,
+                "licence": "MIT",
+                "source_url": "https://github.com/litlEMPEROR/AutoCorrect",
+                "donate_url": DONATE_URL,
             }
-
-        if method == "licence.install_certificate_json":
-            from autocorrect.licensing.signed_licence import SignedLicenceCertificate
-
-            cert_json = str(params.get("certificate_json", "")).strip()
-            cert = SignedLicenceCertificate.from_json(cert_json)
-            d.licence_service.save_and_activate_certificate(cert)
-            if d.entitlement_manager.is_typing_assistance_enabled():
-                d._attach_os_hooks()
-            return self._dispatch("licence.get_state", {})
-
-        if method == "licence.deactivate_device":
-            d.licence_service.deactivate_current_device()
-            if not d.entitlement_manager.is_typing_assistance_enabled():
-                d._release_os_hooks()
-            return self._dispatch("licence.get_state", {})
 
         raise ValueError(f"Unknown IPC method: '{method}'")

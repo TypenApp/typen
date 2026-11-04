@@ -46,7 +46,7 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
         def editionBadge(self) -> str:
             ov = self._ctrl.get_overview()
             ent = ov.get("entitlement", {})
-            return str(ent.get("mode", "TRIAL_PRO")) if isinstance(ent, dict) else "TRIAL_PRO"
+            return str(ent.get("mode", "OPEN_SOURCE")) if isinstance(ent, dict) else "OPEN_SOURCE"
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
         def statusMessage(self) -> str:
@@ -181,13 +181,13 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
             )
 
         @Property(str, notify=stateChanged)  # type: ignore[misc]
-        def licenceSummaryText(self) -> str:
-            lic = self._ctrl.get_licence_state()
-            dev_hash = str(lic.get("device_id_hash", ""))[:24]
+        def aboutSummaryText(self) -> str:
+            about = self._ctrl.get_about_state()
             return (
-                f"Mode: {lic.get('mode')} — {lic.get('status_message')}\n"
-                f"Device Lock SHA-256: {dev_hash}...\n"
-                f"Open-Source Notice: Uses Qt 6 / PySide6-Essentials dynamically linked under GNU LGPLv3."
+                f"Tact v{about.get('app_version')} — {about.get('status_message')}\n"
+                f"Licence: {about.get('licence')}. Source: {about.get('source_url')}\n"
+                f"Tact is funded by donations only: {about.get('donate_url')}\n"
+                f"Uses Qt 6 / PySide6-Essentials, dynamically linked under GNU LGPLv3."
             )
 
         @Slot()  # type: ignore[misc]
@@ -226,9 +226,10 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
             self.stateChanged.emit()
 
         @Slot()  # type: ignore[misc]
-        def deactivateDevice(self) -> None:
-            self._ctrl.deactivate_device()
-            self.stateChanged.emit()
+        def openDonatePage(self) -> None:
+            import webbrowser
+
+            webbrowser.open(str(self._ctrl.get_about_state().get("donate_url", "")))
 
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication.instance() or QGuiApplication(sys.argv)

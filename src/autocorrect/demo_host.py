@@ -40,7 +40,7 @@ SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
 
 # What the public demo enables beyond the bare engine.
 DEMO_DOMAIN_PACKS: frozenset[str] = frozenset({"programming", "medicine", "finance", "business", "academic"})
-DEMO_SNIPPETS: tuple[tuple[str, str], ...] = ((";sig", "Best regards, AutoCorrect Team"),)
+DEMO_SNIPPETS: tuple[tuple[str, str], ...] = ((";sig", "Best regards, the Tact team"),)
 
 # Longest field text a `key` request may carry for priming (characters). Priming
 # only needs the current sentence or two; the client trims at a word boundary.

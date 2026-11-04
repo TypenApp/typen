@@ -1,5 +1,5 @@
 """
-Intelligent Punctuation Assistance (Standard Edition).
+Intelligent Punctuation Assistance.
 Handles:
 1. Unambiguous contraction apostrophe restoration ('dont' -> "don't", 'im' -> "I'm").
 2. Space-before-punctuation transposition recovery ('word , ' -> 'word, ').

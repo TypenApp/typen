@@ -1,5 +1,5 @@
 """
-Layer 2 Advanced Local Intelligence Manager (Pro Edition).
+Layer 2 Advanced Local Intelligence Manager.
 Provides:
 - Hardware-aware model tier selection (inspects CPU count, RAM, and platform accelerators).
 - On-demand loading and idle-timeout unloading of optional local ONNX/GGUF models.
@@ -145,7 +145,7 @@ class LocalModelManager:
 
     def load_model(self, model_id: str | None = None) -> str:
         if not self._is_pro:
-            raise PermissionError("Layer 2 Local AI requires a Pro Edition entitlement.")
+            raise PermissionError("Layer 2 Local AI is not available in this build.")
         hw = self.detect_hardware_profile()
         self._active_model_id = model_id or hw.recommended_model_id
         self._model_loaded = True

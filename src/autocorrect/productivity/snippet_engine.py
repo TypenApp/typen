@@ -1,5 +1,5 @@
 """
-Pro Edition Custom Text Expansion Snippet Engine.
+Custom Text Expansion Snippet Engine.
 Expands user-defined triggers (e.g. ';sig', '@@email', ';addr') upon word boundary
 with dynamic date/time template variables and single-Backspace undo support.
 """

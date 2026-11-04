@@ -85,7 +85,7 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
     End-to-end verification that `SettingsController` drives all 10 screens
     over authenticated Local IPC against a running `AutoCorrectDaemon`, mutating
     the live daemon's engine overlay, domain packs, snippets, profiles, AI controls,
-    and licence state without duplicating the engine in the UI process.
+    and about state without duplicating the engine in the UI process.
     """
     assert len(SCREEN_NAMES) == 10
     daemon = AutoCorrectDaemon(data_dir=tmp_path, dry_run_hooks=True)
@@ -137,7 +137,7 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         assert imported_cnt == 1
         assert "BachsSDK" in controller.list_custom_words()
 
-        # --- Screen 4: Languages & 6 Pro Domain Vocabulary Packs ---
+        # --- Screen 4: Languages & 6 Domain Vocabulary Packs ---
         lang = controller.set_region("EN_US")
         assert lang["active_region"] == "EN_US"
         assert daemon.session._active_region.name == "EN_US"
@@ -166,7 +166,7 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         controller.remove_preferred_variant("color")
         assert daemon.preference_store.overlay.get_preferred_variant("color") is None
 
-        # --- Screen 6: Pro Intelligence (Local AI & BYOK Cloud AI) ---
+        # --- Screen 6: Intelligence (Local AI & BYOK Cloud AI) ---
         ai_state = controller.set_byok_api_key("openai", "sk-proj-validtestkey1234567890")
         assert ai_state["byok"]["providers"]["openai"]["has_key"] is True
 
@@ -205,12 +205,11 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         assert upd["language_resources"]["schema_version"] == 1
         controller.rollback_language_resources()
 
-        # --- Screen 10: Licence & Commercial Entitlement ---
-        lic = controller.get_licence_state()
-        assert lic["mode"] == "TRIAL_PRO"
-        assert lic["pricing"]["standard_quote_usd"] == "14.99"
-        assert lic["pricing"]["pro_quote_usd"] == "34.99"
-        assert "NGN" in lic["pricing"]["regional_standard"]
+        # --- Screen 10: About & Support ---
+        about = controller.get_about_state()
+        assert about["mode"] == "OPEN_SOURCE"
+        assert about["licence"] == "MIT"
+        assert about["donate_url"].startswith("https://")
 
         # One-Click Privacy Wipe clears custom vocabulary and preferences cleanly
         controller.privacy_wipe()

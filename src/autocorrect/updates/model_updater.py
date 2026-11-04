@@ -1,5 +1,5 @@
 """
-Pro Edition Local AI Model Updater.
+Local AI Model Updater.
 Manages optional downloads, Ed25519 manifest checks, and SHA-256 integrity
 verification for quantized ONNX / GGUF local grammar and rewrite models.
 """
@@ -58,7 +58,7 @@ class ModelUpdater:
         updates_expire_at: datetime | None = None,
     ) -> Path:
         if not is_pro_entitled:
-            raise PermissionError("Local AI models require a Pro Edition entitlement")
+            raise PermissionError("Local AI models are not available in this build")
 
         if not verify_manifest_signature(descriptor.to_canonical_dict(), signature_b64, self._public_key):
             raise ValueError("Invalid Ed25519 signature on local model manifest")

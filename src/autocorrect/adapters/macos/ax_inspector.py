@@ -64,7 +64,7 @@ class MacAXFocusInspector:
         return (
             "To enable system-wide autocorrect on macOS:\n"
             "1. Open System Settings -> Privacy & Security -> Accessibility.\n"
-            "2. Toggle ON 'AutoCorrect Desktop'.\n"
+            "2. Toggle ON 'Tact'.\n"
             "3. Ensure 'Input Monitoring' is also enabled if prompted."
         )
 

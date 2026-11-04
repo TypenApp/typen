@@ -3,8 +3,7 @@ Minimal `.env` loader (no third-party dependency) for *development* runs.
 
 Frozen builds never read a `.env`: an end user must not be able to alter the
 application's trust configuration by dropping a file next to the executable
-or into the data directory. Entitlements come exclusively from signed
-certificates (see `autocorrect.licensing`).
+or into the data directory (the embedded root public key verifies signed updates).
 
 Search order when running from source (first file found wins; values never
 override variables already set in the process environment):
@@ -15,8 +14,8 @@ override variables already set in the process environment):
 Recognised variables:
 
 - `AUTOCORRECT_ROOT_PUBLIC_KEY_HEX`  override the embedded Ed25519 root
-  public key (tests / staging licence servers only).
-- `AUTOCORRECT_ENGINE_URL`           used by the website's `/api/engine` proxy.
+  public key (tests / staging update servers only).
+- `AUTOCORRECT_ENGINE_URL`           used by the website's `/api/demo` proxy in `next dev`.
 """
 
 from __future__ import annotations

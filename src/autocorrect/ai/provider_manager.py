@@ -2,7 +2,7 @@
 Layer 3 Cloud AI (BYOK) Provider Manager.
 Supports OpenAI, Anthropic, Google Gemini, and OpenAI-Compatible Custom endpoints.
 Strictly enforces:
-1. Pro Edition entitlement check.
+1. Feature-gate check (always allowed in Tact; kept as a seam).
 2. Explicit user consent (`user_consented=True`) before any network transmission.
 3. Local-Only Mode lockdown and daily/monthly spending caps.
 4. Direct HTTPS transmission to the user's chosen provider (never proxying keys through our servers).
@@ -96,7 +96,7 @@ class BYOKProviderManager:
         Execute an explicit sentence/passage refinement request via the user's BYOK provider.
         """
         if not self._is_pro_fn():
-            raise PermissionError("Cloud AI requires an active Pro Edition licence.")
+            raise PermissionError("Cloud AI is not available in this build.")
 
         if not (request.user_consented or self._global_cloud_consent):
             raise PermissionError(

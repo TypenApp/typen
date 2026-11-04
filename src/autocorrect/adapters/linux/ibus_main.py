@@ -4,7 +4,7 @@ IBus engine process entry point (`AutoCorrectDesktop --ibus`).
 Binds `WaylandIBusEngineAdapter` to a real `IBus.Engine` GObject subclass via
 PyGObject. The engine runs as its own process spawned by ibus-daemon (see
 `ibus_component.py`); it owns a full `AutoCorrectDaemon` in dry-run mode so it
-shares the same lexicon, preferences, licence state and IPC server as the
+shares the same lexicon, preferences and IPC server as the
 tray daemon would — on Wayland *this process is* the typing-assistance daemon.
 
 Requirements on the user's machine: `ibus`, `python3-gi`, `gir1.2-ibus-1.0`
@@ -85,7 +85,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
         # --- IBus.Engine virtual methods ------------------------------------
         def do_process_key_event(self, keyval: int, keycode: int, state: int) -> bool:
             if not daemon.hooks_active:
-                return False  # trial expired / paused: transparent pass-through
+                return False  # paused: transparent pass-through
             return self._adapter.process_raw_key(keyval, keycode, state, time.perf_counter() * 1000.0)
 
         def do_set_capabilities(self, caps: int) -> None:
@@ -132,10 +132,10 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
         # Developer mode: no component XML installed yet, so describe ourselves on the fly.
         component = IBus.Component(
             name=IBUS_BUS_NAME,
-            description="AutoCorrect Desktop input method engine",
+            description="Tact input method engine",
             version="0",
             license="Proprietary",
-            author="AutoCorrect Engineering",
+            author="Tact contributors",
             homepage="https://autocorrect-desktop.vercel.app",
             command_line=f"{sys.executable} --ibus",
             textdomain="autocorrect",
@@ -147,7 +147,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
                 description="System-wide offline autocorrect as you type",
                 language="en",
                 license="Proprietary",
-                author="AutoCorrect Engineering",
+                author="Tact contributors",
                 icon="autocorrect-desktop",
                 layout="default",
             )

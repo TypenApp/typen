@@ -1,7 +1,7 @@
 """
 System Tray / Menu Bar Integration (`pystray`).
 Provides unobtrusive background control:
-- Status display (Edition / Trial status)
+- Status display
 - Pause / Resume typing assistance
 - Launch out-of-process Settings window (same executable with `--settings` when frozen,
   `python -m autocorrect.ui.settings_main` from a source checkout)

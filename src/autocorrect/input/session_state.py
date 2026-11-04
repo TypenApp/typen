@@ -238,7 +238,7 @@ class InputSessionManager:
         if event.is_injected:
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
-        # 2. Check commercial entitlement gate (e.g. expired 14-day trial)
+        # 2. Entitlement gate seam (always allowed in Tact)
         if self._entitlement_gate is not None and not self._entitlement_gate.is_typing_assistance_enabled():
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 

@@ -71,7 +71,7 @@ class StartupManager:
             "[Desktop Entry]\n"
             "Type=Application\n"
             "Version=1.0\n"
-            "Name=AutoCorrect Desktop\n"
+            "Name=Tact\n"
             "Comment=System-wide offline autocorrect and writing assistant\n"
             f"Exec={exec_line}\n"
             "Icon=autocorrect-desktop\n"

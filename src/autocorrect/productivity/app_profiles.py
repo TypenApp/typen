@@ -1,5 +1,5 @@
 """
-Pro Edition Application-Specific Typing Profiles.
+Application-Specific Typing Profiles.
 Allows users to customize correction aggressiveness, punctuation assistance,
 sentence capitalisation, and active domain vocabulary packs per application
 (e.g. VS Code -> programming pack + conservative punctuation; Microsoft Word -> academic + full prose).

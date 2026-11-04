@@ -1,5 +1,5 @@
 """
-Pro Edition Hybrid AI Package (Layer 2 Local AI & Layer 3 Cloud BYOK).
+Hybrid AI Package (Layer 2 Local AI & Layer 3 Cloud BYOK).
 Provides:
 - `api_key_manager.py`: OS Keyring credential storage & log redaction filter.
 - `usage_tracker.py`: Local SQLite token and estimated cost accounting.

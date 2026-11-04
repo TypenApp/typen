@@ -113,7 +113,7 @@ def build_key_event(
 class QuartzEventTapManager:
     """
     Manages the macOS `CGEventTap` runloop on a dedicated background thread
-    and cleanly disables the tap on stop or trial expiry.
+    and cleanly disables the tap on stop.
     """
 
     def __init__(

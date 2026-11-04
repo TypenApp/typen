@@ -1,5 +1,5 @@
 """
-Acceptance Tests for Core Standard Edition:
+Acceptance Tests for the core correction engine:
 - Spelling accuracy & candidate ranking
 - Punctuation assistance (contractions, space-before-punctuation, double-space period, operator preservation)
 - Automatic sentence capitalisation & abbreviation/URL/code guards

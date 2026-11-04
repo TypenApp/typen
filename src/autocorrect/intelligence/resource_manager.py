@@ -135,7 +135,7 @@ class ResourceManager:
         released_dt = datetime.fromisoformat(released_at_str.replace("Z", "+00:00")).astimezone(UTC)
         if max_entitled_date is not None and released_dt > max_entitled_date:
             raise PermissionError(
-                f"Resource release {released_at_str} exceeds licence update entitlement {max_entitled_date.isoformat()}"
+                f"Resource release {released_at_str} is later than the allowed update window {max_entitled_date.isoformat()}"
             )
 
         lexicon = MmapLexicon(

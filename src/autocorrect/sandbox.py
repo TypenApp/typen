@@ -20,10 +20,6 @@ from urllib.parse import parse_qs, urlsplit
 
 from autocorrect.daemon.app import AutoCorrectDaemon
 from autocorrect.demo_host import DemoSession, EngineHost, SessionPool, normalise_route
-from autocorrect.licensing.activation_manager import (
-    compute_local_device_id_hash,
-    get_os_native_machine_uuid,
-)
 
 # Backwards-compatible name for the per-visitor session record.
 SandboxSession = DemoSession
@@ -32,7 +28,7 @@ SANDBOX_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>AutoCorrect Desktop — Controlled Local Sandbox</title>
+<title>Tact — Local Sandbox</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -82,7 +78,7 @@ SANDBOX_HTML = """<!DOCTYPE html>
 <div class="container">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h1>AutoCorrect Desktop — Local Sandbox</h1>
+      <h1>Tact — Local Sandbox</h1>
       <span class="badge" id="edition-badge">14-Day Pro Trial</span>
     </div>
     <div class="sub">
@@ -103,15 +99,13 @@ SANDBOX_HTML = """<!DOCTYPE html>
   </div>
 
   <div class="card">
-    <h2>Live Engine &amp; Device Lock Telemetry</h2>
+    <h2>Live Engine Telemetry</h2>
     <div class="kv"><span>Active Word Buffer</span><code id="st-buffer">(empty)</code></div>
     <div class="kv"><span>Buffer Caret State</span><code id="st-caret">CLEAN</code></div>
     <div class="kv"><span>Sentence Capitaliser</span><code id="st-cap">SENTENCE_START</code></div>
     <div class="kv"><span>Undo Transaction Slot</span><code id="st-undo">None</code></div>
     <div class="kv"><span>Eval Latency (Last Key)</span><code id="st-lat">0.00 ms</code></div>
     <div class="kv"><span>Lexicon Words (mmap)</span><code id="st-words">-</code></div>
-    <div class="kv"><span>OS Machine ID Source</span><code id="st-osid">-</code></div>
-    <div class="kv"><span>Device Lock SHA-256</span><code id="st-devhash">-</code></div>
   </div>
 
   <div class="card">
@@ -160,8 +154,6 @@ function updateTelemetry(data) {
   document.getElementById('st-undo').textContent = data.active_undo || 'None';
   document.getElementById('st-lat').textContent = data.latency_ms.toFixed(2) + ' ms';
   document.getElementById('st-words').textContent = data.word_count;
-  document.getElementById('st-osid').textContent = data.os_id_type;
-  document.getElementById('st-devhash').textContent = data.device_id_hash.slice(0, 20) + '...';
 }
 
 // Serialised key processing: every keystroke is handled strictly in order,
@@ -372,7 +364,7 @@ def create_sandbox_daemon(data_dir: Path) -> AutoCorrectDaemon:
     daemon.resource_manager.set_enabled_domain_packs(
         {"programming", "medicine", "finance", "business", "academic"}
     )
-    daemon.snippet_engine.add_snippet(";sig", "Best regards, AutoCorrect Team")
+    daemon.snippet_engine.add_snippet(";sig", "Best regards, the Tact team")
     return daemon
 
 
@@ -397,7 +389,7 @@ class SandboxSessionPool(SessionPool):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the AutoCorrect Controlled Local Browser Sandbox")
+    parser = argparse.ArgumentParser(description="Run the Tact local browser sandbox")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
@@ -415,10 +407,6 @@ def main(argv: list[str] | None = None) -> int:
         snippet_engine=daemon.snippet_engine,
         entitlement_gate=daemon.entitlement_manager,
     )
-    os_id_raw = get_os_native_machine_uuid()
-    os_id_prefix = "-".join(os_id_raw.split("-")[:2])
-    dev_hash = compute_local_device_id_hash()
-    device_telemetry = {"os_id_type": os_id_prefix, "device_id_hash": dev_hash}
 
     class SandboxHandler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *log_args: object) -> None:
@@ -444,8 +432,6 @@ def main(argv: list[str] | None = None) -> int:
         def _dispatch(self, payload: dict[str, Any]) -> None:
             route = normalise_route(self.path)
             status, body = host.handle(self.command, route, payload, self._session_id(payload))
-            if "action" in body:
-                body.update(device_telemetry)
             self._send_json(body, status)
 
         def do_GET(self) -> None:
@@ -473,8 +459,7 @@ def main(argv: list[str] | None = None) -> int:
     url = f"http://{args.host}:{args.port}"
     server = ThreadingHTTPServer((args.host, args.port), SandboxHandler)
     server.daemon_threads = True
-    print(f"AutoCorrect Local Sandbox running at: {url}")
-    print(f"OS Machine ID Type: {os_id_prefix} | Device Lock Hash: {dev_hash[:24]}...")
+    print(f"Tact local sandbox running at: {url}")
     print("Press Ctrl+C to stop the sandbox server.")
     if not args.no_browser:
         webbrowser.open(url)

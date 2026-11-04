@@ -1,5 +1,5 @@
 """
-AutoCorrect Desktop — Unified Executable Entry Point.
+Tact — Unified Executable Entry Point.
 
 This is the single `main()` compiled into the frozen `AutoCorrectDesktop.exe`
 (PyInstaller one-folder / Nuitka standalone). One executable, two modes:
@@ -28,7 +28,7 @@ from typing import Final
 from autocorrect import __version__
 from autocorrect.platform_paths import default_data_dir, resolve_data_dir
 
-APP_DISPLAY_NAME: Final[str] = "AutoCorrect Desktop"
+APP_DISPLAY_NAME: Final[str] = "Tact"
 RELEASE_CHANNEL: Final[str] = "beta"
 DEFAULT_DATA_DIR: Final[Path] = default_data_dir()
 
@@ -42,10 +42,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--data-dir",
         type=Path,
         default=None,
-        help=(
-            "Directory for local SQLite preferences, licence, and resource cache "
-            f"(default: {DEFAULT_DATA_DIR})"
-        ),
+        help=(f"Directory for local SQLite preferences and the resource cache (default: {DEFAULT_DATA_DIR})"),
     )
     parser.add_argument(
         "--settings",

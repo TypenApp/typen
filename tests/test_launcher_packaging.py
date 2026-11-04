@@ -21,7 +21,7 @@ def test_launcher_version_flag_reports_channel(capsys: pytest.CaptureFixture[str
         launcher.main(["--version"])
     assert exc.value.code == 0
     out = capsys.readouterr().out
-    assert "AutoCorrect Desktop" in out
+    assert launcher.APP_DISPLAY_NAME == "Tact" and "Tact" in out
     assert launcher.RELEASE_CHANNEL in out
 
 

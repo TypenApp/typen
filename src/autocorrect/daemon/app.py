@@ -4,10 +4,10 @@ Wires together:
 - `ResourceManager` (zero-copy mmap language intelligence)
 - `SQLitePreferenceStore` + `PreferenceMemoryOverlay`
 - `AutocorrectEngine` (Layer 1 spelling, contextual confusion sets, punctuation, capitalisation)
-- `EntitlementManager` + `TrialManager` + `LicenceService`
+- `EntitlementManager` (Tact is free software: every feature is always allowed)
 - `InputSessionManager`
 - OS Keyboard/Mouse Hook (`Win32KeyboardMouseHook` / `QuartzEventTapManager`)
-- Safe automatic hook release whenever the 14-day trial expires or the user pauses assistance.
+- Safe hook release whenever the user pauses assistance.
 """
 
 from __future__ import annotations
@@ -36,12 +36,8 @@ from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 from autocorrect.ipc.server import LocalIPCServer
-from autocorrect.licensing.activation_manager import compute_local_device_id_hash
 from autocorrect.licensing.entitlement_manager import EntitlementManager, EntitlementSnapshot
-from autocorrect.licensing.licence_service import LicenceService
 from autocorrect.licensing.root_key import load_root_public_key
-from autocorrect.licensing.trial_manager import TrialManager
-from autocorrect.payments.pricing_config import PricingConfig
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
 from autocorrect.productivity.app_profiles import ApplicationProfileManager
 from autocorrect.productivity.local_insights import LocalInsightsStore
@@ -61,7 +57,6 @@ class AutoCorrectDaemon:
         data_dir: Path,
         bundled_resources_dir: Path = DEFAULT_BUNDLED_DIR,
         public_key: Ed25519PublicKey | None = None,
-        device_id_hash: str | None = None,
         dry_run_hooks: bool = False,
     ) -> None:
         self._data_dir = data_dir
@@ -75,9 +70,8 @@ class AutoCorrectDaemon:
         self._hooks_active: bool = False
         self.hook_status: HookStatus = hook_status.INACTIVE
 
-        # Embedded Ed25519 *public* root key (private half never ships) unless injected.
+        # Embedded Ed25519 *public* root key that verifies signed updates, unless injected.
         self._public_key = public_key or load_root_public_key()
-        self._device_id_hash = device_id_hash or compute_local_device_id_hash()
 
         # 1. Load zero-copy mmap language resources
         self.resource_manager = ResourceManager(
@@ -100,23 +94,8 @@ class AutoCorrectDaemon:
         self.app_profiles = ApplicationProfileManager()
         self.insights = LocalInsightsStore(enabled=True)
 
-        # 5. Initialize Trial & Commercial Entitlement managers
-        self.trial_manager = TrialManager(
-            trial_file_path=self._data_dir / "licence" / "trial.dat",
-            device_id_hash=self._device_id_hash,
-            use_os_keyring=not dry_run_hooks,
-        )
-        self.entitlement_manager = EntitlementManager(
-            public_key=self._public_key,
-            device_id_hash=self._device_id_hash,
-            trial_manager=self.trial_manager,
-            on_typing_disabled_callback=self._on_entitlement_suspended,
-        )
-        self.licence_service = LicenceService(
-            licence_file_path=self._data_dir / "licence" / "entitlement.lic",
-            entitlement_manager=self.entitlement_manager,
-            device_id_hash=self._device_id_hash,
-        )
+        # 5. Entitlements: Tact is free software, so this always answers "allowed".
+        self.entitlement_manager = EntitlementManager()
 
         # 6. Initialize Pro AI (Layer 2 Local AI & Layer 3 BYOK Cloud AI)
         self.local_ai = LocalModelManager(is_pro_entitled=True)
@@ -130,7 +109,7 @@ class AutoCorrectDaemon:
             is_pro_entitled_fn=self.entitlement_manager.is_pro_enabled,
         )
 
-        # 7. Initialize Independent Updaters & Commercial Pricing Config
+        # 7. Initialize Independent Updaters
         self.resource_updater = LanguageResourceUpdater(
             resource_manager=self.resource_manager,
             user_resources_dir=self._data_dir / "resources",
@@ -144,7 +123,6 @@ class AutoCorrectDaemon:
             models_dir=self._data_dir / "models",
             public_key=self._public_key,
         )
-        self.pricing_config = PricingConfig()
 
         # 8. Initialize OS Injector, Focus Inspector, and Session State Machine
         self.injector = create_platform_injector()
@@ -169,18 +147,14 @@ class AutoCorrectDaemon:
         return self._hooks_active
 
     @property
-    def device_id_hash(self) -> str:
-        return self._device_id_hash
-
-    @property
     def dry_run_hooks(self) -> bool:
         return self._dry_run_hooks
 
     def start(self, start_ipc: bool = True) -> EntitlementSnapshot:
         """
-        Evaluate offline licence/trial state, start Local IPC server, and attach OS keyboard hooks only if entitled.
+        Start the Local IPC server and attach the OS keyboard hooks.
         """
-        snapshot = self.licence_service.load_cached_licence_offline()
+        snapshot = self.entitlement_manager.evaluate()
         self.local_ai.set_pro_entitled(snapshot.pro_features_enabled)
         # Restore persisted correction preferences and (Pro) domain packs.
         self.apply_global_correction_settings()
@@ -199,14 +173,6 @@ class AutoCorrectDaemon:
         self._release_os_hooks()
         self.ipc_server.stop()
         self.resource_manager.close()
-
-    def _on_entitlement_suspended(self) -> None:
-        """
-        Invoked automatically when the 14-day trial expires.
-        Immediately releases OS keyboard hooks without deleting any user data or resources.
-        """
-        self._release_os_hooks()
-        self.session.reset_all_state()
 
     # ------------------------------------------------------------------ focus
     def set_user_domain_packs(self, pack_ids: set[str]) -> None:
@@ -285,7 +251,7 @@ class AutoCorrectDaemon:
                 remediation="Restart AutoCorrect. If the problem persists, check the log and report it.",
             )
         if self.hook_status.state in (HookState.FAILED, HookState.UNSUPPORTED):
-            # Nothing is listening; keep the daemon (IPC, settings, licence) alive
+            # Nothing is listening; keep the daemon (IPC, settings) alive
             # but do not pretend typing assistance is running.
             self._hooks_active = False
             self.focus_monitor.stop()
@@ -326,7 +292,7 @@ class AutoCorrectDaemon:
                     detail="Wayland session: compositors do not allow global key hooks.",
                     remediation=(
                         "Enable the AutoCorrect IBus input method "
-                        "(Settings → Keyboard → Input Sources → add 'English (AutoCorrect)') "
+                        "(Settings → Keyboard → Input Sources → add 'English (Tact)') "
                         "and select it as your active input source."
                     ),
                 )
@@ -392,7 +358,7 @@ def main(argv: list[str] | None = None) -> int:
         "--data-dir",
         type=Path,
         default=None,
-        help="Directory for local SQLite preferences, licence, and resource cache",
+        help="Directory for local SQLite preferences and the resource cache",
     )
     parser.add_argument(
         "--live",

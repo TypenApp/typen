@@ -9,7 +9,7 @@ ApplicationWindow {
     minimumWidth: 920
     minimumHeight: 620
     visible: true
-    title: "AutoCorrect Desktop — Settings & Customisation"
+    title: "Tact — Settings"
     color: "#0b0f19"
 
     // Design Tokens
@@ -33,11 +33,11 @@ ApplicationWindow {
         { title: "Dictionary", subtitle: "Custom & suggested words", badge: "" },
         { title: "Languages", subtitle: "Regions & 6 domain packs", badge: "" },
         { title: "Corrections", subtitle: "Sensitivity, rules & undo", badge: "" },
-        { title: "Pro Intelligence", subtitle: "Local AI & BYOK Cloud AI", badge: "PRO" },
-        { title: "Profiles", subtitle: "Per-application behaviour", badge: "PRO" },
-        { title: "Text Expansion", subtitle: "Snippets & macros", badge: "PRO" },
+        { title: "Intelligence", subtitle: "Local AI & BYOK Cloud AI", badge: "" },
+        { title: "Profiles", subtitle: "Per-application behaviour", badge: "" },
+        { title: "Text Expansion", subtitle: "Snippets & macros", badge: "" },
         { title: "Updates", subtitle: "App, lexicon & AI models", badge: "" },
-        { title: "Licence", subtitle: "Edition, device lock & upgrade", badge: "" }
+        { title: "About", subtitle: "Version, licence & support", badge: "" }
     ]
 
     RowLayout {
@@ -75,13 +75,13 @@ ApplicationWindow {
                     ColumnLayout {
                         spacing: 1
                         Text {
-                            text: "AutoCorrect"
+                            text: "Tact"
                             color: window.textPrimary
                             font.pixelSize: 16
                             font.bold: true
                         }
                         Text {
-                            text: "v" + bridge.appVersion + " • " + bridge.editionBadge
+                            text: "v" + bridge.appVersion + " • free & open source"
                             color: window.textSecondary
                             font.pixelSize: 11
                         }
@@ -312,12 +312,12 @@ ApplicationWindow {
                             anchors.margins: 20
                             spacing: 12
                             CheckBox {
-                                text: "Launch AutoCorrect background service automatically at OS login"
+                                text: "Launch the Tact background service automatically at OS login"
                                 checked: bridge.launchAtLogin
                                 onToggled: bridge.setLaunchAtLogin(checked)
                             }
                             Text {
-                                text: "Pro Sentence Rewrite Hotkey: " + bridge.rewriteHotkey + "  |  Pause Hotkey: " + bridge.pauseHotkey
+                                text: "Sentence Rewrite Hotkey: " + bridge.rewriteHotkey + "  |  Pause Hotkey: " + bridge.pauseHotkey
                                 color: window.textSecondary
                                 font.pixelSize: 13
                             }
@@ -390,7 +390,7 @@ ApplicationWindow {
                     anchors.margins: 24
                     spacing: 16
                     Text {
-                        text: "4. Regional English & Pro Domain Vocabulary Packs"
+                        text: "4. Regional English & Domain Vocabulary Packs"
                         color: window.textPrimary
                         font.pixelSize: 22
                         font.bold: true
@@ -407,7 +407,7 @@ ApplicationWindow {
                         }
                     }
                     Text {
-                        text: "Enabled Pro Domain Vocabulary Packs: " + bridge.enabledDomainPacksText
+                        text: "Enabled Domain Vocabulary Packs: " + bridge.enabledDomainPacksText
                         color: window.textSecondary
                         font.pixelSize: 13
                     }
@@ -440,7 +440,7 @@ ApplicationWindow {
             }
 
             // =================================================================
-            // SCREEN 6: PRO INTELLIGENCE
+            // SCREEN 6: INTELLIGENCE
             // =================================================================
             ScrollView {
                 clip: true
@@ -449,7 +449,7 @@ ApplicationWindow {
                     anchors.margins: 24
                     spacing: 16
                     Text {
-                        text: "6. Pro Intelligence: Local AI & BYOK Cloud AI"
+                        text: "6. Intelligence: Local AI & BYOK Cloud AI"
                         color: window.textPrimary
                         font.pixelSize: 22
                         font.bold: true
@@ -499,7 +499,7 @@ ApplicationWindow {
                     anchors.margins: 24
                     spacing: 16
                     Text {
-                        text: "8. Pro Text Expansion Snippets"
+                        text: "8. Text Expansion Snippets"
                         color: window.textPrimary
                         font.pixelSize: 22
                         font.bold: true
@@ -544,7 +544,7 @@ ApplicationWindow {
             }
 
             // =================================================================
-            // SCREEN 10: LICENCE
+            // SCREEN 10: ABOUT
             // =================================================================
             ScrollView {
                 clip: true
@@ -553,21 +553,21 @@ ApplicationWindow {
                     anchors.margins: 24
                     spacing: 16
                     Text {
-                        text: "10. Licence, Device Lock & Commercial Entitlement"
+                        text: "10. About Tact"
                         color: window.textPrimary
                         font.pixelSize: 22
                         font.bold: true
                     }
                     Text {
-                        text: bridge.licenceSummaryText
+                        text: bridge.aboutSummaryText
                         color: window.textSecondary
                         font.pixelSize: 13
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
                     }
                     Button {
-                        text: "Deactivate Current Device Seat"
-                        onClicked: bridge.deactivateDevice()
+                        text: "Support Tact with a donation"
+                        onClicked: bridge.openDonatePage()
                     }
                 }
             }

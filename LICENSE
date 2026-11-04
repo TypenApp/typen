@@ -1,41 +1,35 @@
-AutoCorrect Desktop — Proprietary Software Licence
+MIT License
 
-Copyright (c) 2026 AutoCorrect Engineering. All rights reserved.
+Copyright (c) 2026 Tact contributors
 
-This repository contains the source code, language resources, build tooling and
-website of AutoCorrect Desktop ("the Software").
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-1. Ownership. The Software is licensed, not sold. Except for the third-party
-   components listed below, all title, copyright and other intellectual property
-   rights in the Software remain with AutoCorrect Engineering.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Permitted use. You may view and build the Software from this repository for
-   evaluation, review and personal development purposes. Running the compiled
-   application beyond the 14-day trial requires a valid licence certificate
-   issued by AutoCorrect Engineering (Standard or Pro Edition, per the terms
-   presented at purchase).
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
-3. Restrictions. You may not (a) redistribute, sublicense, sell or host the
-   Software or any derivative work; (b) remove or circumvent the licence
-   verification, trial, or feature-gating mechanisms; (c) publish the signing
-   keys, licence certificates or activation material; or (d) use the Software to
-   build a competing product.
+---
 
-4. Third-party components. The Software bundles or links to components under
-   their own licences, which continue to apply:
-   - SCOWL / ESDB word lists (SCOWL licence; see pipeline/external_sources.py)
-   - Python and its standard library (PSF licence)
-   - cryptography (Apache-2.0 / BSD), zstandard (BSD), rapidfuzz (MIT),
-     httpx (BSD), keyring (MIT), pystray (LGPL-3.0), Pillow (HPND),
-     python-xlib (LGPL-2.1), pyobjc (MIT), PyGObject (LGPL-2.1)
-   - PySide6-Essentials / Qt 6 (LGPL-3.0; dynamically linked, see
-     src/autocorrect/ui/lgpl_compliance.py)
-   - PyInstaller (GPL-2.0 with the bootloader exception)
+Third-party components keep their own licences, which continue to apply:
 
-5. No warranty. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-   EXPRESS OR IMPLIED. IN NO EVENT SHALL AUTOCORRECT ENGINEERING BE LIABLE FOR
-   ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM THE USE OF THE SOFTWARE.
-
-6. Privacy. The Software processes keystrokes locally and transmits nothing
-   unless you enable BYOK cloud AI providers or purchase a licence, in which case
-   only the data described in the in-app Privacy screen is sent.
+- SCOWL / ESDB word lists (SCOWL licence; see pipeline/external_sources.py)
+- Python and its standard library (PSF licence)
+- cryptography (Apache-2.0 / BSD), zstandard (BSD), rapidfuzz (MIT),
+  httpx (BSD), keyring (MIT), pystray (LGPL-3.0), Pillow (HPND),
+  python-xlib (LGPL-2.1), pyobjc (MIT), PyGObject (LGPL-2.1)
+- PySide6-Essentials / Qt 6 (LGPL-3.0; dynamically linked, see
+  src/autocorrect/ui/lgpl_compliance.py)
+- PyInstaller (GPL-2.0 with the bootloader exception)
+- Syne (SIL Open Font License 1.1) and JetBrains Mono (SIL Open Font License 1.1)

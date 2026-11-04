@@ -51,7 +51,7 @@ class KBDLLHOOKSTRUCT(ctypes.Structure):
 class Win32KeyboardMouseHook:
     """
     Manages the Win32 `WH_KEYBOARD_LL` and `WH_MOUSE_LL` hooks and guarantees
-    safe unhook on stop or trial expiry.
+    safe unhook on stop.
     """
 
     def __init__(

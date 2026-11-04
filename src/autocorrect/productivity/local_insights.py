@@ -1,5 +1,5 @@
 """
-Pro Edition Local Typing Insights.
+Local Typing Insights.
 Stores strictly aggregate counters (words evaluated, corrections applied,
 reversals triggered, estimated keystrokes saved).
 Never records individual words, sentences, or timestamps of typing activity.

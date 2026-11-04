@@ -154,11 +154,11 @@ def test_default_data_dir_per_platform(tmp_path: Path) -> None:
 def test_resolve_data_dir_migrates_legacy_dir_once(tmp_path: Path) -> None:
     home = tmp_path / "home"
     legacy = legacy_data_dir(home)
-    (legacy / "licence").mkdir(parents=True)
-    (legacy / "licence" / "entitlement.lic").write_text("{}")
+    legacy.mkdir(parents=True)
+    (legacy / "preferences.sqlite3").write_text("")
     target = resolve_data_dir(platform="linux", home=home, env={})
     assert target == home / ".local" / "share" / "autocorrect"
-    assert (target / "licence" / "entitlement.lic").exists()
+    assert (target / "preferences.sqlite3").exists()
     assert not legacy.exists()
     # Second resolution is a no-op; an explicit path is always honoured.
     assert resolve_data_dir(platform="linux", home=home, env={}) == target
@@ -227,6 +227,6 @@ def test_failed_hook_status_keeps_daemon_but_marks_hooks_inactive(
         assert d.hook_status.state == HookState.FAILED
         assert not d.hooks_active
         assert not d.focus_monitor.is_running
-        assert d.entitlement_manager.evaluate().typing_assistance_enabled  # licence state unaffected
+        assert d.entitlement_manager.evaluate().typing_assistance_enabled  # entitlement unaffected
     finally:
         d.stop()

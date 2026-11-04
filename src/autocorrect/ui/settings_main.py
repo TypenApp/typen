@@ -5,16 +5,18 @@ Communicates with `AutoCorrectDaemon` over authenticated `LocalIPCClient`
 and seamlessly falls back to local stores in standalone/test mode.
 
 Covers all 10 architecture screens:
-1. Overview (Status, active language, edition, LocalInsightsStore statistics)
+1. Overview (Status, active language, LocalInsightsStore statistics)
 2. General (Startup at login, global hotkeys, one-click Privacy Wipe)
 3. Dictionary (Custom words, reverted Suggested Words, CSV/JSON import/export)
 4. Languages (Regional English variants EN_GB/EN_US/EN_CA/EN_AU/UNIVERSAL & 6 Domain Packs)
 5. Corrections (Sensitivity/aggressiveness, rejected pairs, preferred variants, punctuation/undo)
-6. Pro Intelligence (Layer 2 Local AI hardware/models & Layer 3 BYOK Cloud AI, OS Keyring, spend caps, Local-Only mode)
+6. Intelligence (Layer 2 Local AI hardware/models & Layer 3 BYOK Cloud AI, OS Keyring, spend caps, Local-Only mode)
 7. Profiles (Per-application typing & correction profiles)
-8. Text Expansion (Pro custom snippets and `{{date}}`/`{{time}}` macros)
+8. Text Expansion (Custom snippets and `{{date}}`/`{{time}}` macros)
 9. Updates (Independent App, Language Intelligence Library delta/rollback, and Local AI Model updates)
-10. Licence (Edition, activation, Device Lock SHA-256 hash, 12-month update entitlement, and BACHS pricing)
+10. About (Version, licence, source and how to support the project)
+
+Tact is free and open source: every screen is available to everyone.
 """
 
 from __future__ import annotations
@@ -32,18 +34,7 @@ from autocorrect.ai.usage_tracker import UsageTracker
 from autocorrect.ipc.client import LocalIPCClient
 from autocorrect.ipc.protocol import IPC_ENDPOINT_FILENAME, IPCConnectionError, IPCError
 from autocorrect.ipc.server import AVAILABLE_DOMAIN_PACK_METADATA
-from autocorrect.licensing.activation_manager import compute_local_device_id_hash
-from autocorrect.licensing.entitlement_manager import EntitlementManager
-from autocorrect.licensing.licence_service import LicenceService
-from autocorrect.licensing.root_key import load_root_public_key
-from autocorrect.licensing.signed_licence import (
-    Edition,
-    SignedLicenceCertificate,
-    current_platform_sku,
-)
-from autocorrect.licensing.trial_manager import TrialManager
-from autocorrect.payments.pricing_config import PricingConfig
-from autocorrect.payments.upgrade_pricing import UpgradePricingCalculator
+from autocorrect.licensing.entitlement_manager import DONATE_URL, EntitlementManager
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
 from autocorrect.productivity.app_profiles import (
     ApplicationProfile,
@@ -59,11 +50,11 @@ SCREEN_NAMES: tuple[str, ...] = (
     "Dictionary",
     "Languages",
     "Corrections",
-    "Pro Intelligence",
+    "Intelligence",
     "Profiles",
     "Text Expansion",
     "Updates",
-    "Licence",
+    "About",
 )
 
 
@@ -84,41 +75,20 @@ class SettingsController:
         self._api_keys = ApiKeyManager(use_memory_backend=use_memory_keyring)
         self._usage_tracker = UsageTracker(self._data_dir / "ai_usage.sqlite3")
         self._spending = SpendingController(usage_tracker=self._usage_tracker)
-        self._local_ai = LocalModelManager(is_pro_entitled=False)  # synced from entitlement below
+        self._local_ai = LocalModelManager(is_pro_entitled=True)
         self._profiles = ApplicationProfileManager()
         self._snippets = SnippetEngine()
         self._insights = LocalInsightsStore(enabled=True)
-        self._pricing_config = PricingConfig()
-        self._device_id_hash = compute_local_device_id_hash()
-
-        self._public_key = load_root_public_key()
-        self._trial_mgr = TrialManager(
-            trial_file_path=self._data_dir / "licence" / "trial.dat",
-            device_id_hash=self._device_id_hash,
-            use_os_keyring=not use_memory_keyring,
-        )
-        self._entitlement_mgr = EntitlementManager(
-            public_key=self._public_key,
-            device_id_hash=self._device_id_hash,
-            trial_manager=self._trial_mgr,
-        )
-        self._licence_service = LicenceService(
-            licence_file_path=self._data_dir / "licence" / "entitlement.lic",
-            entitlement_manager=self._entitlement_mgr,
-            device_id_hash=self._device_id_hash,
-        )
-        self._licence_service.load_cached_licence_offline()
-        self._local_ai.set_pro_entitled(self._entitlement_mgr.is_pro_enabled())
+        # Tact is free software: the entitlement manager always answers "allowed".
+        self._entitlement_mgr = EntitlementManager()
 
     def _offline_pro_enabled(self) -> bool:
-        """Entitlement as seen by the UI process when the daemon is offline (same signed sources)."""
-        snap = self._licence_service.load_cached_licence_offline()
-        self._local_ai.set_pro_entitled(snap.pro_features_enabled)
-        return snap.pro_features_enabled
+        """Feature-gate seam for the offline path; always True in Tact."""
+        return self._entitlement_mgr.is_pro_enabled()
 
     def _offline_require_pro(self, feature: str) -> None:
         if not self._offline_pro_enabled():
-            raise PermissionError(f"{feature} require a Pro Edition licence (or the active 14-day trial).")
+            raise PermissionError(f"{feature} are not available in this build.")
 
     @property
     def preferences(self) -> SQLitePreferenceStore:
@@ -146,9 +116,9 @@ class SettingsController:
         except IPCConnectionError:
             return None  # daemon offline: use the direct-SQLite fallback
         except IPCError as exc:
-            # The daemon answered and *refused* (e.g. Pro gate). Never fall back to
+            # The daemon answered and *refused* (feature gate). Never fall back to
             # the offline path here, or the UI would silently bypass the gate.
-            if "Pro Edition" in str(exc):
+            if "not available in this build" in str(exc):
                 raise PermissionError(str(exc)) from exc
             raise
 
@@ -171,7 +141,7 @@ class SettingsController:
         if ipc_res is not None:
             return ipc_res
         self._prefs.reload_into_overlay()
-        snap = self._licence_service.load_cached_licence_offline()
+        snap = self._entitlement_mgr.evaluate()
         ins = self._insights.get_summary()
         enabled_packs_raw = self._prefs.get_setting("enabled_domain_packs", "")
         enabled_packs = [p for p in enabled_packs_raw.split(",") if p]
@@ -182,7 +152,7 @@ class SettingsController:
                 "state": "inactive",
                 "backend": "",
                 "detail": "The background service is not running.",
-                "remediation": "Start AutoCorrect Desktop (it normally launches at login).",
+                "remediation": "Start Tact (it normally launches at login).",
             },
             "is_paused": self._prefs.get_setting("is_paused", "false") == "true",
             "active_region": self._prefs.overlay.active_region.name or "EN_GB",
@@ -757,7 +727,7 @@ class SettingsController:
         if ipc_res is not None:
             return ipc_res
         hw = self._local_ai.detect_hardware_profile()
-        snap = self._licence_service.load_cached_licence_offline()
+        snap = self._entitlement_mgr.evaluate()
         return {
             "app": {
                 "current_version": APP_VERSION,
@@ -789,57 +759,23 @@ class SettingsController:
         return self.get_updates_state()
 
     # =========================================================================
-    # SCREEN 10: LICENCE & COMMERCIAL ENTITLEMENT
+    # SCREEN 10: ABOUT & SUPPORT
     # =========================================================================
-    def get_licence_state(self) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online("licence.get_state")
+    def get_about_state(self) -> dict[str, Any]:
+        ipc_res = self._call_ipc_if_online("about.get_state")
         if ipc_res is not None:
             return ipc_res
-        snap = self._licence_service.load_cached_licence_offline()
-        cert = self._entitlement_mgr.active_certificate
-        calc = UpgradePricingCalculator(self._pricing_config)
-        std_q = calc.calculate_quote(current_platform_sku(Edition.STANDARD), existing_cert=cert)
-        pro_q = calc.calculate_quote(current_platform_sku(Edition.PRO), existing_cert=cert)
+        snap = self._entitlement_mgr.evaluate()
         return {
             "mode": snap.mode,
             "status_message": snap.status_message,
             "typing_assistance_enabled": snap.typing_assistance_enabled,
             "pro_features_enabled": snap.pro_features_enabled,
-            "can_download_new_updates": snap.can_download_new_updates,
-            "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
-            "device_id_hash": self._device_id_hash,
-            "certificate": cert.to_unsigned_dict() if cert is not None else None,
-            "pricing": {
-                "currency": self._pricing_config.primary_currency,
-                "standard_quote_usd": std_q.final_amount_str,
-                "standard_upgrade_type": std_q.upgrade_type.value,
-                "pro_quote_usd": pro_q.final_amount_str,
-                "pro_upgrade_type": pro_q.upgrade_type.value,
-                "renewal_discount_pct": int(self._pricing_config.renewal_discount_fraction * 100),
-                "regional_standard": {
-                    k: f"{v:.2f}" for k, v in self._pricing_config.standard_regional_prices.items()
-                },
-                "regional_pro": {k: f"{v:.2f}" for k, v in self._pricing_config.pro_regional_prices.items()},
-            },
+            "app_version": APP_VERSION,
+            "licence": "MIT",
+            "source_url": "https://github.com/litlEMPEROR/AutoCorrect",
+            "donate_url": DONATE_URL,
         }
-
-    def install_licence_certificate_json(self, certificate_json: str) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online(
-            "licence.install_certificate_json",
-            {"certificate_json": certificate_json},
-        )
-        if ipc_res is not None:
-            return ipc_res
-        cert = SignedLicenceCertificate.from_json(certificate_json)
-        self._licence_service.save_and_activate_certificate(cert)
-        return self.get_licence_state()
-
-    def deactivate_device(self) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online("licence.deactivate_device")
-        if ipc_res is not None:
-            return ipc_res
-        self._licence_service.deactivate_current_device()
-        return self.get_licence_state()
 
 
 def _launch_native_fallback_ui(controller: SettingsController) -> int:
@@ -851,7 +787,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
     from tkinter import ttk
 
     root = tk.Tk()
-    root.title("AutoCorrect Desktop — 10-Screen Settings & Customisation")
+    root.title("Tact — Settings")
     root.geometry("920x640")
 
     notebook = ttk.Notebook(root)
@@ -862,7 +798,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
         notebook.add(tab, text=screen)
         ttk.Label(
             tab,
-            text=f"AutoCorrect Desktop — {screen}",
+            text=f"Tact — {screen}",
             font=("Segoe UI", 13, "bold"),
         ).pack(anchor="w", pady=(0, 8))
 
@@ -906,7 +842,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="AutoCorrect Desktop Settings")
+    parser = argparse.ArgumentParser(description="Tact Settings")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--headless-check", action="store_true")
     args = parser.parse_args(argv)

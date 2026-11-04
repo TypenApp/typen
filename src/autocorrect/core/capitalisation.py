@@ -1,5 +1,5 @@
 """
-Automatic Sentence Capitalisation Engine (Standard Edition).
+Automatic Sentence Capitalisation Engine.
 Tracks sentence boundaries across full stops, question marks, exclamation marks,
 and paragraph breaks while suppressing unwanted capitalisation after:
 - Common abbreviations ('Mr.', 'Dr.', 'Prof.', 'e.g.', 'i.e.', 'etc.', 'vs.', 'Inc.', 'Ltd.')

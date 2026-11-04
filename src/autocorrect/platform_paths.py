@@ -1,5 +1,5 @@
 """
-Per-platform user data directory for preferences, licence, trial anchor,
+Per-platform user data directory for preferences,
 resource cache and IPC endpoint files.
 
 - Windows : `~/.autocorrect_desktop` (unchanged — the shipping beta uses it and
@@ -9,7 +9,7 @@ resource cache and IPC endpoint files.
 
 A pre-existing legacy `~/.autocorrect_desktop` on macOS/Linux is migrated
 (moved) into the platform directory the first time it is resolved, so a user
-who ran a source checkout earlier keeps their licence and custom words.
+who ran a source checkout earlier keeps their custom words and settings.
 """
 
 from __future__ import annotations
@@ -73,7 +73,7 @@ def resolve_data_dir(
             legacy.rename(target)
         except OSError:
             # Cross-device (e.g. XDG_DATA_HOME on another mount): copy then leave
-            # the legacy tree in place rather than risk losing the licence file.
+            # the legacy tree in place rather than risk losing user data.
             shutil.copytree(legacy, target)
     target.mkdir(parents=True, exist_ok=True)
     return target
