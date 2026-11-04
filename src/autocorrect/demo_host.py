@@ -334,11 +334,14 @@ class EngineHost:
             # The page sends every key it queued while the previous request was
             # in flight as one batch, so a fast typist or a paste costs one
             # round trip instead of one per character.
-            if created:
-                sess.prime_from_text(_clean_text(payload.get("text")))
             keys = _clean_keys(payload)
             if not keys:
                 return 400, {"ok": False, "error": "no key"}
+            if created:
+                sess.prime_from_text(
+                    _clean_text(payload.get("text")),
+                    typed_at_ms=_previous_key_time(payload, keys[-1]),
+                )
             results = [self._handle_key(sess, k, created and i == 0) for i, k in enumerate(keys)]
             body = dict(results[-1])
             body["results"] = results
@@ -365,7 +368,7 @@ class EngineHost:
             sess,
             action=outcome.action.value,
             plan=plan,
-            reason=outcome.decision.reason.value if outcome.decision else None,
+            reason=outcome.decision.reason.value if outcome.decision else outcome.reason_tag,
             reverted=outcome.reverted_word,
             latency_ms=elapsed_ms,
             session_new=session_new,
@@ -380,6 +383,11 @@ class _Key:
     key_name: str
     char: str
     timestamp_ms: float
+    page_t: float | None = None  # the page's own clock reading, if it sent one
+
+
+def _page_time(value: object) -> float | None:
+    return float(value) if isinstance(value, (int, float)) and math.isfinite(value) else None
 
 
 def _clean_keys(payload: dict[str, Any]) -> list[_Key]:
@@ -395,10 +403,7 @@ def _clean_keys(payload: dict[str, Any]) -> list[_Key]:
     if not items:
         return []
     now_ms = time.time() * 1000.0
-    stamps: list[float | None] = []
-    for i in items:
-        t = i.get("t")
-        stamps.append(float(t) if isinstance(t, (int, float)) and math.isfinite(t) else None)
+    stamps = [_page_time(i.get("t")) for i in items]
     last = next((s for s in reversed(stamps) if s is not None), None)
     out: list[_Key] = []
     for item, t in zip(items, stamps, strict=True):
@@ -408,9 +413,22 @@ def _clean_keys(payload: dict[str, Any]) -> list[_Key]:
                 key_name=str(item.get("key_name", ""))[:32],
                 char=str(item.get("char", ""))[:1],
                 timestamp_ms=ts,
+                page_t=t,
             )
         )
     return out
+
+
+def _previous_key_time(payload: dict[str, Any], last_key: _Key) -> float | None:
+    """
+    Server-clock time of the last key the page sent in an *earlier* batch
+    (`prev_t`, on the page's clock), mapped the same way `_clean_keys` mapped
+    this batch. Lets a freshly primed session time the double-space gesture.
+    """
+    prev_t = _page_time(payload.get("prev_t"))
+    if prev_t is None or last_key.page_t is None:
+        return None
+    return last_key.timestamp_ms - max(0.0, last_key.page_t - prev_t)
 
 
 def _dictionary(store: SQLitePreferenceStore) -> dict[str, Any]:

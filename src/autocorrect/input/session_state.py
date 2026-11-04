@@ -69,6 +69,9 @@ class SessionEventOutcome:
     decision: CorrectionDecision | None = None
     reverted_word: str | None = None
     sentence_completed_text: str | None = None  # Populated for Pro Layer 2 async trigger
+    # Why a plan without a CorrectionDecision was produced (punctuation assist,
+    # snippet expansion); `decision.reason` covers word corrections.
+    reason_tag: str | None = None
 
 
 class InputSessionManager:
@@ -191,7 +194,7 @@ class InputSessionManager:
         self._just_deleted_trailing_space = False
         self._current_sentence_tokens.clear()
 
-    def prime_from_text(self, text: str) -> None:
+    def prime_from_text(self, text: str, typed_at_ms: float | None = None) -> None:
         """
         Rebuild the session state from text that is already in the field, as if
         it had been typed, without correcting any of it.
@@ -202,6 +205,12 @@ class InputSessionManager:
         ring, sentence-start state and last completed word reflect `text`, so the
         next keystroke is evaluated with the right context; no replacement plan
         is produced and the undo ledger stays empty.
+
+        `typed_at_ms`, when known, is when the last character of `text` was
+        typed, on the same clock as the key events that follow. It lets the
+        double-space full stop survive a change of process: the second Space is
+        only honoured within two seconds of the first, and without a real time
+        for that first Space the gesture could never fire after priming.
         """
         self.reset_all_state()
         if not text:
@@ -225,6 +234,8 @@ class InputSessionManager:
         # The field's existing text is not something the visitor can revert.
         self._tx_ledger.clear_active()
         self._tx_ledger.clear_suppression()
+        if typed_at_ms is not None and self._preceded_by_space:
+            self._last_space_timestamp_ms = typed_at_ms
 
     def handle_key_event(
         self,
@@ -371,6 +382,7 @@ class InputSessionManager:
                             else KeyAction.PASS_THROUGH
                         ),
                         replacement_plan=plan,
+                        reason_tag=adj.reason_tag,
                     )
 
             # 8b. Check space-before-punctuation transposition ('word , ' -> 'word, ')
@@ -413,6 +425,7 @@ class InputSessionManager:
                             else KeyAction.PASS_THROUGH
                         ),
                         replacement_plan=plan,
+                        reason_tag=adj.reason_tag,
                     )
 
             outcome = self._evaluate_boundary(
@@ -461,6 +474,54 @@ class InputSessionManager:
 
         # 10. Printable word character (letters, digits, internal apostrophe/hyphen, or snippet prefix ';')
         if event.char:
+            # 10a. A word started straight after a misplaced 'space + closing mark'
+            # ('milk ,and' -> 'milk, and'). The mark was parked in the buffer by
+            # step 9 waiting for a Space; a letter instead means the visitor ran
+            # the next word into it, so fix the spacing now rather than letting
+            # ',and' be evaluated as one misspelt token (which would lose the comma).
+            curr = self._word_buffer.current_word
+            if (
+                len(curr) == 1
+                and curr in (",", ".", "!", "?")
+                and self._preceded_by_space
+                and event.char.isalnum()
+                and self._enable_punctuation_assist
+                and not self._priming
+            ):
+                adj = evaluate_space_before_punctuation(
+                    prev_token=self._last_completed_word,
+                    punct_char=curr,
+                    trailing_space=" ",
+                    is_code_context=self._focus_context.is_terminal_or_code,
+                )
+                if adj.should_modify:
+                    # Field holds 'milk ,' (the letter is suppressed) or 'milk ,a'
+                    # (the letter already landed): remove back to 'milk' and inject ', a'.
+                    plan = ReplacementPlan(
+                        backspaces_to_send=2 if suppress_delimiter_on_replace else 3,
+                        text_to_inject=f"{curr} {event.char}",
+                        common_prefix_len=0,
+                        original_full=f" {curr}{event.char}",
+                        target_full=f"{curr} {event.char}",
+                    )
+                    self._word_buffer.clear_clean()
+                    self._word_buffer.append_char(event.char, event.timestamp_ms)
+                    self._double_space_eligible = False
+                    self._just_deleted_trailing_space = False
+                    if adj.triggers_sentence_start:
+                        self._capitaliser.reset_to_sentence_start()
+                        self._current_sentence_tokens.clear()
+                    if self._injector is not None:
+                        self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+                    return SessionEventOutcome(
+                        action=(
+                            KeyAction.SUPPRESS_AND_INJECT
+                            if suppress_delimiter_on_replace
+                            else KeyAction.PASS_THROUGH
+                        ),
+                        replacement_plan=plan,
+                        reason_tag=adj.reason_tag,
+                    )
             self._just_deleted_trailing_space = False
             self._tx_ledger.on_subsequent_char_typed()
             if not self._word_buffer.current_word and event.char in PREFIX_SYMBOLS:
@@ -532,6 +593,7 @@ class InputSessionManager:
                 return SessionEventOutcome(
                     action=(KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH),
                     replacement_plan=plan,
+                    reason_tag=CorrectionReason.SNIPPET_EXPANSION.value,
                 )
 
         # Build evaluation context from the 5-token ID ring buffer

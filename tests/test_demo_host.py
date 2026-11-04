@@ -189,6 +189,68 @@ def test_batch_reconstructs_key_timing_for_double_backspace(host: EngineHost) ->
     assert results[5]["action"] == "PASS_THROUGH"
 
 
+def test_site_samples_render_as_promised(host: EngineHost) -> None:
+    """The sentences the website offers as samples must come out exactly as the page shows them."""
+    expected = {
+        "i recieved your mesage. its still not woking propaly. ": (
+            "I received your message. It's still not working properly. "
+        ),
+        "your welcome. raw eggs is best. ": "You're welcome. Raw eggs are best. ",
+        "dont forget teh milk ,and the braed. ": "Don't forget the milk, and the bread. ",
+        ";sig ": "Best regards, the Typen team ",
+    }
+    for n, (text, want) in enumerate(expected.items()):
+        sid = f"web-sample{n:010d}"
+        host.handle("POST", "reset", {}, sid)
+        status, body = host.handle("POST", "key", {"keys": _keys(text), "text": ""}, sid)
+        assert status == 200, body
+        field = ""
+        for key, res in zip(_keys(text), body["results"], strict=True):
+            field = _apply(field, key["key_name"], key["char"], res)
+        assert field == want, text
+
+
+def test_punctuation_and_snippet_fixes_carry_a_reason(host: EngineHost) -> None:
+    sid = "web-reasons000000001"
+    host.handle("POST", "reset", {}, sid)
+    _, body = host.handle("POST", "key", {"keys": _keys("milk ,a"), "text": ""}, sid)
+    assert body["results"][-1]["reason"] == "PUNCTUATION_SPACING"
+    host.handle("POST", "reset", {}, sid)
+    _, body = host.handle("POST", "key", {"keys": _keys("milk  ")}, sid)
+    assert body["results"][-1]["reason"] == "DOUBLE_SPACE_PERIOD"
+    assert body["results"][-1]["plan"]["target_full"] == ". "
+    host.handle("POST", "reset", {}, sid)
+    _, body = host.handle("POST", "key", {"keys": _keys(";sig ")}, sid)
+    assert body["results"][-1]["reason"] == "SNIPPET_EXPANSION"
+
+
+def test_double_space_survives_priming_when_the_page_dates_its_last_key(host: EngineHost) -> None:
+    """
+    'milk' Space ... Space, with the second Space landing on an instance that
+    has never seen the visitor. The page sends `prev_t` (its clock when the
+    first Space was sent); within two seconds the full stop still appears.
+    Without it, or when stale, nothing happens: a lone Space is never promoted.
+    """
+    text = "dont forget the milk "
+    second_space = {"keys": [{"key_name": "Space", "char": " ", "t": 1300.0}], "text": text}
+    _, body = host.handle("POST", "key", {**second_space, "prev_t": 1000.0}, "web-primedspace00001")
+    assert body["session_new"] is True
+    assert body["action"] == "SUPPRESS_AND_INJECT" and body["plan"]["target_full"] == ". "
+    assert body["plan"]["backspaces_to_send"] == 1 and body["reason"] == "DOUBLE_SPACE_PERIOD"
+
+    _, body = host.handle("POST", "key", second_space, "web-primedspace00002")
+    assert body["action"] == "PASS_THROUGH"
+
+    stale = {"keys": [{"key_name": "Space", "char": " ", "t": 9000.0}], "text": text, "prev_t": 1000.0}
+    _, body = host.handle("POST", "key", stale, "web-primedspace00003")
+    assert body["action"] == "PASS_THROUGH"
+
+    # After a sentence end there is nothing to promote, dated or not.
+    ended = {"keys": [{"key_name": "Space", "char": " ", "t": 1300.0}], "text": "Done. ", "prev_t": 1000.0}
+    _, body = host.handle("POST", "key", ended, "web-primedspace00004")
+    assert body["action"] == "PASS_THROUGH"
+
+
 def test_work_dir_is_relocatable(tmp_path: Path) -> None:
     h = EngineHost(work_dir=tmp_path / "nested" / "work")
     try:

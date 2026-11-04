@@ -87,7 +87,7 @@ const API = "/api/demo";
 const SAMPLES: Array<{ label: string; text: string }> = [
   { label: "i recieved your mesage", text: "i recieved your mesage. its still not woking propaly. " },
   { label: "your welcome", text: "your welcome. raw eggs is best. " },
-  { label: "dont forget teh milk", text: "dont forget teh milk ,and the bred. " },
+  { label: "dont forget teh milk", text: "dont forget teh milk ,and the braed. " },
   { label: ";sig", text: ";sig " },
 ];
 const MAX_PASTE = 300;
@@ -117,7 +117,8 @@ export function InteractiveSandbox() {
   const pendingRef = useRef<PendingKey[]>([]);
   const flushQueuedRef = useRef(false);
   const draftRef = useRef("");
-  const animTokenRef = useRef(0);
+  /** `t` of the last key sent to the engine: a fresh instance needs it to time a double Space across batches. */
+  const lastKeyTRef = useRef<number | null>(null);
 
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -153,7 +154,7 @@ export function InteractiveSandbox() {
       const cut = text.indexOf(" ");
       if (cut >= 0) text = text.slice(cut + 1);
     }
-    return { text, words: wordsRef.current.slice(0, 64) };
+    return { text, words: wordsRef.current.slice(0, 64), prev_t: lastKeyTRef.current ?? undefined };
   };
 
   const enqueue = useCallback(
@@ -266,9 +267,11 @@ export function InteractiveSandbox() {
         return true;
       }
       const why = (data.reason ?? "auto").toLowerCase().replace(/_/g, " ");
+      // Punctuation fixes are mostly spaces; show them rather than trimming them away.
+      const show = (s: string) => s.trim() || s.replace(/ /g, "␣");
       pushLog(
         "FIXED",
-        `${data.plan.original_full.trim()} → ${data.plan.target_full.trim()}  (${why}, ${data.latency_ms.toFixed(1)} ms)`,
+        `${show(data.plan.original_full)} → ${show(data.plan.target_full)}  (${why}, ${data.latency_ms.toFixed(1)} ms)`,
       );
       return false;
     }
@@ -276,7 +279,14 @@ export function InteractiveSandbox() {
     return false;
   };
 
-  /** Send a batch of keys in one request and apply the results in order. */
+  /**
+   * Send a batch of keys in one request and apply the results in order.
+   *
+   * Manual typing is applied the moment the answer arrives, so the field never
+   * lags the keyboard. Samples and pastes are also evaluated in one request,
+   * but `animate` replays the answer at a typewriter cadence so the visitor
+   * sees each typo typed and then repaired, instead of a block of text landing.
+   */
   const sendKeys = async (keys: PendingKey[], opts?: { animate?: boolean }) => {
     if (keys.length === 0) return;
     let data: BatchResponse;
@@ -286,32 +296,30 @@ export function InteractiveSandbox() {
       // Whatever went wrong, the visitor's keystrokes must not vanish.
       for (const k of keys) applyPassThrough(k.key_name, k.char);
       throw err;
+    } finally {
+      lastKeyTRef.current = keys[keys.length - 1].t;
     }
     const results = data.results ?? [data];
     let reverted = false;
     if (opts?.animate) {
-      const token = ++animTokenRef.current;
+      const ed = editorRef.current;
+      // The playback owns the caret: a stray click must not scatter the text.
+      let caret = ed ? ed.selectionStart : 0;
       for (let i = 0; i < keys.length; i++) {
-        if (animTokenRef.current !== token) break;
         const r = results[i];
-        if (!r) {
-          applyPassThrough(keys[i].key_name, keys[i].char);
-          continue;
-        }
-        if (r.action === "SUPPRESS_AND_INJECT" && r.plan) {
-          // Brief beat at the word boundary so the typo is visible before the correction snaps in.
-          await sleep(85);
-          if (animTokenRef.current !== token) break;
+        const ch = keys[i].char;
+        const correcting = r !== undefined && r.action === "SUPPRESS_AND_INJECT" && r.plan !== null;
+        // A beat before a correction so the typo is seen before it snaps right.
+        if (correcting) await sleep(85);
+        ed?.setSelectionRange(caret, caret);
+        if (r === undefined) applyPassThrough(keys[i].key_name, ch);
+        else {
           if (applyResult(keys[i], r)) reverted = true;
           setLatency(r.latency_ms);
-          await sleep(55);
-        } else {
-          if (applyResult(keys[i], r)) reverted = true;
-          setLatency(r.latency_ms);
-          const ch = keys[i].char;
-          const jitter = ((i * 17) % 13) - 6; // subtle human cadence variation (-6..+6 ms)
-          await sleep(Math.max(18, (ch === "." || ch === "," ? 70 : ch === " " ? 45 : 34) + jitter));
         }
+        caret = ed ? ed.selectionStart : caret;
+        const jitter = ((i * 17) % 13) - 6; // -6..+6 ms, a human cadence rather than a metronome
+        await sleep(Math.max(18, (correcting ? 55 : ch === "." || ch === "," ? 70 : ch === " " ? 45 : 34) + jitter));
       }
     } else {
       results.forEach((r, i) => {
@@ -322,12 +330,12 @@ export function InteractiveSandbox() {
     if (reverted) await loadDictionary();
   };
 
-  /** Everything queued since the last request goes out as one batch. */
+  /** Everything queued since the last request goes out as one batch, applied at once. */
   const flushKeys = async () => {
     flushQueuedRef.current = false;
     const keys = pendingRef.current;
     pendingRef.current = [];
-    await sendKeys(keys, { animate: keys.length > 1 });
+    await sendKeys(keys);
   };
 
   const queueKey = (keyName: string, ch: string) => {
@@ -377,12 +385,17 @@ export function InteractiveSandbox() {
   /** Type a whole text through the engine as one batch, then play back with a typewriter cadence. */
   const typeThroughEngine = async (text: string) => {
     const ed = editorRef.current;
-    if (ed) ed.setSelectionRange(ed.value.length, ed.value.length);
+    if (ed) {
+      ed.focus();
+      ed.setSelectionRange(ed.value.length, ed.value.length);
+    }
     const now = performance.now();
-    const keys: PendingKey[] = Array.from(text, (ch, i) => ({
+    const chars = Array.from(text);
+    const keys: PendingKey[] = chars.map((ch, i) => ({
       key_name: ch === " " ? "Space" : ch === "\n" ? "Return" : ch,
       char: ch,
-      t: now + i * 40, // a steady 25 keys/s, so timing-based gestures behave as if typed
+      // A steady 25 keys/s ending now, so timing-based gestures behave as if typed.
+      t: now - (chars.length - 1 - i) * 40,
     }));
     await sendKeys(keys, { animate: true });
   };
@@ -398,26 +411,25 @@ export function InteractiveSandbox() {
 
   const runSample = (sample: string) => {
     if (mode !== "live") return;
-    animTokenRef.current++;
     setBusy(true);
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
+      lastKeyTRef.current = null;
       await call("reset", {});
       await typeThroughEngine(sample);
       ed?.focus();
     }).finally(() => setBusy(false));
   };
 
-  const clear = () => {
-    animTokenRef.current++;
+  const clear = () =>
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
+      lastKeyTRef.current = null;
       await call("reset", {});
       ed?.focus();
     });
-  };
 
   const dictionaryAction = (action: "add" | "delete" | "dismiss", word: string) =>
     enqueue(async () => {
@@ -459,8 +471,9 @@ export function InteractiveSandbox() {
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
         <p className="text-sm text-ink-muted">
-          Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; press{" "}
-          <kbd className="kbd">Backspace</kbd> twice right after one to keep what you typed.
+          Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; a second{" "}
+          <kbd className="kbd">Space</kbd> ends the sentence with a full stop; press{" "}
+          <kbd className="kbd">Backspace</kbd> twice right after a correction to keep what you typed.
         </p>
         <span className="inline-flex items-center gap-2 font-mono text-[11px] text-ink-faint">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />

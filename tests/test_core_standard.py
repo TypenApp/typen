@@ -124,6 +124,42 @@ def test_punctuation_assistance() -> None:
         rm.close()
 
 
+def test_space_before_punctuation_with_the_next_word_run_in() -> None:
+    """
+    'milk ,and' (space before the comma, none after) is fixed the moment the
+    next word starts, so the comma survives instead of ',and' being treated as
+    one misspelt token. A closing mark also restarts the sentence. Numbers and
+    single letters are left alone, as for 'word , '.
+    """
+    rm = ResourceManager(bundled_dir=DEFAULT_BUNDLED_DIR)
+    engine = AutocorrectEngine(rm)
+    session = InputSessionManager(engine=engine)
+    try:
+        assert _type_string(session, "Get milk ,and the braed. ") == "Get milk, and the bread. "
+        session.reset_all_state()
+        assert _type_string(session, "The end .next one ") == "The end. Next one "
+        session.reset_all_state()
+        assert _type_string(session, "Wait !what ") == "Wait! What "
+        session.reset_all_state()
+        assert _type_string(session, "Pick 3 ,5 ") == "Pick 3 ,5 "
+        session.reset_all_state()
+        # The fix reports why, for hosts that surface it (the website demo log).
+        for ch in "Get milk ,":
+            session.handle_key_event(
+                KeyEvent(key_name="Space" if ch == " " else ch, char=ch, timestamp_ms=1.0)
+            )
+        outcome = session.handle_key_event(KeyEvent(key_name="a", char="a", timestamp_ms=2.0))
+        assert outcome.action == KeyAction.SUPPRESS_AND_INJECT
+        assert outcome.reason_tag == "PUNCTUATION_SPACING"
+        assert outcome.replacement_plan is not None
+        assert (outcome.replacement_plan.original_full, outcome.replacement_plan.target_full) == (
+            " ,a",
+            ", a",
+        )
+    finally:
+        rm.close()
+
+
 def test_automatic_sentence_capitalisation_and_abbreviation_guards() -> None:
     """
     Verify automatic sentence capitalisation after '.', '?', '!' and suppression after
