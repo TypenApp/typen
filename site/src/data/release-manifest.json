@@ -1,9 +1,9 @@
 {
-  "product": "AutoCorrect Desktop",
+  "product": "Tact",
   "version": "1.2.0",
-  "channel": "beta.3",
-  "full_version": "1.2.0-beta.3",
-  "built_at": "2026-11-03T23:24:43Z",
+  "channel": "beta.4",
+  "full_version": "1.2.0-beta.4",
+  "built_at": "2026-11-04T00:59:24Z",
   "resources": {
     "bundle_version": "1.0.9",
     "schema_version": 1,
@@ -78,66 +78,66 @@
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-03T23:08:30Z",
-      "full_version": "1.2.0-beta.3",
+      "built_at": "2026-11-04T00:59:20Z",
+      "full_version": "1.2.0-beta.4",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "portable",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-portable.zip",
-          "size_bytes": 40915767,
-          "sha256": "be78e646ebdbd616d672e61e7f1ecb43303ce79bc3cc38022b664ea2f24bf7b7"
+          "file": "Tact-1.2.0-beta.4-win64-portable.zip",
+          "size_bytes": 40795786,
+          "sha256": "6393a0330df7bdc26832831ca8ab04e470471d64705f88261a7f312a01285e9f"
         },
         {
           "kind": "installer",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-setup.exe",
-          "size_bytes": 29645779,
-          "sha256": "de0cf29d1d6bc520c968e6a5d45962e1de4c5f309f4d611e89ed301ada0b8129"
+          "file": "Tact-1.2.0-beta.4-win64-setup.exe",
+          "size_bytes": 29558959,
+          "sha256": "a58da98ad10bec75687f0a801bb35dfa332d19c2dfc2cbd0d47945df14e8dd83"
         }
       ]
     },
     "macos-arm64": {
-      "built_at": "2026-11-03T23:24:43Z",
-      "full_version": "1.2.0-beta.3",
+      "built_at": "2026-11-04T00:58:56Z",
+      "full_version": "1.2.0-beta.4",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "installer",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-macos-arm64.dmg",
-          "size_bytes": 40152065,
-          "sha256": "e4224eddd15143bedf86cdf7e2e530af0e807a0a061a59bd450896d037af223d"
+          "file": "Tact-1.2.0-beta.4-macos-arm64.dmg",
+          "size_bytes": 40824837,
+          "sha256": "57620e6dec031812e5afdb6a339c2e258b06cd9cb6cbb94a15e385e745fda641"
         },
         {
           "kind": "portable",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-macos-arm64.zip",
-          "size_bytes": 36074888,
-          "sha256": "842511230b936da887d9fa58afaf0fa375b565f178a5fd5060a91eca5eb0c365"
+          "file": "Tact-1.2.0-beta.4-macos-arm64.zip",
+          "size_bytes": 35933114,
+          "sha256": "9208d096cb416395fe31dd26824269811d88c5cefbf89c9dc297619c449ed552"
         }
       ],
       "notarized": false
     },
     "linux-x86_64": {
-      "built_at": "2026-11-03T23:08:23Z",
-      "full_version": "1.2.0-beta.3",
+      "built_at": "2026-11-04T00:59:24Z",
+      "full_version": "1.2.0-beta.4",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "portable",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-linux-x86_64-portable.tar.gz",
-          "size_bytes": 67055046,
-          "sha256": "daf47fa6648c3903c65f7cabdc8bb57ea3ae7968f154b5ecb4280f15e0a2d13f"
+          "file": "Tact-1.2.0-beta.4-linux-x86_64-portable.tar.gz",
+          "size_bytes": 66930069,
+          "sha256": "02fedc54d7ae112533422ba8ce40e591ddfd6b84ea505a95e8b416214293fd3a"
         },
         {
           "kind": "appimage",
-          "file": "AutoCorrect-Desktop-1.2.0-beta.3-linux-x86_64.AppImage",
-          "size_bytes": 62093816,
-          "sha256": "74b58e62adeefb85725c08457140bbcb914a030b1e81c93526577190c995afbc"
+          "file": "Tact-1.2.0-beta.4-linux-x86_64.AppImage",
+          "size_bytes": 61970936,
+          "sha256": "a0ae3e1de650f768aae46bf48b02c7307c5e7b367c9b3681bc31a2c137871764"
         },
         {
           "kind": "deb",
-          "file": "autocorrect-desktop_1.2.0-beta.3_amd64.deb",
-          "size_bytes": 54243824,
-          "sha256": "1615087c304565653f4126747fb7f62b5b3e83f954a3f50d47496e4d177839c1"
+          "file": "autocorrect-desktop_1.2.0-beta.4_amd64.deb",
+          "size_bytes": 54124236,
+          "sha256": "1bc2721f03b03ea21cea7bf955d598d2a78e9456678b8f77a94652f619934c01"
         }
       ]
     }
@@ -148,15 +148,15 @@
   "artifacts": [
     {
       "kind": "portable",
-      "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-portable.zip",
-      "size_bytes": 40915767,
-      "sha256": "be78e646ebdbd616d672e61e7f1ecb43303ce79bc3cc38022b664ea2f24bf7b7"
+      "file": "Tact-1.2.0-beta.4-win64-portable.zip",
+      "size_bytes": 40795786,
+      "sha256": "6393a0330df7bdc26832831ca8ab04e470471d64705f88261a7f312a01285e9f"
     },
     {
       "kind": "installer",
-      "file": "AutoCorrect-Desktop-1.2.0-beta.3-win64-setup.exe",
-      "size_bytes": 29645779,
-      "sha256": "de0cf29d1d6bc520c968e6a5d45962e1de4c5f309f4d611e89ed301ada0b8129"
+      "file": "Tact-1.2.0-beta.4-win64-setup.exe",
+      "size_bytes": 29558959,
+      "sha256": "a58da98ad10bec75687f0a801bb35dfa332d19c2dfc2cbd0d47945df14e8dd83"
     }
   ]
 }
