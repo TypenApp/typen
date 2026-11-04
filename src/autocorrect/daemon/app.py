@@ -4,7 +4,7 @@ Wires together:
 - `ResourceManager` (zero-copy mmap language intelligence)
 - `SQLitePreferenceStore` + `PreferenceMemoryOverlay`
 - `AutocorrectEngine` (Layer 1 spelling, contextual confusion sets, punctuation, capitalisation)
-- `EntitlementManager` (Tact is free software: every feature is always allowed)
+- `EntitlementManager` (Typen is free software: every feature is always allowed)
 - `InputSessionManager`
 - OS Keyboard/Mouse Hook (`Win32KeyboardMouseHook` / `QuartzEventTapManager`)
 - Safe hook release whenever the user pauses assistance.
@@ -94,7 +94,7 @@ class AutoCorrectDaemon:
         self.app_profiles = ApplicationProfileManager()
         self.insights = LocalInsightsStore(enabled=True)
 
-        # 5. Entitlements: Tact is free software, so this always answers "allowed".
+        # 5. Entitlements: Typen is free software, so this always answers "allowed".
         self.entitlement_manager = EntitlementManager()
 
         # 6. Initialize Pro AI (Layer 2 Local AI & Layer 3 BYOK Cloud AI)
@@ -292,7 +292,7 @@ class AutoCorrectDaemon:
                     detail="Wayland session: compositors do not allow global key hooks.",
                     remediation=(
                         "Enable the AutoCorrect IBus input method "
-                        "(Settings → Keyboard → Input Sources → add 'English (Tact)') "
+                        "(Settings → Keyboard → Input Sources → add 'English (Typen)') "
                         "and select it as your active input source."
                     ),
                 )

@@ -5,7 +5,7 @@ Manages independent updates for:
 2. Global language intelligence resources (`language_resource_updater.py`)
 3. Optional local AI models (`model_updater.py`)
 Governed by `update_policy.py` to enforce Ed25519 signatures, schema compatibility,
-and an optional update window (unused in Tact, which has no expiry) without ever breaking offline usage.
+and an optional update window (unused in Typen, which has no expiry) without ever breaking offline usage.
 """
 
 from autocorrect.updates.application_updater import ApplicationReleaseDescriptor, ApplicationUpdater

@@ -90,7 +90,7 @@ jobs:
         run: |
           case "$RUNNER_OS" in
             Windows) BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop.exe" ;;
-            macOS)   BIN="dist/Tact.app/Contents/MacOS/AutoCorrectDesktop" ;;
+            macOS)   BIN="dist/Typen.app/Contents/MacOS/AutoCorrectDesktop" ;;
             Linux)   BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop" ;;
           esac
           "$BIN" --version

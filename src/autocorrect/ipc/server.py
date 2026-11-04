@@ -268,7 +268,7 @@ class LocalIPCServer:
             )
 
     def _require_pro(self, feature: str) -> None:
-        """Feature gate seam. Tact is free software, so the entitlement manager always allows."""
+        """Feature gate seam. Typen is free software, so the entitlement manager always allows."""
         if not self._daemon.entitlement_manager.is_pro_enabled():
             raise PermissionError(f"{feature} are not available in this build.")
 

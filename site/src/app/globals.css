@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
-  Tact — site styles.
+  Typen — site styles.
   Tokens live in tailwind.config.ts and resolve to the RGB channel variables
   below. Light theme: black text on white paper. Dark theme: the same two
   colours, reversed, chosen by the device (`prefers-color-scheme`) with no

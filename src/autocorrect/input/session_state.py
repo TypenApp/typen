@@ -238,7 +238,7 @@ class InputSessionManager:
         if event.is_injected:
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
-        # 2. Entitlement gate seam (always allowed in Tact)
+        # 2. Entitlement gate seam (always allowed in Typen)
         if self._entitlement_gate is not None and not self._entitlement_gate.is_typing_assistance_enabled():
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 

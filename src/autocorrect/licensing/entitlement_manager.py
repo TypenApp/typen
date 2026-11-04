@@ -1,7 +1,7 @@
 """
 Entitlements in a free product.
 
-Tact is free and open source and funded by donations. There is one edition,
+Typen is free and open source and funded by donations. There is one edition,
 nothing expires, nothing is locked. This module is kept because the daemon,
 the Settings controller and `InputSessionManager` all ask one object whether a
 feature is allowed; keeping that single seam means the answer ("yes") lives in
@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 DONATE_URL = "https://github.com/sponsors/litlEMPEROR"
-STATUS_MESSAGE = "Tact is free and open source — every feature, on every machine, for as long as you like."
+STATUS_MESSAGE = "Typen is free and open source — every feature, on every machine, for as long as you like."
 
 
 @dataclass(frozen=True, slots=True)
 class EntitlementSnapshot:
-    """What the app may do right now. In Tact this is constant."""
+    """What the app may do right now. In Typen this is constant."""
 
     mode: str = "OPEN_SOURCE"
     typing_assistance_enabled: bool = True

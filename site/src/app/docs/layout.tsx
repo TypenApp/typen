@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { DocsShell } from "@/components/DocsShell";
 
 export const metadata: Metadata = {
-  title: { default: "Documentation", template: "%s — Tact docs" },
+  title: { default: "Documentation", template: "%s — Typen docs" },
   description:
-    "How the Tact background service and Settings window work, how to customise corrections, and how updates are verified.",
+    "How the Typen background service and Settings window work, how to customise corrections, and how updates are verified.",
 };
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {

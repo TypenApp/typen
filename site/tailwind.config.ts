@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Tact design tokens.
+ * Typen design tokens.
  *
  * Identity: text on paper. Literal black (#000) ink on literal white (#fff)
  * paper; greys exist only for secondary text and hairlines. The one accent is

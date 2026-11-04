@@ -9,7 +9,7 @@ ApplicationWindow {
     minimumWidth: 920
     minimumHeight: 620
     visible: true
-    title: "Tact — Settings"
+    title: "Typen — Settings"
     color: "#0b0f19"
 
     // Design Tokens
@@ -75,7 +75,7 @@ ApplicationWindow {
                     ColumnLayout {
                         spacing: 1
                         Text {
-                            text: "Tact"
+                            text: "Typen"
                             color: window.textPrimary
                             font.pixelSize: 16
                             font.bold: true
@@ -312,7 +312,7 @@ ApplicationWindow {
                             anchors.margins: 20
                             spacing: 12
                             CheckBox {
-                                text: "Launch the Tact background service automatically at OS login"
+                                text: "Launch the Typen background service automatically at OS login"
                                 checked: bridge.launchAtLogin
                                 onToggled: bridge.setLaunchAtLogin(checked)
                             }
@@ -553,7 +553,7 @@ ApplicationWindow {
                     anchors.margins: 24
                     spacing: 16
                     Text {
-                        text: "10. About Tact"
+                        text: "10. About Typen"
                         color: window.textPrimary
                         font.pixelSize: 22
                         font.bold: true
@@ -566,7 +566,7 @@ ApplicationWindow {
                         Layout.fillWidth: true
                     }
                     Button {
-                        text: "Support Tact with a donation"
+                        text: "Support Typen with a donation"
                         onClicked: bridge.openDonatePage()
                     }
                 }

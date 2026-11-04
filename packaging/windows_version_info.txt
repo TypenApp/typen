@@ -20,12 +20,12 @@ VSVersionInfo(
           '040904B0',
           [
             StringStruct('CompanyName', 'Omnii'),
-            StringStruct('FileDescription', 'Tact — system-wide offline autocorrect'),
+            StringStruct('FileDescription', 'Typen — system-wide offline autocorrect'),
             StringStruct('FileVersion', '1.2.0'),
             StringStruct('InternalName', 'AutoCorrectDesktop'),
             StringStruct('LegalCopyright', '© Omnii. MIT licence. Qt components (if present) under LGPLv3.'),
             StringStruct('OriginalFilename', 'AutoCorrectDesktop.exe'),
-            StringStruct('ProductName', 'Tact'),
+            StringStruct('ProductName', 'Typen'),
             StringStruct('ProductVersion', '1.2.0'),
             StringStruct('Comments', 'Free and open source. Nothing you type leaves your computer.')
           ]

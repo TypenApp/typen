@@ -28,7 +28,7 @@ SANDBOX_HTML = """<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Tact — Local Sandbox</title>
+<title>Typen — Local Sandbox</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -78,7 +78,7 @@ SANDBOX_HTML = """<!DOCTYPE html>
 <div class="container">
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <h1>Tact — Local Sandbox</h1>
+      <h1>Typen — Local Sandbox</h1>
       <span class="badge" id="edition-badge">14-Day Pro Trial</span>
     </div>
     <div class="sub">
@@ -364,7 +364,7 @@ def create_sandbox_daemon(data_dir: Path) -> AutoCorrectDaemon:
     daemon.resource_manager.set_enabled_domain_packs(
         {"programming", "medicine", "finance", "business", "academic"}
     )
-    daemon.snippet_engine.add_snippet(";sig", "Best regards, the Tact team")
+    daemon.snippet_engine.add_snippet(";sig", "Best regards, the Typen team")
     return daemon
 
 
@@ -389,7 +389,7 @@ class SandboxSessionPool(SessionPool):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Run the Tact local browser sandbox")
+    parser = argparse.ArgumentParser(description="Run the Typen local browser sandbox")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument(
@@ -459,7 +459,7 @@ def main(argv: list[str] | None = None) -> int:
     url = f"http://{args.host}:{args.port}"
     server = ThreadingHTTPServer((args.host, args.port), SandboxHandler)
     server.daemon_threads = True
-    print(f"Tact local sandbox running at: {url}")
+    print(f"Typen local sandbox running at: {url}")
     print("Press Ctrl+C to stop the sandbox server.")
     if not args.no_browser:
         webbrowser.open(url)

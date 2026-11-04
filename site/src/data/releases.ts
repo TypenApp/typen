@@ -11,7 +11,7 @@
  */
 import manifest from "./release-manifest.json";
 
-/** The source repository. Tact is MIT-licensed and funded by donations only. */
+/** The source repository. Typen is MIT-licensed and funded by donations only. */
 export const GITHUB_REPO = "litlEMPEROR/AutoCorrect";
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
 export const LICENSE_NAME = "MIT";
@@ -250,7 +250,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     notarized: macNotarized,
     verifyCommand: macArtifacts[0] ? `shasum -a 256 ${macArtifacts[0].filename}` : undefined,
     firstRun: [
-      "Open the .dmg and drag Tact to Applications.",
+      "Open the .dmg and drag Typen to Applications.",
       "On first launch macOS asks for Input Monitoring, then Accessibility. Enable both and relaunch.",
       "A menu-bar icon appears. Corrections apply when you press Space or punctuation.",
     ],
@@ -262,7 +262,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     architecture: "x86_64 · X11 sessions, or Wayland via the IBus engine",
     requirements: [
       "X11: an Xorg session with the RECORD and XTEST extensions (default on all major distros)",
-      "Wayland: ibus, python3-gi and gir1.2-ibus-1.0; select “English (Tact)” as an input source",
+      "Wayland: ibus, python3-gi and gir1.2-ibus-1.0; select “English (Typen)” as an input source",
       "Artifacts are minisign-signed; see the .minisig next to each download",
     ],
     artifacts: linuxArtifacts,
@@ -271,7 +271,7 @@ export const PLATFORM_RELEASES: PlatformRelease[] = [
     firstRun: [
       "Install the .deb (sudo apt install ./autocorrect-desktop_*.deb) or chmod +x the AppImage and run it.",
       "On X11 a tray icon appears and corrections start immediately.",
-      "On Wayland open Settings → Keyboard → Input Sources, add “English (Tact)” and switch to it.",
+      "On Wayland open Settings → Keyboard → Input Sources, add “English (Typen)” and switch to it.",
     ],
   },
 ];

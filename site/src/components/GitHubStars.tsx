@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { GITHUB_REPO, GITHUB_REPO_URL } from "@/data/releases";
 import { GitHubIcon, StarIcon } from "./Icons";
 
-const CACHE_KEY = "tact-gh-stars";
+const CACHE_KEY = "typen-gh-stars";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 
 function format(n: number): string {
@@ -56,8 +56,8 @@ export function GitHubStars({ className = "" }: { className?: string }) {
       href={GITHUB_REPO_URL}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label={stars === null ? "Tact on GitHub" : `Tact on GitHub, ${stars.toLocaleString()} stars`}
-      title="Star Tact on GitHub"
+      aria-label={stars === null ? "Typen on GitHub" : `Typen on GitHub, ${stars.toLocaleString()} stars`}
+      title="Star Typen on GitHub"
       className={`btn-secondary h-10 gap-2 border-line px-3.5 text-xs text-ink-muted hover:border-ink-faint hover:text-ink ${className}`}
     >
       <GitHubIcon size={16} />

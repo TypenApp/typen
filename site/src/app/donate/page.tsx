@@ -22,11 +22,11 @@ const WHAT_IT_PAYS_FOR = [
 const FAQ: Array<[string, string]> = [
   [
     "Is anything locked behind a donation?",
-    "No. Tact has one edition and it is the whole thing. Donating changes nothing in the app; it only decides how much time can go into it.",
+    "No. Typen has one edition and it is the whole thing. Donating changes nothing in the app; it only decides how much time can go into it.",
   ],
   [
     "Was it always free?",
-    "No. Earlier betas had Standard and Pro licences and a 14-day trial. That machinery has been removed entirely; if you bought a licence, you now simply have the same Tact as everyone else, with nothing to activate.",
+    "No. Earlier betas had Standard and Pro licences and a 14-day trial. That machinery has been removed entirely; if you bought a licence, you now simply have the same Typen as everyone else, with nothing to activate.",
   ],
   [
     "Which licence is the code under?",
@@ -52,7 +52,7 @@ export default function DonatePage() {
         }
         lede={
           <p>
-            Tact is open source under the {LICENSE_NAME} licence and has no paid tier, trial or licence key. If it saves
+            Typen is open source under the {LICENSE_NAME} licence and has no paid tier, trial or licence key. If it saves
             you time, a donation keeps the lexicon, the builds and the signing going.
           </p>
         }
@@ -82,7 +82,7 @@ export default function DonatePage() {
           ))}
         </ul>
         <p className="mt-8 text-sm text-ink-muted">
-          Donations are handled by GitHub Sponsors; Tact never sees card details and never stores anything about you.
+          Donations are handled by GitHub Sponsors; Typen never sees card details and never stores anything about you.
         </p>
       </Section>
 
@@ -102,7 +102,7 @@ export default function DonatePage() {
           </a>
           . Ready to try it?{" "}
           <Link href="/download" className="link">
-            Download Tact
+            Download Typen
           </Link>
           .
         </p>

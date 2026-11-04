@@ -1,5 +1,5 @@
 """
-Tact — Unified Executable Entry Point.
+Typen — Unified Executable Entry Point.
 
 This is the single `main()` compiled into the frozen `AutoCorrectDesktop.exe`
 (PyInstaller one-folder / Nuitka standalone). One executable, two modes:
@@ -28,7 +28,7 @@ from typing import Final
 from autocorrect import __version__
 from autocorrect.platform_paths import default_data_dir, resolve_data_dir
 
-APP_DISPLAY_NAME: Final[str] = "Tact"
+APP_DISPLAY_NAME: Final[str] = "Typen"
 # Maturity is a property of the platform build, not of the version: the Windows
 # build has been verified end to end and ships as stable; macOS and Linux are
 # still in public beta and say so in their version string and tray tooltip.
@@ -36,7 +36,7 @@ RELEASE_CHANNEL: Final[str] = "stable" if sys.platform == "win32" else "beta"
 IS_BETA_BUILD: Final[bool] = RELEASE_CHANNEL != "stable"
 #: "1.2.0" on stable builds, "1.2.0-beta" on beta builds.
 VERSION_LABEL: Final[str] = __version__ if not IS_BETA_BUILD else f"{__version__}-{RELEASE_CHANNEL}"
-#: "Tact" on stable builds, "Tact (beta)" on beta builds.
+#: "Typen" on stable builds, "Typen (beta)" on beta builds.
 STATUS_PREFIX: Final[str] = (
     APP_DISPLAY_NAME if not IS_BETA_BUILD else f"{APP_DISPLAY_NAME} ({RELEASE_CHANNEL})"
 )

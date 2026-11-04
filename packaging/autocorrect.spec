@@ -1,6 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller One-Folder Specification for Tact (Windows, macOS, Linux).
+PyInstaller One-Folder Specification for Typen (Windows, macOS, Linux).
 
 Uses COLLECT (one-folder mode) rather than one-file mode to guarantee:
 1. Sub-400ms cold startup (no temp-dir archive extraction on every boot).
@@ -158,7 +158,7 @@ if IS_MAC:
 
     app = BUNDLE(
         coll,
-        name="Tact.app",
+        name="Typen.app",
         icon=str(packaging_dir / "autocorrect.icns") if (packaging_dir / "autocorrect.icns").exists() else None,
         bundle_identifier=info_plist.get("CFBundleIdentifier", "io.autocorrect.desktop"),
         info_plist=info_plist,

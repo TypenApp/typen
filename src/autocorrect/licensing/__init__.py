@@ -1,7 +1,7 @@
 """
 Entitlements and update signing.
 
-Tact has no paid editions, trials or licence certificates: `EntitlementManager`
+Typen has no paid editions, trials or licence certificates: `EntitlementManager`
 always answers "allowed". `root_key` holds the Ed25519 *public* key used to verify
 signed language-resource, model and application updates.
 """

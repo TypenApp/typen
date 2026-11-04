@@ -184,9 +184,9 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
         def aboutSummaryText(self) -> str:
             about = self._ctrl.get_about_state()
             return (
-                f"Tact v{about.get('app_version')} — {about.get('status_message')}\n"
+                f"Typen v{about.get('app_version')} — {about.get('status_message')}\n"
                 f"Licence: {about.get('licence')}. Source: {about.get('source_url')}\n"
-                f"Tact is funded by donations only: {about.get('donate_url')}\n"
+                f"Typen is funded by donations only: {about.get('donate_url')}\n"
                 f"Uses Qt 6 / PySide6-Essentials, dynamically linked under GNU LGPLv3."
             )
 

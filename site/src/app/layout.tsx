@@ -11,26 +11,26 @@ const mono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--
 
 const SITE_URL = "https://autocorrect-desktop.vercel.app";
 const DESCRIPTION =
-  "Tact is a small background service that fixes typos, homophones and punctuation in every application as you type. Offline, under a millisecond per keystroke, free and open source, for Windows, macOS and Linux.";
+  "Typen is a small background service that fixes typos, homophones and punctuation in every application as you type. Offline, under a millisecond per keystroke, free and open source, for Windows, macOS and Linux.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Tact — system-wide autocorrect, offline and open source",
-    template: "%s — Tact",
+    default: "Typen — system-wide autocorrect, offline and open source",
+    template: "%s — Typen",
   },
   description: DESCRIPTION,
-  applicationName: "Tact",
+  applicationName: "Typen",
   keywords: ["autocorrect", "spell check", "typing", "desktop", "offline", "open source", "Windows", "macOS", "Linux"],
   openGraph: {
     type: "website",
-    siteName: "Tact",
-    title: "Tact — system-wide autocorrect, offline and open source",
+    siteName: "Typen",
+    title: "Typen — system-wide autocorrect, offline and open source",
     description: DESCRIPTION,
     url: SITE_URL,
   },
-  twitter: { card: "summary", title: "Tact", description: DESCRIPTION },
-  other: { "x-tact-version": FULL_VERSION },
+  twitter: { card: "summary", title: "Typen", description: DESCRIPTION },
+  other: { "x-typen-version": FULL_VERSION },
 };
 
 export const viewport: Viewport = {

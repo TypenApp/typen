@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>Tact</string>
+    <string>Typen</string>
     <key>CFBundleExecutable</key>
     <string>AutoCorrectDesktop</string>
     <key>CFBundleIdentifier</key>
     <string>io.autocorrect.desktop</string>
     <key>CFBundleName</key>
-    <string>Tact</string>
+    <string>Typen</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>
@@ -33,11 +33,11 @@
     <true/>
     <!-- TCC usage strings: required for the Input Monitoring and Accessibility prompts. -->
     <key>NSInputMonitoringUsageDescription</key>
-    <string>Tact watches the keys you type so it can spot misspellings as you finish each word. Nothing is sent anywhere; everything runs on this Mac.</string>
+    <string>Typen watches the keys you type so it can spot misspellings as you finish each word. Nothing is sent anywhere; everything runs on this Mac.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>Tact uses Accessibility to replace a misspelled word in place, and to recognise password fields so it never touches them.</string>
+    <string>Typen uses Accessibility to replace a misspelled word in place, and to recognise password fields so it never touches them.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>Tact may ask the frontmost application for its name to apply your per-app correction profiles.</string>
+    <string>Typen may ask the frontmost application for its name to apply your per-app correction profiles.</string>
     <key>NSHumanReadableCopyright</key>
     <string>© Omnii. MIT licence.</string>
 </dict>

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autocorrect"
 version = "1.2.0"
-description = "Tact: offline-first, system-wide desktop autocorrect and writing assistant"
+description = "Typen: offline-first, system-wide desktop autocorrect and writing assistant"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}

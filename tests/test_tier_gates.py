@@ -1,5 +1,5 @@
 """
-Tact is free software: there are no editions, trials or licence files. These
+Typen is free software: there are no editions, trials or licence files. These
 tests pin that down end to end (daemon, IPC, offline Settings fallback, input
 session) so a regression that reintroduces a gate is caught immediately.
 Also covers the focus monitor that makes password/terminal/excluded-app

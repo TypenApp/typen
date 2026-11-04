@@ -2,7 +2,7 @@
 Layer 3 Cloud AI (BYOK) Provider Manager.
 Supports OpenAI, Anthropic, Google Gemini, and OpenAI-Compatible Custom endpoints.
 Strictly enforces:
-1. Feature-gate check (always allowed in Tact; kept as a seam).
+1. Feature-gate check (always allowed in Typen; kept as a seam).
 2. Explicit user consent (`user_consented=True`) before any network transmission.
 3. Local-Only Mode lockdown and daily/monthly spending caps.
 4. Direct HTTPS transmission to the user's chosen provider (never proxying keys through our servers).

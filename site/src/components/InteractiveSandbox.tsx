@@ -41,7 +41,7 @@ class CheckpointError extends Error {
   }
 }
 
-const DRAFT_KEY = "tact-demo-draft";
+const DRAFT_KEY = "typen-demo-draft";
 
 interface LogEntry {
   id: number;

@@ -71,7 +71,7 @@ export default function HomePage() {
         >
           <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" aria-hidden="true" />
           <span className="truncate">
-            Tact {FULL_VERSION} is out
+            Typen {FULL_VERSION} is out
             {available.length > 0 ? ` for ${joinNames(available)}` : ""}
           </span>
           <ArrowRightIcon size={13} className="shrink-0 transition-transform group-hover:translate-x-0.5" />
@@ -85,7 +85,7 @@ export default function HomePage() {
           every app on your desktop.
         </h1>
         <p className="prose-site mt-6 max-w-2xl text-base sm:mt-7 sm:text-xl">
-          Tact is one small background service that fixes typos, homophones and punctuation as you type — in
+          Typen is one small background service that fixes typos, homophones and punctuation as you type — in
           any application, entirely offline, in under a millisecond per keystroke. Free and open source.
         </p>
 
@@ -93,7 +93,7 @@ export default function HomePage() {
         <div className="mt-8 flex flex-wrap items-center gap-2.5 sm:mt-9 sm:gap-3">
           <Link href="/download" className="btn-primary h-12 w-full gap-2.5 px-6 text-[15px] sm:w-auto">
             <DownloadIcon size={17} />
-            {available.length === 1 ? `Download for ${available[0]}` : "Download Tact"}
+            {available.length === 1 ? `Download for ${available[0]}` : "Download Typen"}
           </Link>
           <a href="#demo" className="btn-secondary h-12 gap-2.5 border-line px-5 text-[15px] hover:border-ink-faint">
             <PlayIcon size={13} />
@@ -103,7 +103,7 @@ export default function HomePage() {
             href={GITHUB_REPO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            aria-label="Tact on GitHub"
+            aria-label="Typen on GitHub"
             title="Source on GitHub"
             className="icon-btn h-12 w-12"
           >
@@ -177,7 +177,7 @@ export default function HomePage() {
           ))}
         </div>
         <p className="mt-5 text-sm text-ink-faint">
-          Domain vocabulary packs, per-application profiles and text snippets are included too. Tact is free and
+          Domain vocabulary packs, per-application profiles and text snippets are included too. Typen is free and
           open source;{" "}
           <Link href="/donate" className="link">
             donations

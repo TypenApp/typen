@@ -1,4 +1,4 @@
-; Inno Setup Installer Script for Tact (Windows 10 & Windows 11)
+; Inno Setup Installer Script for Typen (Windows 10 & Windows 11)
 ; Build: ISCC.exe /DMyAppVersion=1.2.0 /DMyChannel=beta.1 packaging\windows_installer.iss
 #ifndef MyAppVersion
   #define MyAppVersion "1.2.0"
@@ -6,7 +6,7 @@
 #ifndef MyChannel
   #define MyChannel "beta.1"
 #endif
-#define MyAppName "Tact"
+#define MyAppName "Typen"
 #define MyAppPublisher "Omnii"
 #define MyAppExeName "AutoCorrectDesktop.exe"
 #define MyFullVersion MyAppVersion + "-" + MyChannel
@@ -26,7 +26,7 @@ DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\dist\installer
-OutputBaseFilename=Tact-{#MyFullVersion}-win64-setup
+OutputBaseFilename=Typen-{#MyFullVersion}-win64-setup
 SetupIconFile=autocorrect.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

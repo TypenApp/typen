@@ -132,7 +132,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
         # Developer mode: no component XML installed yet, so describe ourselves on the fly.
         component = IBus.Component(
             name=IBUS_BUS_NAME,
-            description="Tact input method engine",
+            description="Typen input method engine",
             version="0",
             license="Proprietary",
             author="Omnii",

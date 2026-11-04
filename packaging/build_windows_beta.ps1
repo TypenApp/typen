@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Build the Tact Windows distributables (the stable platform build; the file
+    Build the Typen Windows distributables (the stable platform build; the file
     name still carries the release's channel suffix, e.g. 1.2.0-beta.4).
 
 .DESCRIPTION
@@ -62,7 +62,7 @@ function Invoke-Sign([string]$Path) {
     if (-not ($SignPfx -or $SignSha1)) { return $false }
     $signtool = Find-SignTool
     if (-not $signtool) { throw "Signing requested but signtool.exe was not found (install the Windows 10/11 SDK)." }
-    $args = @("sign", "/fd", "SHA256", "/td", "SHA256", "/tr", $SignTimestamp, "/d", "Tact")
+    $args = @("sign", "/fd", "SHA256", "/td", "SHA256", "/tr", $SignTimestamp, "/d", "Typen")
     if ($SignPfx) {
         $args += @("/f", $SignPfx)
         if ($env:AC_WIN_SIGN_PFX_PASSWORD) { $args += @("/p", $env:AC_WIN_SIGN_PFX_PASSWORD) }
@@ -87,7 +87,7 @@ $DistDir = Join-Path $Root "dist"
 $AppDir = Join-Path $DistDir "AutoCorrectDesktop"
 $OutDir = Join-Path $DistDir "installer"
 
-Write-Host "==> Tact $FullVersion (win64)" -ForegroundColor Cyan
+Write-Host "==> Typen $FullVersion (win64)" -ForegroundColor Cyan
 
 # 0. Tooling
 python -c "import PyInstaller" 2>$null
@@ -118,7 +118,7 @@ if ($check -notmatch "OK") { throw "Frozen executable failed --headless-check" }
 # 4. Portable ZIP
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 Get-ChildItem $OutDir -File | Remove-Item -Force
-$ZipName = "Tact-$FullVersion-win64-portable.zip"
+$ZipName = "Typen-$FullVersion-win64-portable.zip"
 $ZipPath = Join-Path $OutDir $ZipName
 Compress-Archive -Path (Join-Path $AppDir "*") -DestinationPath $ZipPath -CompressionLevel Optimal
 
@@ -144,7 +144,7 @@ if (-not $SkipInstaller) {
 $artifacts = Get-ChildItem $OutDir -File | Where-Object { $_.Extension -in ".zip", ".exe" }
 $resManifest = Get-Content (Join-Path $Root "resources\en_base\manifest.json") -Raw | ConvertFrom-Json
 $manifest = [ordered]@{
-    product   = "Tact"
+    product   = "Typen"
     version   = $Version
     channel   = $Channel
     full_version = $FullVersion

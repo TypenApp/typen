@@ -46,8 +46,8 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
 ];
 
 const SOCIAL: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: GITHUB_REPO_URL, label: "Tact on GitHub", icon: <GitHubIcon size={17} /> },
-  { href: DONATE_URL, label: "Sponsor Tact", icon: <HeartIcon size={17} /> },
+  { href: GITHUB_REPO_URL, label: "Typen on GitHub", icon: <GitHubIcon size={17} /> },
+  { href: DONATE_URL, label: "Sponsor Typen", icon: <HeartIcon size={17} /> },
   { href: RELEASES_URL, label: "Releases", icon: <DownloadIcon size={17} /> },
 ];
 
@@ -71,9 +71,9 @@ export function Footer() {
       <div className="container-site grid gap-x-8 gap-y-12 py-14 sm:py-16 lg:grid-cols-[minmax(0,1fr)_auto]">
         {/* Brand column */}
         <div className="max-w-lg">
-          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Tact home">
+          <Link href="/" className="inline-flex items-center gap-2.5" aria-label="Typen home">
             <BrandMark size={26} />
-            <span className="font-display text-xl font-extrabold tracking-[-0.03em] text-ink">Tact</span>
+            <span className="font-display text-xl font-extrabold tracking-[-0.03em] text-ink">Typen</span>
           </Link>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-ink-muted">
             Free, open source, system-wide autocorrect. One small background service that fixes typos,
@@ -126,7 +126,7 @@ export function Footer() {
         <div className="rule flex flex-col gap-4 py-6 text-xs text-ink-faint sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-xl space-y-1.5">
             <p>
-              © {new Date().getFullYear()} Omnii. Tact is free and open source under the {LICENSE_NAME} licence.
+              © {new Date().getFullYear()} Omnii. Typen is free and open source under the {LICENSE_NAME} licence.
             </p>
             <p>The lexicon is built from public-domain sources, and nothing you type leaves your computer.</p>
           </div>

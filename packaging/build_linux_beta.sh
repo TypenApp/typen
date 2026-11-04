@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Tact Linux BETA distributables (x86_64 / aarch64).
+# Build the Typen Linux BETA distributables (x86_64 / aarch64).
 #
 #   1. Generates freedesktop PNG icons.
 #   2. Runs PyInstaller via packaging/autocorrect.spec       -> dist/AutoCorrectDesktop/
@@ -42,7 +42,7 @@ DIST="$ROOT/dist"
 APPDIR_SRC="$DIST/AutoCorrectDesktop"
 OUT="$DIST/installer"
 
-echo "==> Tact $FULL_VERSION ($PLATFORM)"
+echo "==> Typen $FULL_VERSION ($PLATFORM)"
 
 # 0. Tooling
 $PY -c "import PyInstaller" 2>/dev/null || $PY -m pip install --quiet pyinstaller
@@ -66,7 +66,7 @@ echo "    $CHECK"
 mkdir -p "$OUT"; rm -f "$OUT"/*."$PLATFORM".* "$OUT"/*.AppImage "$OUT"/*.deb "$OUT"/*.minisig
 
 # 4a. Portable tarball
-TARBALL="$OUT/Tact-$FULL_VERSION-$PLATFORM-portable.tar.gz"
+TARBALL="$OUT/Typen-$FULL_VERSION-$PLATFORM-portable.tar.gz"
 tar -C "$DIST" -czf "$TARBALL" AutoCorrectDesktop
 
 # Shared desktop entry + icon theme (used by AppImage and .deb)
@@ -75,7 +75,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Tact
+Name=Typen
 GenericName=Autocorrect
 Comment=System-wide offline autocorrect and writing assistant
 Exec=AutoCorrectDesktop
@@ -105,7 +105,7 @@ EOF
   chmod +x "$APPDIR/AppRun"
   # mktemp creates the desktop file 0600 and cp preserves it; appimagetool refuses non-world-readable AppDirs.
   chmod -R a+rX "$APPDIR"
-  APPIMAGE="$OUT/Tact-$FULL_VERSION-$PLATFORM.AppImage"
+  APPIMAGE="$OUT/Typen-$FULL_VERSION-$PLATFORM.AppImage"
   ARCH="$ARCH" "$APPIMAGETOOL" "$APPDIR" "$APPIMAGE" >/dev/null
   echo "    built $(basename "$APPIMAGE")"
 else
@@ -174,7 +174,7 @@ CODE_SIGNED=false
 if [[ -n "${AC_MINISIGN_KEY:-}" ]] && command -v minisign >/dev/null 2>&1; then
   for f in "$OUT"/*.tar.gz "$OUT"/*.AppImage "$OUT"/*.deb; do
     [[ -f "$f" ]] || continue
-    minisign -S -s "$AC_MINISIGN_KEY" -m "$f" -t "Tact $FULL_VERSION $PLATFORM"
+    minisign -S -s "$AC_MINISIGN_KEY" -m "$f" -t "Typen $FULL_VERSION $PLATFORM"
   done
   CODE_SIGNED=true
 else
@@ -202,7 +202,7 @@ for p in sorted((root / "resources/en_base/packs").glob("*.pack.json")):
     packs.append({"id": pj["pack_id"], "version": pj["version"], "file": p.name, "size_bytes": p.stat().st_size,
                   "sha256": sha(p), "word_count": len(pj.get("words", {})), "direct_typo_count": len(pj.get("direct_typos", {}))})
     sums.append(f"{sha(p)}  packs/{p.name}")
-manifest = {"product": "Tact", "version": version, "channel": channel, "full_version": f"{version}-{channel}",
+manifest = {"product": "Typen", "version": version, "channel": channel, "full_version": f"{version}-{channel}",
             "platform": platform, "built_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "code_signed": signed == "true", "signature_scheme": "minisign" if signed == "true" else None,
             "resources": {"bundle_version": res["version"], "schema_version": res["schema_version"], "word_count": res["word_count"]},

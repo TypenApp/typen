@@ -16,7 +16,7 @@ Covers all 10 architecture screens:
 9. Updates (Independent App, Language Intelligence Library delta/rollback, and Local AI Model updates)
 10. About (Version, licence, source and how to support the project)
 
-Tact is free and open source: every screen is available to everyone.
+Typen is free and open source: every screen is available to everyone.
 """
 
 from __future__ import annotations
@@ -79,11 +79,11 @@ class SettingsController:
         self._profiles = ApplicationProfileManager()
         self._snippets = SnippetEngine()
         self._insights = LocalInsightsStore(enabled=True)
-        # Tact is free software: the entitlement manager always answers "allowed".
+        # Typen is free software: the entitlement manager always answers "allowed".
         self._entitlement_mgr = EntitlementManager()
 
     def _offline_pro_enabled(self) -> bool:
-        """Feature-gate seam for the offline path; always True in Tact."""
+        """Feature-gate seam for the offline path; always True in Typen."""
         return self._entitlement_mgr.is_pro_enabled()
 
     def _offline_require_pro(self, feature: str) -> None:
@@ -152,7 +152,7 @@ class SettingsController:
                 "state": "inactive",
                 "backend": "",
                 "detail": "The background service is not running.",
-                "remediation": "Start Tact (it normally launches at login).",
+                "remediation": "Start Typen (it normally launches at login).",
             },
             "is_paused": self._prefs.get_setting("is_paused", "false") == "true",
             "active_region": self._prefs.overlay.active_region.name or "EN_GB",
@@ -787,7 +787,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
     from tkinter import ttk
 
     root = tk.Tk()
-    root.title("Tact — Settings")
+    root.title("Typen — Settings")
     root.geometry("920x640")
 
     notebook = ttk.Notebook(root)
@@ -798,7 +798,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
         notebook.add(tab, text=screen)
         ttk.Label(
             tab,
-            text=f"Tact — {screen}",
+            text=f"Typen — {screen}",
             font=("Segoe UI", 13, "bold"),
         ).pack(anchor="w", pady=(0, 8))
 
@@ -842,7 +842,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Tact Settings")
+    parser = argparse.ArgumentParser(description="Typen Settings")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--headless-check", action="store_true")
     args = parser.parse_args(argv)

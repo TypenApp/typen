@@ -4,7 +4,7 @@ IBus component descriptor for the AutoCorrect engine.
 `python -m autocorrect.adapters.linux.ibus_component --exec /usr/libexec/ibus-engine-autocorrect`
 prints the XML that must be installed to `/usr/share/ibus/component/autocorrect.xml`
 (the .deb does this) so ibus-daemon can spawn the engine on demand and users can
-add "English (Tact)" under Settings → Keyboard → Input Sources.
+add "English (Typen)" under Settings → Keyboard → Input Sources.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from autocorrect.version import APP_VERSION
 
 IBUS_BUS_NAME: Final[str] = "org.freedesktop.IBus.AutoCorrect"
 IBUS_ENGINE_NAME: Final[str] = "autocorrect"
-IBUS_ENGINE_LONGNAME: Final[str] = "English (Tact)"
+IBUS_ENGINE_LONGNAME: Final[str] = "English (Typen)"
 IBUS_ENGINE_TYPE_NAME: Final[str] = "IBusAutoCorrectEngine"
 
 
@@ -29,7 +29,7 @@ def build_component_xml(exec_path: str, version: str = APP_VERSION) -> str:
         '<?xml version="1.0" encoding="utf-8"?>\n'
         "<component>\n"
         f"  <name>{IBUS_BUS_NAME}</name>\n"
-        "  <description>Tact input method engine</description>\n"
+        "  <description>Typen input method engine</description>\n"
         f"  <exec>{exec_line}</exec>\n"
         f"  <version>{escape(version)}</version>\n"
         "  <author>Omnii</author>\n"

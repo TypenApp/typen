@@ -29,7 +29,7 @@ const plural = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 export const metadata: Metadata = {
   title: "Download",
-  description: `Tact ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
+  description: `Typen ${FULL_VERSION} for Windows, macOS and Linux. Every file is built by the release pipeline and published on GitHub with its SHA-256.`,
 };
 
 function formatDate(iso: string): string {
@@ -109,7 +109,7 @@ export default function DownloadPage() {
     <div className="pb-8">
       <PageHeader
         eyebrow={`Download · ${RELEASE_TAG}`}
-        title={<>Tact {FULL_VERSION}</>}
+        title={<>Typen {FULL_VERSION}</>}
         lede={
           nothingPublished ? (
             <p>
@@ -125,7 +125,7 @@ export default function DownloadPage() {
               {stable.length > 0 &&
                 `Stable for ${joinNames(stable)}${beta.length > 0 ? `; public beta for ${joinNames(beta)}` : ""}.`}
               {stable.length === 0 && `Public beta for ${joinNames(beta)}.`} Built {formatDate(BUILT_AT_ISO)}.
-              Includes the full offline engine and every feature; Tact is free and open source.
+              Includes the full offline engine and every feature; Typen is free and open source.
               {unsigned.length > 0 &&
                 ` The ${joinNames(unsigned)} ${plural(unsigned.length, "build is", "builds are")} not yet code-signed.`}
             </p>

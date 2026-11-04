@@ -61,9 +61,9 @@ export function BrandMark({ size = 28, className = "" }: { size?: number; classN
  */
 export function Wordmark({ withMark = true }: { withMark?: boolean }) {
   return (
-    <Link href="/" className="group inline-flex items-center gap-2.5" aria-label="Tact home">
+    <Link href="/" className="group inline-flex items-center gap-2.5" aria-label="Typen home">
       {withMark && <BrandMark size={26} />}
-      <span className="font-display text-[22px] font-extrabold leading-none tracking-[-0.03em] text-ink">Tact</span>
+      <span className="font-display text-[22px] font-extrabold leading-none tracking-[-0.03em] text-ink">Typen</span>
     </Link>
   );
 }

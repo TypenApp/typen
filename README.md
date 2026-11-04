@@ -1,11 +1,11 @@
-# Tact
+# Typen
 
 Offline-first, system-wide autocorrect and writing assistant for Windows, macOS and Linux.
 One small background process owns the keyboard hook and a memory-mapped 166k-word English
 lexicon; an on-demand Settings window talks to it over authenticated local IPC. Nothing you
 type leaves the machine.
 
-Tact is free and open source (MIT) and funded by donations only. There are no editions,
+Typen is free and open source (MIT) and funded by donations only. There are no editions,
 trials or licence keys: every feature is available to everyone.
 
 - Website: <https://autocorrect-desktop.vercel.app> (live demo runs the real engine)
@@ -32,7 +32,7 @@ trials or licence keys: every feature is available to everyone.
 
 The Python package, executable (`AutoCorrectDesktop`), bundle identifier and user data
 directory keep their original `autocorrect` identifiers so existing beta installs upgrade
-in place. Everything a user sees says Tact.
+in place. Everything a user sees says Typen.
 
 ## Development
 
@@ -81,7 +81,7 @@ in a development `.env` overrides the embedded key for testing against a staging
 pwsh packaging/build_windows_beta.ps1 -Channel beta.4     # .exe installer + portable .zip
 ```
 ```bash
-packaging/build_macos_beta.sh --channel beta.4            # Tact.app in .dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
+packaging/build_macos_beta.sh --channel beta.4            # Typen.app in .dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
 packaging/build_linux_beta.sh --channel beta.4            # tar.gz + AppImage + .deb (minisign if AC_MINISIGN_KEY set)
 ```
 
@@ -119,7 +119,7 @@ Code signing is environment-gated and off by default:
 
 ## Supporting the project
 
-Tact has no paid tier and never will. If it saves you time, consider a donation at
+Typen has no paid tier and never will. If it saves you time, consider a donation at
 <https://github.com/sponsors/litlEMPEROR>. Bug reports and pull requests are equally welcome.
 
 ## Licence

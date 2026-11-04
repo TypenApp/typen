@@ -2,7 +2,7 @@
 Update Policy Engine.
 Enforces:
 1. Binary schema compatibility (`schema_version == BINARY_SCHEMA_VERSION`).
-2. Optional update window (`release.published_at <= updates_expire_at`); Tact ships with no window (None).
+2. Optional update window (`release.published_at <= updates_expire_at`); Typen ships with no window (None).
 3. Critical security-patch override (`is_security_patch == True` for the user's entitled branch).
 4. Protection of perpetual installations (blocks downloading non-entitled updates so an
    expired update window never disables an existing perpetual installation).

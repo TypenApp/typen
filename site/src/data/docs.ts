@@ -27,14 +27,14 @@ export const DOC_ARTICLES: DocArticle[] = [
     shortTitle: "Getting Started",
     category: "Foundation",
     summary:
-      "Install Tact on Windows (stable), macOS or Linux (public beta), understand the tray service and Settings window, grant the OS permissions each platform needs, and check that corrections are live.",
+      "Install Typen on Windows (stable), macOS or Linux (public beta), understand the tray service and Settings window, grant the OS permissions each platform needs, and check that corrections are live.",
     readingTime: "4 min read",
     sections: [
       {
         id: "architecture-overview",
-        heading: "How Tact Works",
+        heading: "How Typen Works",
         paragraphs: [
-          "Tact is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (AutoCorrectDesktop.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the current builds ship the lightweight native fallback window.",
+          "Typen is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (AutoCorrectDesktop.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the current builds ship the lightweight native fallback window.",
           "When you close the Settings window, the UI process terminates completely (0% UI CPU and 0 MB GUI RAM), while the background daemon continues correcting typos across every native and web application on your machine.",
         ],
         bullets: [
@@ -55,14 +55,14 @@ export const DOC_ARTICLES: DocArticle[] = [
           language: "powershell",
           title: "Verify and launch from PowerShell",
           code: `# 1. Verify the download
-Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
+Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
 # ...and compare with SHA256SUMS.txt on the GitHub release
 
 # 2. Start the background service (tray icon)
-& "$env:LOCALAPPDATA\\Programs\\Tact\\AutoCorrectDesktop.exe"
+& "$env:LOCALAPPDATA\\Programs\\Typen\\AutoCorrectDesktop.exe"
 
 # 3. Open the Settings window (connects to the service over a Named Pipe)
-& "$env:LOCALAPPDATA\\Programs\\Tact\\AutoCorrectDesktop.exe" --settings
+& "$env:LOCALAPPDATA\\Programs\\Typen\\AutoCorrectDesktop.exe" --settings
 
 # Optional: print a one-line health check and exit
 & "...\\AutoCorrectDesktop.exe" --headless-check`,
@@ -72,7 +72,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
         id: "macos-setup",
         heading: "macOS 12+ Setup (Input Monitoring & Accessibility) — Beta",
         paragraphs: [
-          "The macOS build is in public beta: feature-complete, with less real-world mileage than the Windows build. Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag Tact to /Applications. Because Tact listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
+          "The macOS build is in public beta: feature-complete, with less real-world mileage than the Windows build. Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag Typen to /Applications. Because Typen listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
           "On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings remains available.",
           "Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/AutoCorrect.",
         ],
@@ -83,7 +83,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
         paragraphs: [
           "The Linux build is in public beta: feature-complete, with less real-world mileage than the Windows build. Check the Downloads page for availability: Linux artifacts (.deb, AppImage, portable tar.gz) are listed there only once they have been published, each with a minisign signature. Data lives in $XDG_DATA_HOME/autocorrect (default ~/.local/share/autocorrect) and launch at login uses an XDG autostart entry.",
           "X11 sessions: the service uses the XRecord extension to observe keys and XTest to type corrections; window class and title (EWMH _NET_ACTIVE_WINDOW / WM_CLASS) identify password managers, polkit and keyring prompts, and terminals. Because XRecord observes keys after delivery, the delimiter you typed is deleted and re-typed together with the corrected word.",
-          "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (Tact)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
+          "Wayland sessions: compositors do not allow global key hooks, so the service reports 'Not correcting' and asks you to enable the IBus engine. Install ibus, python3-gi and gir1.2-ibus-1.0 (the .deb recommends them), then add 'English (Typen)' under Settings -> Keyboard -> Input Sources and switch to it. The engine receives IBUS_INPUT_PURPOSE_PASSWORD / PIN and the NO_SPELLCHECK hint from applications, so secure fields are never touched, and replaces text with delete_surrounding_text + commit_text.",
         ],
       },
     ],
@@ -184,7 +184,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
         id: "lgplv3-compliance",
         heading: "Qt 6 / PySide6-Essentials LGPLv3 Compliance Architecture",
         paragraphs: [
-          "Tact depends exclusively on PySide6-Essentials (QtCore, QtGui, QtQml, QtQuick, QtQuickControls2, QtQuickLayouts, QtQuickDialogs, QtSvg) under the GNU Lesser General Public License v3 (LGPLv3).",
+          "Typen depends exclusively on PySide6-Essentials (QtCore, QtGui, QtQml, QtQuick, QtQuickControls2, QtQuickLayouts, QtQuickDialogs, QtSvg) under the GNU Lesser General Public License v3 (LGPLv3).",
           "GPLv3-only modules (such as QtCharts, QtGraphs, QtQuick3D, and QtVirtualKeyboard) are strictly excluded and verified at both runtime and build time via src/autocorrect/ui/lgpl_compliance.py. Packaging uses one-folder (never one-file) mode so any Qt shared libraries (.dll / .dylib / .so) remain user-replaceable on disk. The current Windows build does not bundle Qt at all; it ships the native fallback Settings window.",
         ],
       },
@@ -212,7 +212,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
           code: `[
   {
     "trigger": ";sig",
-    "expansion": "Best regards,\\nthe Tact team",
+    "expansion": "Best regards,\\nthe Typen team",
     "description": "Standard email sign-off"
   },
   {
@@ -260,7 +260,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
         id: "three-layer-intelligence",
         heading: "The 3-Layer Intelligence Hierarchy",
         paragraphs: [
-          "Tact strictly separates real-time keystroke correction from heavy neural inference so typing latency never degrades:",
+          "Typen strictly separates real-time keystroke correction from heavy neural inference so typing latency never degrades:",
         ],
         bullets: [
           "Layer 1 (Always-On, < 0.4ms): Deterministic mmap Lexicon + SymSpell + Trigram Context Model + Confusion Sets.",
@@ -297,14 +297,14 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
     shortTitle: "Security & Privacy",
     category: "Security",
     summary:
-      "How Tact guarantees zero keystroke logging, automatic password field exclusion, Ed25519 manifest verification, and atomic Zstandard delta updates.",
+      "How Typen guarantees zero keystroke logging, automatic password field exclusion, Ed25519 manifest verification, and atomic Zstandard delta updates.",
     readingTime: "5 min read",
     sections: [
       {
         id: "zero-keylogging-guarantee",
         heading: "Zero Keystroke Logging & Ephemeral Memory Buffers",
         paragraphs: [
-          "Tact is architected so that your typed documents, messages, and passwords can never be reconstructed from disk. SQLitePreferenceStore (preferences.sqlite3) stores only your explicit custom dictionary words, rejected correction pairs, preferred variants, and aggregate counters.",
+          "Typen is architected so that your typed documents, messages, and passwords can never be reconstructed from disk. SQLitePreferenceStore (preferences.sqlite3) stores only your explicit custom dictionary words, rejected correction pairs, preferred variants, and aggregate counters.",
           "The active word buffer holds at most the single word currently being typed, and the context ring buffer holds at most 5 integer word IDs—both flushed immediately on every window switch or mouse click.",
         ],
       },
@@ -336,15 +336,15 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
     shortTitle: "Open Source & Donations",
     category: "Project",
     summary:
-      "Tact is MIT-licensed with a single edition and no trial, licence key or activation. How the project is funded, what changed from the earlier commercial betas, and how to contribute.",
+      "Typen is MIT-licensed with a single edition and no trial, licence key or activation. How the project is funded, what changed from the earlier commercial betas, and how to contribute.",
     readingTime: "3 min read",
     sections: [
       {
         id: "one-edition",
         heading: "One Edition, Nothing Locked",
         paragraphs: [
-          "Tact has exactly one build and it contains everything: the offline correction engine, every English variant and domain vocabulary pack, per-application profiles, text-expansion snippets, local insights, and the Local AI and BYOK Cloud AI screens. There is no trial, no licence certificate, no device lock and no account.",
-          "Internally the daemon, the IPC server and the Settings controller still ask a single EntitlementManager whether a feature is allowed. In Tact that object always answers yes; it is kept only so a fork that wants gating has exactly one class to replace.",
+          "Typen has exactly one build and it contains everything: the offline correction engine, every English variant and domain vocabulary pack, per-application profiles, text-expansion snippets, local insights, and the Local AI and BYOK Cloud AI screens. There is no trial, no licence certificate, no device lock and no account.",
+          "Internally the daemon, the IPC server and the Settings controller still ask a single EntitlementManager whether a feature is allowed. In Typen that object always answers yes; it is kept only so a fork that wants gating has exactly one class to replace.",
         ],
       },
       {
@@ -352,7 +352,7 @@ Get-FileHash .\\Tact-<version>-win64-setup.exe -Algorithm SHA256
         heading: "Donations Only",
         paragraphs: [
           "The project has no paid tier and never will. It is funded by donations through GitHub Sponsors, which pay for code-signing certificates, CI minutes for three platforms, hosting for the site and live demo, and the time that goes into lexicon curation and bug fixes. Donating changes nothing in the app.",
-          "Earlier betas (1.2.0-beta.3 and before) shipped Standard and Pro licences, a 14-day trial and a payment integration. All of that code has been removed from the repository, not merely disabled. Anyone who bought a licence simply has the same Tact as everyone else now, with nothing to activate.",
+          "Earlier betas (1.2.0-beta.3 and before) shipped Standard and Pro licences, a 14-day trial and a payment integration. All of that code has been removed from the repository, not merely disabled. Anyone who bought a licence simply has the same Typen as everyone else now, with nothing to activate.",
         ],
       },
       {
