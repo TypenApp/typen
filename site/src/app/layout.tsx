@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Syne, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { THEME_INIT_SCRIPT } from "@/components/ThemeToggle";
 import { FULL_VERSION } from "@/data/releases";
 
 // Syne is a variable font: one file covers 400–800, used for both display and UI text.
@@ -33,9 +34,20 @@ export const metadata: Metadata = {
   other: { "x-tact-version": FULL_VERSION },
 };
 
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    // suppressHydrationWarning: the inline script may add `dark` before React hydrates.
+    <html lang="en" className={`${sans.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="flex min-h-screen flex-col antialiased">
         <Navbar />
         <main className="flex-1">{children}</main>

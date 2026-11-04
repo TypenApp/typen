@@ -1,7 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#ffffff"/>
-  <rect x="1" y="1" width="62" height="62" rx="13" fill="none" stroke="#000000" stroke-width="2"/>
-  <text x="27" y="39" text-anchor="middle" font-family="Syne, system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="700" font-size="24" letter-spacing="-1" fill="#000000">Aa</text>
-  <rect x="44" y="36" width="9" height="3" rx="1" fill="#000000"/>
-  <path d="M12 50 q4 -5 8 0 t8 0 t8 0 t8 0 t8 0" fill="none" stroke="#e5341a" stroke-width="3.2" stroke-linecap="round"/>
+  <style>
+    .tile { fill: #000000; }
+    .glyph { fill: #ffffff; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #ffffff; }
+      .glyph { fill: #000000; }
+    }
+  </style>
+  <rect class="tile" width="64" height="64" rx="14"/>
+  <text class="glyph" x="7.75" y="36" font-family="Syne, system-ui, -apple-system, 'Segoe UI', sans-serif" font-weight="700" font-size="24" letter-spacing="-1">Aa</text>
+  <rect class="glyph" x="48.25" y="33" width="8" height="3" rx="1"/>
+  <path d="M8 46 q4 -5 8 0 t8 0 t8 0 t8 0 t8 0 t8 0" fill="none" stroke="#e5341a" stroke-width="3.2" stroke-linecap="round"/>
 </svg>

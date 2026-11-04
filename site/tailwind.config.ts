@@ -10,8 +10,12 @@ import type { Config } from "tailwindcss";
  * interface text; JetBrains Mono for anything technical and for the live demo's
  * text input.
  *
- * `ink-*` are foreground colours, `paper-*` are surfaces.
+ * `ink-*` are foreground colours, `paper-*` are surfaces. Every value is an RGB
+ * channel triple read from a CSS variable (see globals.css), so the dark theme
+ * is one class on <html> that swaps ink and paper; no component knows about it.
  */
+const v = (name: string) => `rgb(var(${name}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -27,28 +31,27 @@ const config: Config = {
       },
       colors: {
         ink: {
-          DEFAULT: "#000000",
-          1: "#0a0a0a",
-          2: "#171717",
-          3: "#262626",
-          muted: "#595959",
-          faint: "#8a8a8a",
+          DEFAULT: v("--ink"),
+          1: v("--ink-1"),
+          2: v("--ink-2"),
+          3: v("--ink-3"),
+          muted: v("--ink-muted"),
+          faint: v("--ink-faint"),
         },
         paper: {
-          DEFAULT: "#ffffff",
-          1: "#fafafa",
-          2: "#f4f4f4",
-          3: "#ececec",
+          DEFAULT: v("--paper"),
+          1: v("--paper-1"),
+          2: v("--paper-2"),
+          3: v("--paper-3"),
         },
         line: {
-          DEFAULT: "#e4e4e4",
-          strong: "#c9c9c9",
+          DEFAULT: v("--line"),
+          strong: v("--line-strong"),
         },
         proof: {
-          DEFAULT: "#e5341a",
-          strong: "#c42a12",
-          soft: "#fdece8",
-          ink: "#ffffff",
+          DEFAULT: v("--proof"),
+          strong: v("--proof-strong"),
+          soft: v("--proof-soft"),
         },
       },
       borderRadius: {
