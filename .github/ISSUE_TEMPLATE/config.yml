@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Typen Community Discussions
+    url: https://github.com/orgs/TypenApp/discussions
+    about: Ask questions, share snippets and domain packs, or discuss ideas with the community.
+  - name: Global Language Library (TypenApp/language-data)
+    url: https://github.com/TypenApp/language-data/issues
+    about: Report missed typos, false-positive corrections, confusion sets, or domain pack vocabulary.
+  - name: Local AI Models (TypenApp/model-resources)
+    url: https://github.com/TypenApp/model-resources/issues
+    about: Report issues with Layer 2 ONNX/GGUF local models or hardware acceleration profiles.
+  - name: Documentation (TypenApp/docs)
+    url: https://github.com/TypenApp/docs/issues
+    about: Suggest improvements or fixes to Typen guides and reference documentation.
+  - name: Security Vulnerability Report
+    url: https://github.com/TypenApp/typen/security/advisories/new
+    about: Privately report a security or privacy vulnerability.

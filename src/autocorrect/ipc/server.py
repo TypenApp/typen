@@ -30,7 +30,11 @@ from autocorrect.ipc.protocol import (
     compute_default_ipc_address,
     create_and_persist_auth_token,
 )
-from autocorrect.licensing.entitlement_manager import DONATE_URL
+from autocorrect.licensing.entitlement_manager import (
+    DONATE_URL,
+    GITHUB_REPO_URL,
+    GITHUB_SPONSORS_URL,
+)
 from autocorrect.productivity.app_profiles import ApplicationProfile
 from autocorrect.version import APP_RELEASE_TIMESTAMP, APP_VERSION, BINARY_SCHEMA_VERSION
 
@@ -763,8 +767,9 @@ class LocalIPCServer:
                 "pro_features_enabled": snap.pro_features_enabled,
                 "app_version": APP_VERSION,
                 "licence": "MIT",
-                "source_url": "https://github.com/litlEMPEROR/AutoCorrect",
+                "source_url": GITHUB_REPO_URL,
                 "donate_url": DONATE_URL,
+                "sponsors_url": GITHUB_SPONSORS_URL,
             }
 
         raise ValueError(f"Unknown IPC method: '{method}'")

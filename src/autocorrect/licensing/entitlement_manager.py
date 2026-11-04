@@ -13,7 +13,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-DONATE_URL = "https://github.com/sponsors/litlEMPEROR"
+GITHUB_ORG = "TypenApp"
+GITHUB_REPO = "TypenApp/typen"
+GITHUB_REPO_URL = "https://github.com/TypenApp/typen"
+SPONSORS_HANDLE = "TypenApp"
+GITHUB_SPONSORS_URL = f"https://github.com/sponsors/{SPONSORS_HANDLE}"
+DONATE_URL = GITHUB_SPONSORS_URL
 STATUS_MESSAGE = "Typen is free and open source — every feature, on every machine, for as long as you like."
 
 

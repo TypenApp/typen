@@ -1,7 +1,7 @@
 import React from "react";
 import Link from "next/link";
 import { Check, Dash, PageHeader, Section } from "@/components/Page";
-import { DONATE_URL, GITHUB_REPO_URL, LICENSE_NAME, LICENSE_URL } from "@/data/releases";
+import { DONATE_URL, GITHUB_ORG_URL, GITHUB_REPO_URL, LICENSE_NAME, LICENSE_URL } from "@/data/releases";
 
 const EVERYONE_GETS = [
   "Offline spelling, homophone, punctuation and capitalisation correction in every application",
@@ -59,10 +59,13 @@ export default function DonatePage() {
       >
         <div className="mt-8 flex flex-wrap items-center gap-3">
           <a href={DONATE_URL} target="_blank" rel="noopener noreferrer" className="btn-primary">
-            Donate <span aria-hidden="true">↗</span>
+            Sponsor @TypenApp on GitHub <span aria-hidden="true">↗</span>
           </a>
           <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
             Source on GitHub <span aria-hidden="true">↗</span>
+          </a>
+          <a href={GITHUB_ORG_URL} target="_blank" rel="noopener noreferrer" className="btn-secondary">
+            TypenApp Organisation <span aria-hidden="true">↗</span>
           </a>
         </div>
       </PageHeader>

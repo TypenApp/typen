@@ -9,9 +9,21 @@ Typen is free and open source (MIT) and funded by donations only. There are no e
 trials or licence keys: every feature is available to everyone.
 
 - Website: <https://autocorrect-desktop.vercel.app> (live demo runs the real engine)
-- Downloads: GitHub Releases (<https://github.com/litlEMPEROR/AutoCorrect/releases>)
-- Donate: <https://github.com/sponsors/litlEMPEROR>
+- Organisation: <https://github.com/TypenApp>
+- Downloads: GitHub Releases (<https://github.com/TypenApp/typen/releases>)
+- Donate: <https://github.com/sponsors/TypenApp>
 - Current channel: `1.2.0-beta.x` (see `site/src/data/release-manifest.json`)
+
+## Official `TypenApp` repositories
+
+Typen is organised under [`github.com/TypenApp`](https://github.com/TypenApp) across focused repositories:
+
+| Repository | Purpose |
+| --- | --- |
+| [`TypenApp/typen`](https://github.com/TypenApp/typen) | Main desktop application, OS keyboard hooks, Settings UI, packaging and public website |
+| [`TypenApp/language-data`](https://github.com/TypenApp/language-data) | Global English lexicon pipeline, confusion sets, domain vocabulary packs and held-out quality corpus |
+| [`TypenApp/model-resources`](https://github.com/TypenApp/model-resources) | Optional Layer 2 on-device ONNX / GGUF grammar & rewrite model descriptors and Ed25519 signing tools |
+| [`TypenApp/docs`](https://github.com/TypenApp/docs) | Product documentation, architecture guides and CLI reference |
 
 ## Repository layout
 
@@ -120,7 +132,7 @@ Code signing is environment-gated and off by default:
 ## Supporting the project
 
 Typen has no paid tier and never will. If it saves you time, consider a donation at
-<https://github.com/sponsors/litlEMPEROR>. Bug reports and pull requests are equally welcome.
+<https://github.com/sponsors/TypenApp>. Bug reports and pull requests are equally welcome.
 
 ## Licence
 

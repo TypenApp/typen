@@ -29,6 +29,9 @@ from pipeline.sign_release import verify_manifest_signature
 from autocorrect.intelligence.resource_manager import ResourceManager
 from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
 
+LANGUAGE_DATA_REPO = "TypenApp/language-data"
+DEFAULT_LANGUAGE_DATA_RELEASES_URL = f"https://github.com/{LANGUAGE_DATA_REPO}/releases"
+
 
 @dataclass(frozen=True, slots=True)
 class ResourceUpdateDescriptor:

@@ -3,6 +3,10 @@ import Link from "next/link";
 import {
   DONATE_URL,
   FULL_VERSION,
+  GITHUB_DOCS_URL,
+  GITHUB_LANGUAGE_DATA_URL,
+  GITHUB_MODEL_RESOURCES_URL,
+  GITHUB_ORG_URL,
   GITHUB_REPO_URL,
   LICENSE_NAME,
   LICENSE_URL,
@@ -37,16 +41,20 @@ const COLUMNS: { heading: string; links: FooterLink[] }[] = [
   {
     heading: "Community",
     links: [
-      { href: GITHUB_REPO_URL, label: "Source on GitHub", external: true },
+      { href: GITHUB_ORG_URL, label: "TypenApp on GitHub", external: true },
+      { href: GITHUB_REPO_URL, label: "App source (typen)", external: true },
+      { href: GITHUB_LANGUAGE_DATA_URL, label: "Language data", external: true },
+      { href: GITHUB_MODEL_RESOURCES_URL, label: "Model resources", external: true },
+      { href: GITHUB_DOCS_URL, label: "Docs repository", external: true },
       { href: `${GITHUB_REPO_URL}/issues`, label: "Report an issue", external: true },
-      { href: `${GITHUB_REPO_URL}/discussions`, label: "Discussions", external: true },
+      { href: `${GITHUB_ORG_URL}/discussions`, label: "Discussions", external: true },
       { href: RELEASES_URL, label: "All releases", external: true },
     ],
   },
 ];
 
 const SOCIAL: { href: string; label: string; icon: React.ReactNode }[] = [
-  { href: GITHUB_REPO_URL, label: "Typen on GitHub", icon: <GitHubIcon size={17} /> },
+  { href: GITHUB_ORG_URL, label: "TypenApp on GitHub", icon: <GitHubIcon size={17} /> },
   { href: DONATE_URL, label: "Sponsor Typen", icon: <HeartIcon size={17} /> },
   { href: RELEASES_URL, label: "Releases", icon: <DownloadIcon size={17} /> },
 ];
@@ -142,7 +150,7 @@ export function Footer() {
               </Link>
             </li>
             <li>
-              <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-ink">
+              <a href={GITHUB_ORG_URL} target="_blank" rel="noopener noreferrer" className="transition-colors hover:text-ink">
                 GitHub
               </a>
             </li>

@@ -34,7 +34,12 @@ from autocorrect.ai.usage_tracker import UsageTracker
 from autocorrect.ipc.client import LocalIPCClient
 from autocorrect.ipc.protocol import IPC_ENDPOINT_FILENAME, IPCConnectionError, IPCError
 from autocorrect.ipc.server import AVAILABLE_DOMAIN_PACK_METADATA
-from autocorrect.licensing.entitlement_manager import DONATE_URL, EntitlementManager
+from autocorrect.licensing.entitlement_manager import (
+    DONATE_URL,
+    GITHUB_REPO_URL,
+    GITHUB_SPONSORS_URL,
+    EntitlementManager,
+)
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
 from autocorrect.productivity.app_profiles import (
     ApplicationProfile,
@@ -773,9 +778,26 @@ class SettingsController:
             "pro_features_enabled": snap.pro_features_enabled,
             "app_version": APP_VERSION,
             "licence": "MIT",
-            "source_url": "https://github.com/litlEMPEROR/AutoCorrect",
+            "source_url": GITHUB_REPO_URL,
             "donate_url": DONATE_URL,
+            "sponsors_url": GITHUB_SPONSORS_URL,
         }
+
+    def open_sponsors_page(self) -> str:
+        """Open the official Typen GitHub Sponsors page in the user's default browser."""
+        import webbrowser
+
+        url = str(self.get_about_state().get("donate_url") or DONATE_URL)
+        webbrowser.open(url)
+        return url
+
+    def open_source_repository(self) -> str:
+        """Open the official Typen GitHub repository in the user's default browser."""
+        import webbrowser
+
+        url = str(self.get_about_state().get("source_url") or GITHUB_REPO_URL)
+        webbrowser.open(url)
+        return url
 
 
 def _launch_native_fallback_ui(controller: SettingsController) -> int:
@@ -830,6 +852,33 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
             ttk.Button(add_row, text="Add Word", command=on_add).pack(side="left", padx=(8, 0))
             ttk.Button(tab, text="Delete Selected Word", command=on_delete).pack(anchor="w")
             refresh_list()
+        elif screen == "About":
+            about = controller.get_about_state()
+            ttk.Label(
+                tab,
+                text=f"Typen v{about.get('app_version')} — {about.get('status_message')}",
+                wraplength=820,
+            ).pack(anchor="w", pady=(0, 6))
+            ttk.Label(
+                tab,
+                text=f"Licence: {about.get('licence')}  •  Source: {about.get('source_url')}",
+            ).pack(anchor="w", pady=(0, 4))
+            ttk.Label(
+                tab,
+                text=f"GitHub Sponsors: {about.get('donate_url')}",
+            ).pack(anchor="w", pady=(0, 12))
+            btn_row = ttk.Frame(tab)
+            btn_row.pack(anchor="w")
+            ttk.Button(
+                btn_row,
+                text="Sponsor Typen on GitHub Sponsors",
+                command=controller.open_sponsors_page,
+            ).pack(side="left", padx=(0, 8))
+            ttk.Button(
+                btn_row,
+                text="View Source on GitHub",
+                command=controller.open_source_repository,
+            ).pack(side="left")
         else:
             ov = controller.get_overview()
             ttk.Label(

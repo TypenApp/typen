@@ -565,9 +565,16 @@ ApplicationWindow {
                         wrapMode: Text.WordWrap
                         Layout.fillWidth: true
                     }
-                    Button {
-                        text: "Support Typen with a donation"
-                        onClicked: bridge.openDonatePage()
+                    RowLayout {
+                        spacing: 10
+                        Button {
+                            text: "Sponsor Typen on GitHub Sponsors"
+                            onClicked: bridge.openDonatePage()
+                        }
+                        Button {
+                            text: "View Source on GitHub"
+                            onClicked: bridge.openSourcePage()
+                        }
                     }
                 }
             }

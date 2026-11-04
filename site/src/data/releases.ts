@@ -11,13 +11,55 @@
  */
 import manifest from "./release-manifest.json";
 
-/** The source repository. Typen is MIT-licensed and funded by donations only. */
-export const GITHUB_REPO = "litlEMPEROR/AutoCorrect";
+/** The official GitHub organisation and its focused repositories. Typen is MIT-licensed and funded by donations only. */
+export const GITHUB_ORG = "TypenApp";
+export const GITHUB_ORG_URL = `https://github.com/${GITHUB_ORG}`;
+export const GITHUB_REPO = `${GITHUB_ORG}/typen`;
 export const GITHUB_REPO_URL = `https://github.com/${GITHUB_REPO}`;
+export const GITHUB_LANGUAGE_DATA_REPO = `${GITHUB_ORG}/language-data`;
+export const GITHUB_LANGUAGE_DATA_URL = `https://github.com/${GITHUB_LANGUAGE_DATA_REPO}`;
+export const GITHUB_MODEL_RESOURCES_REPO = `${GITHUB_ORG}/model-resources`;
+export const GITHUB_MODEL_RESOURCES_URL = `https://github.com/${GITHUB_MODEL_RESOURCES_REPO}`;
+export const GITHUB_DOCS_REPO = `${GITHUB_ORG}/docs`;
+export const GITHUB_DOCS_URL = `https://github.com/${GITHUB_DOCS_REPO}`;
 export const LICENSE_NAME = "MIT";
-export const LICENSE_URL = `${GITHUB_REPO_URL}/blob/master/LICENSE`;
+export const LICENSE_URL = `${GITHUB_REPO_URL}/blob/main/LICENSE`;
 /** Where donations go. One link, used everywhere a "support" call to action appears. */
-export const DONATE_URL = "https://github.com/sponsors/litlEMPEROR";
+export const DONATE_URL = "https://github.com/sponsors/TypenApp";
+
+export interface OrgRepositoryInfo {
+  name: string;
+  slug: string;
+  url: string;
+  summary: string;
+}
+
+export const ORG_REPOSITORIES: OrgRepositoryInfo[] = [
+  {
+    name: "typen",
+    slug: GITHUB_REPO,
+    url: GITHUB_REPO_URL,
+    summary: "Main desktop application, OS keyboard hooks, Settings UI and public website.",
+  },
+  {
+    name: "language-data",
+    slug: GITHUB_LANGUAGE_DATA_REPO,
+    url: GITHUB_LANGUAGE_DATA_URL,
+    summary: "Global English lexicon pipeline, confusion sets, domain packs and held-out quality corpus.",
+  },
+  {
+    name: "model-resources",
+    slug: GITHUB_MODEL_RESOURCES_REPO,
+    url: GITHUB_MODEL_RESOURCES_URL,
+    summary: "Optional Layer 2 on-device ONNX / GGUF grammar and rewrite model descriptors and signing tools.",
+  },
+  {
+    name: "docs",
+    slug: GITHUB_DOCS_REPO,
+    url: GITHUB_DOCS_URL,
+    summary: "Product guides, architecture specifications and CLI reference.",
+  },
+];
 /**
  * The repository whose GitHub Release hosts the downloadable files. The publish
  * job records it in the manifest (`--download-repo`); by default it is the source repo.

@@ -8,9 +8,13 @@ import {
   BETA_PLATFORMS,
   BUILT_AT_ISO,
   DOMAIN_PACK_RELEASES,
+  DOWNLOAD_REPO,
   ED25519_KEY_IS_DEV_KEY,
   ED25519_PUBLIC_KEY_HEX,
   FULL_VERSION,
+  GITHUB_LANGUAGE_DATA_URL,
+  GITHUB_ORG_URL,
+  ORG_REPOSITORIES,
   RELEASE_INCLUDED,
   RELEASE_NOT_INCLUDED,
   RELEASE_PAGE_URL,
@@ -135,11 +139,15 @@ export default function DownloadPage() {
         <p className="mt-6 font-mono text-xs text-ink-faint">
           Files are served from{" "}
           <a href={RELEASE_PAGE_URL} className="link" target="_blank" rel="noopener noreferrer">
-            github.com/…/releases/{RELEASE_TAG}
+            github.com/{DOWNLOAD_REPO}/releases/{RELEASE_TAG}
           </a>
           {" · "}
           <a href={RELEASES_URL} className="link" target="_blank" rel="noopener noreferrer">
             all releases
+          </a>
+          {" · "}
+          <a href={GITHUB_ORG_URL} className="link" target="_blank" rel="noopener noreferrer">
+            github.com/TypenApp
           </a>
         </p>
       </PageHeader>
@@ -195,7 +203,11 @@ export default function DownloadPage() {
       <Section id="packs" index="02" title="Domain vocabulary packs" aside="Bundled with the app">
         <p className="max-w-2xl text-sm leading-relaxed text-ink-muted">
           Small seed vocabularies that protect field-specific terms from correction and fix the common typos of
-          each field. Enable them per variant or per application in Settings.
+          each field. Enable them per variant or per application in Settings, or contribute new terms in{" "}
+          <a href={GITHUB_LANGUAGE_DATA_URL} target="_blank" rel="noopener noreferrer" className="link">
+            TypenApp/language-data
+          </a>
+          .
         </p>
         {DOMAIN_PACK_RELEASES.length > 0 ? (
           <div className="card mt-6 divide-y divide-line">
@@ -268,7 +280,11 @@ export default function DownloadPage() {
           <Link href="/docs/getting-started" className="link">
             getting-started guide
           </Link>
-          .
+          , or browse all repositories under{" "}
+          <a href={GITHUB_ORG_URL} target="_blank" rel="noopener noreferrer" className="link">
+            github.com/TypenApp
+          </a>{" "}
+          ({ORG_REPOSITORIES.map((r) => r.name).join(", ")}).
         </p>
       </Section>
     </div>

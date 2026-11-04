@@ -17,6 +17,9 @@ from pipeline.sign_release import verify_manifest_signature
 
 from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
 
+APP_RELEASES_REPO = "TypenApp/typen"
+DEFAULT_APP_RELEASES_URL = f"https://github.com/{APP_RELEASES_REPO}/releases"
+
 
 @dataclass(frozen=True, slots=True)
 class ApplicationReleaseDescriptor:

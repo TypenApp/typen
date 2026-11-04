@@ -17,6 +17,9 @@ from pipeline.sign_release import verify_manifest_signature
 
 from autocorrect.updates.update_policy import UpdatePolicyEngine
 
+MODEL_RESOURCES_REPO = "TypenApp/model-resources"
+DEFAULT_MODEL_RESOURCES_RELEASES_URL = f"https://github.com/{MODEL_RESOURCES_REPO}/releases"
+
 
 @dataclass(frozen=True, slots=True)
 class LocalModelDescriptor:

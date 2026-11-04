@@ -356,16 +356,29 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
         ],
       },
       {
+        id: "github-organisation",
+        heading: "Official GitHub Organisation & Focused Repositories",
+        paragraphs: [
+          "Typen lives under the official TypenApp GitHub organisation (github.com/TypenApp) across four focused repositories so that the desktop application, the global language library, optional AI resources and documentation each have a clear home, release history and issue tracker:",
+        ],
+        bullets: [
+          "github.com/TypenApp/typen — Main desktop application, OS keyboard hooks, Settings UI, installers and public website.",
+          "github.com/TypenApp/language-data — Global English lexicon pipeline, confusion sets, domain vocabulary packs and held-out quality corpus.",
+          "github.com/TypenApp/model-resources — Optional Layer 2 on-device ONNX / GGUF grammar and rewrite model descriptors and Ed25519 signing tools.",
+          "github.com/TypenApp/docs — Product guides, architecture specifications and CLI reference.",
+        ],
+      },
+      {
         id: "licence-and-contributing",
         heading: "MIT Licence & Contributing",
         paragraphs: [
           "The source is published under the MIT licence: you may read, build, modify and redistribute it, including commercially, as long as the copyright notice is preserved. Bundled third-party components (SCOWL/ESDB word lists, Qt / PySide6-Essentials under LGPLv3, PyInstaller, Python libraries) keep their own licences, listed in LICENSE.",
-          "The most useful contributions are correction reports: a misspelling the engine misses, or a correction it should not have made. Those become held-out test cases in tests/test_engine_quality_heldout.py, whose thresholds are only ever raised. Platform testing, packaging fixes and pull requests are equally welcome.",
+          "The most useful contributions are correction reports: a misspelling the engine misses, or a correction it should not have made. Open a Correction Report in TypenApp/language-data or TypenApp/typen; accepted reports become held-out test cases in tests/test_engine_quality_heldout.py, whose thresholds are only ever raised. Platform testing, packaging fixes, documentation improvements and pull requests are equally welcome.",
         ],
         codeBlock: {
           language: "bash",
           title: "Build from source",
-          code: `git clone https://github.com/litlEMPEROR/AutoCorrect.git && cd AutoCorrect
+          code: `git clone https://github.com/TypenApp/typen.git && cd typen
 python -m venv .venv && . .venv/bin/activate
 pip install -e ".[dev,ui]"
 pytest

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Dash } from "@/components/Page";
 import { DOC_ARTICLES, getDocBySlug } from "@/data/docs";
+import { GITHUB_DOCS_URL } from "@/data/releases";
 
 export function generateStaticParams() {
   return DOC_ARTICLES.map((doc) => ({ slug: doc.slug }));
@@ -80,7 +81,19 @@ export default async function DocArticlePage({ params }: { params: Promise<{ slu
         ))}
       </div>
 
-      <div className="rule mt-16 flex justify-between gap-4 pt-6 text-sm">
+      <div className="rule mt-14 pt-5 text-xs text-ink-faint">
+        Spotted an inaccuracy or want to improve this guide?{" "}
+        <a
+          href={`${GITHUB_DOCS_URL}/blob/main/${article.slug}.md`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="link"
+        >
+          Edit {article.slug}.md on GitHub (TypenApp/docs) ↗
+        </a>
+      </div>
+
+      <div className="rule mt-6 flex justify-between gap-4 pt-6 text-sm">
         {prev ? (
           <Link href={`/docs/${prev.slug}`} className="text-ink-muted hover:text-ink">
             ← {prev.shortTitle}

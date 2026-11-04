@@ -186,9 +186,17 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
             return (
                 f"Typen v{about.get('app_version')} — {about.get('status_message')}\n"
                 f"Licence: {about.get('licence')}. Source: {about.get('source_url')}\n"
-                f"Typen is funded by donations only: {about.get('donate_url')}\n"
+                f"Sponsored via GitHub Sponsors: {about.get('donate_url')}\n"
                 f"Uses Qt 6 / PySide6-Essentials, dynamically linked under GNU LGPLv3."
             )
+
+        @Property(str, notify=stateChanged)  # type: ignore[misc]
+        def donateUrl(self) -> str:
+            return str(self._ctrl.get_about_state().get("donate_url", ""))
+
+        @Property(str, notify=stateChanged)  # type: ignore[misc]
+        def sourceUrl(self) -> str:
+            return str(self._ctrl.get_about_state().get("source_url", ""))
 
         @Slot()  # type: ignore[misc]
         def togglePause(self) -> None:
@@ -227,9 +235,11 @@ def launch_pyside6_qml_ui(controller: SettingsController) -> int:
 
         @Slot()  # type: ignore[misc]
         def openDonatePage(self) -> None:
-            import webbrowser
+            self._ctrl.open_sponsors_page()
 
-            webbrowser.open(str(self._ctrl.get_about_state().get("donate_url", "")))
+        @Slot()  # type: ignore[misc]
+        def openSourcePage(self) -> None:
+            self._ctrl.open_source_repository()
 
     QQuickStyle.setStyle("Basic")
     app = QGuiApplication.instance() or QGuiApplication(sys.argv)

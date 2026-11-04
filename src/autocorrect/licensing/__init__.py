@@ -9,8 +9,23 @@ signed language-resource, model and application updates.
 from autocorrect.licensing.entitlement_manager import (
     DONATE_URL,
     FULL_ENTITLEMENT,
+    GITHUB_ORG,
+    GITHUB_REPO,
+    GITHUB_REPO_URL,
+    GITHUB_SPONSORS_URL,
+    SPONSORS_HANDLE,
     EntitlementManager,
     EntitlementSnapshot,
 )
 
-__all__ = ["DONATE_URL", "FULL_ENTITLEMENT", "EntitlementManager", "EntitlementSnapshot"]
+__all__ = [
+    "DONATE_URL",
+    "FULL_ENTITLEMENT",
+    "GITHUB_ORG",
+    "GITHUB_REPO",
+    "GITHUB_REPO_URL",
+    "GITHUB_SPONSORS_URL",
+    "SPONSORS_HANDLE",
+    "EntitlementManager",
+    "EntitlementSnapshot",
+]

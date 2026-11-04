@@ -179,17 +179,16 @@ jobs:
       contents: write
     env:
       FULL_VERSION: ${{ needs.prepare.outputs.full_version }}
-      # Where the public can download from. This source repository is private, so by
-      # default its Release assets 404 for visitors. Set the repository variable
-      # RELEASES_REPO (e.g. "litlEMPEROR/AutoCorrect-releases", a public repo with no
-      # source) and the secret RELEASES_TOKEN (a fine-grained PAT with "Contents: write"
-      # on that repo) to publish there instead. Leave both unset if this repo is public.
+      # Where the public can download from. By default this publishes directly to
+      # TypenApp/typen releases. Set the repository variable RELEASES_REPO and the
+      # secret RELEASES_TOKEN (a fine-grained PAT with "Contents: write" on that
+      # repo) only if publishing to a separate releases mirror.
       RELEASES_REPO: ${{ vars.RELEASES_REPO || github.repository }}
       HAS_RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.prepare.outputs.publish == 'true' && 'master' || github.ref }}
+          ref: ${{ needs.prepare.outputs.publish == 'true' && github.event.repository.default_branch || github.ref }}
           fetch-depth: 0
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
@@ -221,15 +220,16 @@ jobs:
           generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
           body: ${{ env.RELEASES_REPO != github.repository && format('Typen {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
           files: dist/installer/*
-      - name: Commit merged manifest to master (deploys the site)
+      - name: Commit merged manifest to default branch (deploys the site)
         if: needs.prepare.outputs.publish == 'true'
         run: |
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch || 'main' }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/src/data/release-manifest.json
           if git diff --cached --quiet; then echo "manifest unchanged"; exit 0; fi
           git commit -m "Release ${GITHUB_REF_NAME}: publish site manifest"
           for attempt in 1 2 3; do
-            git push origin HEAD:master && break
-            git pull --rebase origin master
+            git push origin "HEAD:${DEFAULT_BRANCH}" && break
+            git pull --rebase origin "${DEFAULT_BRANCH}"
           done

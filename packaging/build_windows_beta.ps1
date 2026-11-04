@@ -123,7 +123,7 @@ $ZipPath = Join-Path $OutDir $ZipName
 Compress-Archive -Path (Join-Path $AppDir "*") -DestinationPath $ZipPath -CompressionLevel Optimal
 
 # 5. Inno Setup installer
-$SetupName = "AutoCorrect-Desktop-$FullVersion-win64-setup.exe"
+$SetupName = "Typen-$FullVersion-win64-setup.exe"
 $SetupPath = Join-Path $OutDir $SetupName
 if (-not $SkipInstaller) {
     $iscc = @(

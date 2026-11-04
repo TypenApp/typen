@@ -1,5 +1,5 @@
 {
-  "product": "Tact",
+  "product": "Typen",
   "version": "1.2.0",
   "channel": "beta.4",
   "full_version": "1.2.0-beta.4",
@@ -84,13 +84,13 @@
       "artifacts": [
         {
           "kind": "portable",
-          "file": "Tact-1.2.0-beta.4-win64-portable.zip",
+          "file": "Typen-1.2.0-beta.4-win64-portable.zip",
           "size_bytes": 40795786,
           "sha256": "6393a0330df7bdc26832831ca8ab04e470471d64705f88261a7f312a01285e9f"
         },
         {
           "kind": "installer",
-          "file": "Tact-1.2.0-beta.4-win64-setup.exe",
+          "file": "Typen-1.2.0-beta.4-win64-setup.exe",
           "size_bytes": 29558959,
           "sha256": "a58da98ad10bec75687f0a801bb35dfa332d19c2dfc2cbd0d47945df14e8dd83"
         }
@@ -103,13 +103,13 @@
       "artifacts": [
         {
           "kind": "installer",
-          "file": "Tact-1.2.0-beta.4-macos-arm64.dmg",
+          "file": "Typen-1.2.0-beta.4-macos-arm64.dmg",
           "size_bytes": 40824837,
           "sha256": "57620e6dec031812e5afdb6a339c2e258b06cd9cb6cbb94a15e385e745fda641"
         },
         {
           "kind": "portable",
-          "file": "Tact-1.2.0-beta.4-macos-arm64.zip",
+          "file": "Typen-1.2.0-beta.4-macos-arm64.zip",
           "size_bytes": 35933114,
           "sha256": "9208d096cb416395fe31dd26824269811d88c5cefbf89c9dc297619c449ed552"
         }
@@ -123,13 +123,13 @@
       "artifacts": [
         {
           "kind": "portable",
-          "file": "Tact-1.2.0-beta.4-linux-x86_64-portable.tar.gz",
+          "file": "Typen-1.2.0-beta.4-linux-x86_64-portable.tar.gz",
           "size_bytes": 66930069,
           "sha256": "02fedc54d7ae112533422ba8ce40e591ddfd6b84ea505a95e8b416214293fd3a"
         },
         {
           "kind": "appimage",
-          "file": "Tact-1.2.0-beta.4-linux-x86_64.AppImage",
+          "file": "Typen-1.2.0-beta.4-linux-x86_64.AppImage",
           "size_bytes": 61970936,
           "sha256": "a0ae3e1de650f768aae46bf48b02c7307c5e7b367c9b3681bc31a2c137871764"
         },
@@ -142,19 +142,19 @@
       ]
     }
   },
-  "download_repo": "litlEMPEROR/AutoCorrect",
+  "download_repo": "TypenApp/typen",
   "platform": "win64",
   "code_signed": false,
   "artifacts": [
     {
       "kind": "portable",
-      "file": "Tact-1.2.0-beta.4-win64-portable.zip",
+      "file": "Typen-1.2.0-beta.4-win64-portable.zip",
       "size_bytes": 40795786,
       "sha256": "6393a0330df7bdc26832831ca8ab04e470471d64705f88261a7f312a01285e9f"
     },
     {
       "kind": "installer",
-      "file": "Tact-1.2.0-beta.4-win64-setup.exe",
+      "file": "Typen-1.2.0-beta.4-win64-setup.exe",
       "size_bytes": 29558959,
       "sha256": "a58da98ad10bec75687f0a801bb35dfa332d19c2dfc2cbd0d47945df14e8dd83"
     }

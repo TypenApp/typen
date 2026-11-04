@@ -18,6 +18,8 @@ from typing import Any
 
 from PIL import Image, ImageDraw
 
+from autocorrect.licensing.entitlement_manager import DONATE_URL
+
 
 def build_settings_command(data_dir: Path) -> list[str]:
     """
@@ -101,6 +103,11 @@ class SystemTrayController:
         def on_settings(_icon: Any, _item: Any) -> None:
             self.launch_settings_subprocess()
 
+        def on_sponsor(_icon: Any, _item: Any) -> None:
+            import webbrowser
+
+            webbrowser.open(DONATE_URL)
+
         def on_quit(_icon: Any, _item: Any) -> None:
             try:
                 self._on_quit()
@@ -113,6 +120,7 @@ class SystemTrayController:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Open Settings…", on_settings, default=True),
             pystray.MenuItem(pause_label, on_toggle),
+            pystray.MenuItem("Sponsor Typen on GitHub…", on_sponsor),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Quit AutoCorrect", on_quit),
         )

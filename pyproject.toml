@@ -22,6 +22,18 @@ dependencies = [
     "Pillow>=10.0.0",
 ]
 
+[project.urls]
+Homepage = "https://autocorrect-desktop.vercel.app"
+Organisation = "https://github.com/TypenApp"
+Repository = "https://github.com/TypenApp/typen"
+Documentation = "https://github.com/TypenApp/docs"
+"Language Data" = "https://github.com/TypenApp/language-data"
+"Model Resources" = "https://github.com/TypenApp/model-resources"
+Issues = "https://github.com/TypenApp/typen/issues"
+Discussions = "https://github.com/orgs/TypenApp/discussions"
+Changelog = "https://github.com/TypenApp/typen/releases"
+Funding = "https://github.com/sponsors/TypenApp"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
