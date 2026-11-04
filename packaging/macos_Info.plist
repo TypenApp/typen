@@ -3,13 +3,13 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleDisplayName</key>
-    <string>AutoCorrect Desktop</string>
+    <string>Tact</string>
     <key>CFBundleExecutable</key>
     <string>AutoCorrectDesktop</string>
     <key>CFBundleIdentifier</key>
     <string>io.autocorrect.desktop</string>
     <key>CFBundleName</key>
-    <string>AutoCorrect Desktop</string>
+    <string>Tact</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleIconFile</key>
@@ -33,12 +33,12 @@
     <true/>
     <!-- TCC usage strings: required for the Input Monitoring and Accessibility prompts. -->
     <key>NSInputMonitoringUsageDescription</key>
-    <string>AutoCorrect Desktop watches the keys you type so it can spot misspellings as you finish each word. Nothing is sent anywhere; everything runs on this Mac.</string>
+    <string>Tact watches the keys you type so it can spot misspellings as you finish each word. Nothing is sent anywhere; everything runs on this Mac.</string>
     <key>NSAccessibilityUsageDescription</key>
-    <string>AutoCorrect Desktop uses Accessibility to replace a misspelled word in place, and to recognise password fields so it never touches them.</string>
+    <string>Tact uses Accessibility to replace a misspelled word in place, and to recognise password fields so it never touches them.</string>
     <key>NSAppleEventsUsageDescription</key>
-    <string>AutoCorrect Desktop may ask the frontmost application for its name to apply your per-app correction profiles.</string>
+    <string>Tact may ask the frontmost application for its name to apply your per-app correction profiles.</string>
     <key>NSHumanReadableCopyright</key>
-    <string>© AutoCorrect Engineering. Proprietary.</string>
+    <string>© Tact contributors. MIT licence.</string>
 </dict>
 </plist>

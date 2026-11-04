@@ -216,10 +216,10 @@ jobs:
           tag_name: ${{ github.ref_name }}
           # When publishing to another repo the tag does not exist there; create it on its default branch.
           target_commitish: ${{ env.RELEASES_REPO != github.repository && 'main' || github.sha }}
-          name: AutoCorrect Desktop ${{ env.FULL_VERSION }}
+          name: Tact ${{ env.FULL_VERSION }}
           prerelease: true
           generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
-          body: ${{ env.RELEASES_REPO != github.repository && format('AutoCorrect Desktop {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
+          body: ${{ env.RELEASES_REPO != github.repository && format('Tact {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
           files: dist/installer/*
       - name: Commit merged manifest to master (deploys the site)
         if: needs.prepare.outputs.publish == 'true'

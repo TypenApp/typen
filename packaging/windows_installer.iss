@@ -1,4 +1,4 @@
-; Inno Setup Installer Script for AutoCorrect Desktop (Windows 10 & Windows 11)
+; Inno Setup Installer Script for Tact (Windows 10 & Windows 11)
 ; Build: ISCC.exe /DMyAppVersion=1.2.0 /DMyChannel=beta.1 packaging\windows_installer.iss
 #ifndef MyAppVersion
   #define MyAppVersion "1.2.0"
@@ -6,8 +6,8 @@
 #ifndef MyChannel
   #define MyChannel "beta.1"
 #endif
-#define MyAppName "AutoCorrect Desktop"
-#define MyAppPublisher "AutoCorrect Engineering"
+#define MyAppName "Tact"
+#define MyAppPublisher "Tact contributors"
 #define MyAppExeName "AutoCorrectDesktop.exe"
 #define MyFullVersion MyAppVersion + "-" + MyChannel
 
@@ -24,7 +24,7 @@ DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 OutputDir=..\dist\installer
-OutputBaseFilename=AutoCorrect-Desktop-{#MyFullVersion}-win64-setup
+OutputBaseFilename=Tact-{#MyFullVersion}-win64-setup
 SetupIconFile=autocorrect.ico
 Compression=lzma2/ultra64
 SolidCompression=yes

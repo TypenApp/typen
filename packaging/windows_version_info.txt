@@ -17,13 +17,13 @@ VSVersionInfo(
         StringTable(
           '040904B0',
           [
-            StringStruct('CompanyName', 'AutoCorrect Engineering'),
-            StringStruct('FileDescription', 'AutoCorrect Desktop (Beta) — system-wide offline autocorrect'),
+            StringStruct('CompanyName', 'Tact contributors'),
+            StringStruct('FileDescription', 'Tact (Beta) — system-wide offline autocorrect'),
             StringStruct('FileVersion', '1.2.0-beta.1'),
             StringStruct('InternalName', 'AutoCorrectDesktop'),
-            StringStruct('LegalCopyright', '© AutoCorrect Engineering. Proprietary. Qt components (if present) under LGPLv3.'),
+            StringStruct('LegalCopyright', '© Tact contributors. MIT licence. Qt components (if present) under LGPLv3.'),
             StringStruct('OriginalFilename', 'AutoCorrectDesktop.exe'),
-            StringStruct('ProductName', 'AutoCorrect Desktop'),
+            StringStruct('ProductName', 'Tact'),
             StringStruct('ProductVersion', '1.2.0-beta.1'),
             StringStruct('Comments', 'Pre-release build. Not for production use.')
           ]

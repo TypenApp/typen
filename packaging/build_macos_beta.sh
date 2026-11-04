@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build the AutoCorrect Desktop macOS BETA distributables.
+# Build the Tact macOS BETA distributables.
 #
 #   1. Generates icons (ICNS).
-#   2. Runs PyInstaller via packaging/autocorrect.spec  -> dist/AutoCorrect Desktop.app
+#   2. Runs PyInstaller via packaging/autocorrect.spec  -> dist/Tact.app
 #   3. Signs the .app (Developer ID + Hardened Runtime) when AC_SIGN_IDENTITY is set,
 #      otherwise ad-hoc signs so the bundle launches locally.
 #   4. Smoke-tests the frozen binary (--version, --headless-check).
@@ -39,10 +39,10 @@ ARCH="$(uname -m)"            # arm64 | x86_64
 case "$ARCH" in x86_64) ARCH_LABEL="x64" ;; *) ARCH_LABEL="$ARCH" ;; esac
 PLATFORM="macos-$ARCH_LABEL"
 DIST="$ROOT/dist"
-APP="$DIST/AutoCorrect Desktop.app"
+APP="$DIST/Tact.app"
 OUT="$DIST/installer"
 
-echo "==> AutoCorrect Desktop $FULL_VERSION ($PLATFORM)"
+echo "==> Tact $FULL_VERSION ($PLATFORM)"
 
 # 0. Tooling
 $PY -c "import PyInstaller" 2>/dev/null || $PY -m pip install --quiet pyinstaller
@@ -82,14 +82,14 @@ echo "    $CHECK"
 
 # 5. DMG + ZIP
 mkdir -p "$OUT"; rm -f "$OUT"/*.dmg "$OUT"/*.zip "$OUT"/SHA256SUMS.txt "$OUT"/release-manifest.json
-ZIP="$OUT/AutoCorrect-Desktop-$FULL_VERSION-$PLATFORM.zip"
-DMG="$OUT/AutoCorrect-Desktop-$FULL_VERSION-$PLATFORM.dmg"
+ZIP="$OUT/Tact-$FULL_VERSION-$PLATFORM.zip"
+DMG="$OUT/Tact-$FULL_VERSION-$PLATFORM.dmg"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ZIP"
 
 STAGE="$(mktemp -d)"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
-hdiutil create -volname "AutoCorrect Desktop" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+hdiutil create -volname "Tact" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
 rm -rf "$STAGE"
 
 NOTARIZED=false
@@ -134,7 +134,7 @@ for p in sorted((root / "resources/en_base/packs").glob("*.pack.json")):
     packs.append({"id": pj["pack_id"], "version": pj["version"], "file": p.name, "size_bytes": p.stat().st_size,
                   "sha256": sha(p), "word_count": len(pj.get("words", {})), "direct_typo_count": len(pj.get("direct_typos", {}))})
     sums.append(f"{sha(p)}  packs/{p.name}")
-manifest = {"product": "AutoCorrect Desktop", "version": version, "channel": channel, "full_version": f"{version}-{channel}",
+manifest = {"product": "Tact", "version": version, "channel": channel, "full_version": f"{version}-{channel}",
             "platform": platform, "built_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "code_signed": signed == "true", "notarized": notarized == "true",
             "resources": {"bundle_version": res["version"], "schema_version": res["schema_version"], "word_count": res["word_count"]},
