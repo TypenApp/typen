@@ -28,7 +28,7 @@ class RawWordEntry:
 class RawCorpusDataset:
     """Complete structured language intelligence dataset ready for validation & compilation."""
 
-    version: str = "1.0.9"
+    version: str = "1.1.0"
     released_at: str = "2026-11-02T00:00:00Z"
     words: dict[str, RawWordEntry] = field(default_factory=dict)
     direct_typos: dict[str, tuple[str, float]] = field(default_factory=dict)
@@ -39,7 +39,7 @@ class RawCorpusDataset:
     domain_packs: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
-def build_master_english_dataset(version: str = "1.0.9") -> RawCorpusDataset:
+def build_master_english_dataset(version: str = "1.1.0") -> RawCorpusDataset:
     """
     Construct the curated master English language dataset including:
     - Core high/medium/low frequency English vocabulary
@@ -2923,6 +2923,7 @@ def build_master_english_dataset(version: str = "1.0.9") -> RawCorpusDataset:
     # are accepted as valid but never offered as corrections.
     from pipeline.external_sources import (
         corpus_log_frequency,
+        load_common_misspellings,
         load_external_lexicon,
     )
 
@@ -2938,6 +2939,23 @@ def build_master_english_dataset(version: str = "1.0.9") -> RawCorpusDataset:
             morph_mask=MorphFlag.NONE if ext.can_suggest else MorphFlag.DO_NOT_SUGGEST,
             source_count=2,
         )
+
+    # 11a. Common-misspelling pairs (Wikipedia machine-readable list), merged
+    # UNDER the curated `direct_typos`. Each pair is kept only when the target
+    # is an attested lexicon word that may be suggested, and the misspelling is
+    # not itself a valid word (so 'form'/'from' style pairs can never sneak in).
+    # Curated pairs score 8.x; these get a slightly lower boost so a curated
+    # entry for the same intent always wins in the candidate ranker.
+    external_typos = load_common_misspellings()
+    for typo, target in external_typos.items():
+        if typo in ds.direct_typos or typo in ds.words:
+            continue
+        entry = ds.words.get(target)
+        if entry is None or entry.morph_mask & MorphFlag.DO_NOT_SUGGEST:
+            continue
+        if entry.casing_flags & CasingFlag.TITLE_ONLY:
+            continue
+        ds.direct_typos[typo] = (target, 7.5)
 
     # 11b. Technical & internet vocabulary (recognition-only).
     # Everyday developer / online terms that SCOWL (a general-English database)

@@ -306,3 +306,72 @@ def load_external_lexicon(
     except Exception:
         return {}
     return _parse_esdb_cached(str(path), path.stat().st_mtime, max_level)
+
+
+# ---------------------------------------------------------------------------
+# Common misspellings (Wikipedia "Lists of common misspellings / For machines")
+# ---------------------------------------------------------------------------
+# ~4,300 "misspelling->correction" pairs compiled by Wikipedia editors from
+# real article edits. CC BY-SA 4.0; attribution lives in data/external/README.md.
+# Merged into `direct_typos` UNDER the curated table: curated pairs win, and a
+# pair is only kept when it is unambiguous (one correction), both sides are
+# plain words, the correction is a known lexicon word and the "misspelling" is
+# not itself a valid word.
+WIKIPEDIA_MISSPELLINGS_URL = (
+    "https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings/For_machines?action=raw"
+)
+WIKIPEDIA_MISSPELLINGS_FILENAME = "wikipedia-misspellings.txt"
+_MISSPELLING_LINE_RE = re.compile(r"^\s*([A-Za-z][A-Za-z'\-]*)\s*->\s*(.+?)\s*$")
+
+
+def ensure_misspellings_downloaded(cache_dir: Path = EXTERNAL_DATA_DIR) -> Path:
+    """Download the machine-readable misspelling list once and cache it locally."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    dest = cache_dir / WIKIPEDIA_MISSPELLINGS_FILENAME
+    if dest.exists() and dest.stat().st_size > 50_000:
+        return dest
+    request = urllib.request.Request(
+        WIKIPEDIA_MISSPELLINGS_URL, headers={"User-Agent": "AutoCorrect-LanguagePipeline/1.0"}
+    )
+    with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310 (fixed URL)
+        data = response.read()
+    tmp = dest.with_suffix(".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(dest)
+    return dest
+
+
+def parse_misspellings(text: str) -> dict[str, str]:
+    """
+    Parse "misspelling->correction" lines into {typo: correction}, keeping only
+    unambiguous single-word pairs (lowercase letters, optional apostrophe).
+    Entries with several candidate corrections ("adress->address, dress") are
+    dropped: a direct typo table must be certain.
+    """
+    out: dict[str, str] = {}
+    for raw in text.splitlines():
+        m = _MISSPELLING_LINE_RE.match(raw)
+        if not m:
+            continue
+        typo = m.group(1).strip().lower()
+        corrections = [c.strip() for c in m.group(2).split(",") if c.strip()]
+        if len(corrections) != 1:
+            continue
+        target = corrections[0].lower()
+        if not _WORD_RE.match(typo) or not _WORD_RE.match(target):
+            continue
+        if typo == target or len(typo) < 3:
+            continue
+        out[typo] = target
+    return out
+
+
+def load_common_misspellings(cache_dir: Path = EXTERNAL_DATA_DIR) -> dict[str, str]:
+    """Return {typo: correction} from the cached Wikipedia list, or {} when unavailable."""
+    if not external_data_enabled():
+        return {}
+    try:
+        path = ensure_misspellings_downloaded(cache_dir)
+        return parse_misspellings(path.read_text(encoding="utf-8", errors="replace"))
+    except Exception:
+        return {}
