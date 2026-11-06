@@ -34,7 +34,7 @@ def build_component_xml(exec_path: str, version: str = APP_VERSION) -> str:
         f"  <version>{escape(version)}</version>\n"
         "  <author>Omnii</author>\n"
         "  <license>Proprietary</license>\n"
-        "  <homepage>https://autocorrect-desktop-six.vercel.app</homepage>\n"
+        "  <homepage>https://autocorrect-desktop.vercel.app</homepage>\n"
         "  <textdomain>autocorrect</textdomain>\n"
         "  <engines>\n"
         "    <engine>\n"

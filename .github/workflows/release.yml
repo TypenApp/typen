@@ -225,7 +225,7 @@ jobs:
           name: Typen ${{ env.FULL_VERSION }}
           prerelease: true
           generate_release_notes: ${{ env.RELEASES_REPO == github.repository }}
-          body: ${{ env.RELEASES_REPO != github.repository && format('Typen {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop-six.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
+          body: ${{ env.RELEASES_REPO != github.repository && format('Typen {0}. Verify downloads against SHA256SUMS.txt; see https://autocorrect-desktop.vercel.app/download#verify.', env.FULL_VERSION) || '' }}
           files: dist/installer/*
       - name: Commit merged manifest to the site's source repository (deploys the site)
         if: needs.prepare.outputs.publish == 'true'

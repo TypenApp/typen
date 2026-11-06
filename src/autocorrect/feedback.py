@@ -22,8 +22,8 @@ import httpx
 
 from autocorrect.version import APP_VERSION
 
-FEEDBACK_URL: Final[str] = "https://autocorrect-desktop-six.vercel.app/api/feedback"
-FEEDBACK_PAGE_URL: Final[str] = "https://autocorrect-desktop-six.vercel.app/feedback"
+FEEDBACK_URL: Final[str] = "https://autocorrect-desktop.vercel.app/api/feedback"
+FEEDBACK_PAGE_URL: Final[str] = "https://autocorrect-desktop.vercel.app/feedback"
 TIMEOUT_S: Final[float] = 15.0
 MAX_NOTE_CHARS: Final[int] = 4000
 

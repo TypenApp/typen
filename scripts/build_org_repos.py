@@ -46,7 +46,7 @@ REPO_SPECS: list[dict[str, object]] = [
         "repo_name": ".github",
         "full_name": f"{ORG_NAME}/.github",
         "description": "Organisation profile, community health files, and issue/PR templates for TypenApp.",
-        "homepage": "https://autocorrect-desktop-six.vercel.app",
+        "homepage": "https://autocorrect-desktop.vercel.app",
         "topics": ["typen", "autocorrect", "open-source"],
     },
     {
@@ -54,7 +54,7 @@ REPO_SPECS: list[dict[str, object]] = [
         "repo_name": "typen",
         "full_name": f"{ORG_NAME}/typen",
         "description": "Free, open-source, offline-first system-wide autocorrect for Windows, macOS and Linux.",
-        "homepage": "https://autocorrect-desktop-six.vercel.app",
+        "homepage": "https://autocorrect-desktop.vercel.app",
         "topics": ["typen", "autocorrect", "desktop", "offline-first", "windows", "macos", "linux", "python"],
     },
     {
@@ -62,7 +62,7 @@ REPO_SPECS: list[dict[str, object]] = [
         "repo_name": "language-data",
         "full_name": f"{ORG_NAME}/language-data",
         "description": "Global English lexicon pipeline, confusion sets, domain packs and held-out quality corpus for Typen.",
-        "homepage": "https://autocorrect-desktop-six.vercel.app/docs/core-engine",
+        "homepage": "https://autocorrect-desktop.vercel.app/docs/core-engine",
         "topics": ["typen", "lexicon", "nlp", "spellcheck", "scowl", "symspell"],
     },
     {
@@ -70,7 +70,7 @@ REPO_SPECS: list[dict[str, object]] = [
         "repo_name": "model-resources",
         "full_name": f"{ORG_NAME}/model-resources",
         "description": "Optional Layer 2 on-device ONNX/GGUF grammar and rewrite model descriptors and Ed25519 signing tools for Typen.",
-        "homepage": "https://autocorrect-desktop-six.vercel.app/docs/ai-intelligence",
+        "homepage": "https://autocorrect-desktop.vercel.app/docs/ai-intelligence",
         "topics": ["typen", "onnx", "gguf", "local-ai", "ed25519"],
     },
     {
@@ -78,7 +78,7 @@ REPO_SPECS: list[dict[str, object]] = [
         "repo_name": "docs",
         "full_name": f"{ORG_NAME}/docs",
         "description": "Official documentation, architecture specifications, security guarantees and CLI reference for Typen.",
-        "homepage": "https://autocorrect-desktop-six.vercel.app/docs",
+        "homepage": "https://autocorrect-desktop.vercel.app/docs",
         "topics": ["typen", "documentation", "autocorrect"],
     },
 ]
@@ -147,13 +147,13 @@ Need help installing, configuring, or building **Typen**?
 
 Start with the official guides on our website or in [`TypenApp/docs`](https://github.com/TypenApp/docs):
 
-1. [Getting Started & Cross-Platform Installation](https://autocorrect-desktop-six.vercel.app/docs/getting-started)
-2. [Core Typing Engine & Double-Backspace Undo](https://autocorrect-desktop-six.vercel.app/docs/core-engine)
-3. [10-Screen Desktop Customisation UI & Local IPC](https://autocorrect-desktop-six.vercel.app/docs/customisation)
-4. [Productivity: Snippets, Domain Packs & App Profiles](https://autocorrect-desktop-six.vercel.app/docs/productivity)
-5. [AI: Layer 2 Local Models & Layer 3 BYOK Cloud AI](https://autocorrect-desktop-six.vercel.app/docs/ai-intelligence)
-6. [Security, Privacy & Cryptographic Update Architecture](https://autocorrect-desktop-six.vercel.app/docs/security-privacy)
-7. [CLI & Lexicon Pipeline Reference](https://autocorrect-desktop-six.vercel.app/docs/cli-reference)
+1. [Getting Started & Cross-Platform Installation](https://autocorrect-desktop.vercel.app/docs/getting-started)
+2. [Core Typing Engine & Double-Backspace Undo](https://autocorrect-desktop.vercel.app/docs/core-engine)
+3. [10-Screen Desktop Customisation UI & Local IPC](https://autocorrect-desktop.vercel.app/docs/customisation)
+4. [Productivity: Snippets, Domain Packs & App Profiles](https://autocorrect-desktop.vercel.app/docs/productivity)
+5. [AI: Layer 2 Local Models & Layer 3 BYOK Cloud AI](https://autocorrect-desktop.vercel.app/docs/ai-intelligence)
+6. [Security, Privacy & Cryptographic Update Architecture](https://autocorrect-desktop.vercel.app/docs/security-privacy)
+7. [CLI & Lexicon Pipeline Reference](https://autocorrect-desktop.vercel.app/docs/cli-reference)
 
 ## Where to Open an Issue
 
@@ -171,9 +171,9 @@ Start with the official guides on our website or in [`TypenApp/docs`](https://gi
 
 Typen is one small background service that fixes typos, homophones, punctuation, and capitalisation as you type across every application on Windows, macOS, and Linux. Nothing you type ever leaves your machine.
 
-- **Website & Live Engine Demo**: <https://autocorrect-desktop-six.vercel.app>
+- **Website & Live Engine Demo**: <https://autocorrect-desktop.vercel.app>
 - **Download Installers**: <https://github.com/TypenApp/typen/releases>
-- **Documentation**: <https://autocorrect-desktop-six.vercel.app/docs>
+- **Documentation**: <https://autocorrect-desktop.vercel.app/docs>
 - **Sponsor Typen**: <https://github.com/sponsors/TypenApp>
 
 ---
@@ -296,7 +296,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://autocorrect-desktop-six.vercel.app"
+Homepage = "https://autocorrect-desktop.vercel.app"
 Repository = "https://github.com/TypenApp/language-data"
 MainApp = "https://github.com/TypenApp/typen"
 Issues = "https://github.com/TypenApp/language-data/issues"
@@ -870,7 +870,7 @@ def publish_org_repos(
                 json={
                     "name": "Typen",
                     "description": "Free, open-source, offline-first system-wide autocorrect for Windows, macOS and Linux.",
-                    "blog": "https://autocorrect-desktop-six.vercel.app",
+                    "blog": "https://autocorrect-desktop.vercel.app",
                 },
             )
             if org_resp.is_success:

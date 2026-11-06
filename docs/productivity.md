@@ -55,4 +55,4 @@ ApplicationProfileManager automatically adapts correction behaviour when you swi
 
 ---
 
-*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop-six.vercel.app/docs/productivity) · [TypenApp on GitHub](https://github.com/TypenApp)*
+*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop.vercel.app/docs/productivity) · [TypenApp on GitHub](https://github.com/TypenApp)*
