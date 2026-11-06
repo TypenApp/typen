@@ -69,6 +69,191 @@ UNAMBIGUOUS_CONTRACTIONS: Final[dict[str, str]] = {
     "whove": "who've",
     "aint": "ain't",
     "shant": "shan't",
+    # Added conservatively: each fused form has no standalone English meaning.
+    "whatve": "what've",
+    "whatll": "what'll",
+    "whatre": "what're",
+    "wherell": "where'll",
+    "whereve": "where've",
+    "whod": "who'd",
+    "wholl": "who'll",
+    "whyd": "why'd",
+    "howd": "how'd",
+    "howve": "how've",
+    "howll": "how'll",
+    "thatll": "that'll",
+    "thatd": "that'd",
+    "therell": "there'll",
+    "thered": "there'd",
+    "oughtnt": "oughtn't",
+    "darent": "daren't",
+    "mightnt": "mightn't",
+    "shouldntve": "shouldn't've",
+    "couldntve": "couldn't've",
+    "wouldntve": "wouldn't've",
+    "yallve": "y'all've",
+    "maam": "ma'am",
+    "neer": "ne'er",
+    "oer": "o'er",
+}
+
+# Fused forms that are ALSO ordinary words. They are only restored when the
+# surrounding context makes the contraction reading near-certain (the word
+# right after is one of these auxiliaries/verbs). `evaluate_token` consults
+# this via `lookup_contraction_restoration(word, next_word)`.
+AMBIGUOUS_CONTRACTIONS: Final[dict[str, tuple[str, frozenset[str]]]] = {
+    "ill": (
+        "I'll",
+        frozenset(
+            {
+                "be",
+                "have",
+                "do",
+                "get",
+                "go",
+                "see",
+                "let",
+                "send",
+                "call",
+                "take",
+                "make",
+                "try",
+                "check",
+                "look",
+                "need",
+                "give",
+                "come",
+                "tell",
+                "ask",
+                "wait",
+                "keep",
+                "put",
+                "bring",
+            }
+        ),
+    ),
+    "wed": (
+        "we'd",
+        frozenset(
+            {
+                "like",
+                "love",
+                "better",
+                "rather",
+                "prefer",
+                "appreciate",
+                "need",
+                "have",
+                "be",
+                "want",
+                "recommend",
+                "suggest",
+                "already",
+                "never",
+                "probably",
+            }
+        ),
+    ),
+    "well": (
+        "we'll",
+        frozenset(
+            {
+                "see",
+                "have",
+                "be",
+                "get",
+                "do",
+                "go",
+                "need",
+                "take",
+                "make",
+                "let",
+                "send",
+                "call",
+                "try",
+                "check",
+                "look",
+                "talk",
+                "meet",
+                "figure",
+                "find",
+                "keep",
+                "start",
+                "come",
+                "wait",
+                "handle",
+                "cover",
+                "review",
+                "discuss",
+                "follow",
+                "sort",
+            }
+        ),
+    ),
+    "shell": (
+        "she'll",
+        frozenset(
+            {
+                "be",
+                "have",
+                "do",
+                "get",
+                "go",
+                "see",
+                "let",
+                "send",
+                "call",
+                "take",
+                "make",
+                "try",
+                "need",
+                "come",
+                "tell",
+                "ask",
+                "want",
+                "probably",
+                "never",
+                "always",
+                "also",
+                "just",
+                "know",
+                "love",
+                "like",
+            }
+        ),
+    ),
+    "hell": (
+        "he'll",
+        frozenset(
+            {
+                "be",
+                "have",
+                "do",
+                "get",
+                "go",
+                "see",
+                "let",
+                "send",
+                "call",
+                "take",
+                "make",
+                "try",
+                "need",
+                "come",
+                "tell",
+                "ask",
+                "want",
+                "probably",
+                "never",
+                "always",
+                "also",
+                "just",
+                "know",
+                "love",
+                "like",
+            }
+        ),
+    ),
 }
 
 CLOSING_CLAUSE_PUNCTUATION: Final[frozenset[str]] = frozenset({",", ".", ";", ":", "!", "?"})
@@ -91,6 +276,45 @@ MISSING_SPACE_CORRECTIONS: Final[dict[str, str]] = {
     "thankyou": "thank you",
     "goodmorning": "good morning",
     "goodnight": "good night",
+    "goodafternoon": "good afternoon",
+    "goodevening": "good evening",
+    "aslong": "as long",
+    "assoon": "as soon",
+    "eventhough": "even though",
+    "inspite": "in spite",
+    "inbetween": "in between",
+    "infull": "in full",
+    "ontop": "on top",
+    "upto": "up to",
+    "abit": "a bit",
+    "afew": "a few",
+    "alittle": "a little",
+    "everytime": "every time",
+    "atall": "at all",
+    "forsure": "for sure",
+    "ofcourse": "of course",
+    "noone": "no one",
+    "letme": "let me",
+    "canyou": "can you",
+    "doyou": "do you",
+    "haveyou": "have you",
+    "didyou": "did you",
+    "areyou": "are you",
+    "thesame": "the same",
+    "tothe": "to the",
+    "inthe": "in the",
+    "onthe": "on the",
+    "forthe": "for the",
+    "andthe": "and the",
+    "isthe": "is the",
+    "atthe": "at the",
+    "withthe": "with the",
+    "fromthe": "from the",
+    "willbe": "will be",
+    "wouldbe": "would be",
+    "couldbe": "could be",
+    "shouldbe": "should be",
+    "mightbe": "might be",
 }
 
 
@@ -108,6 +332,21 @@ class PunctuationAdjustment:
 def lookup_contraction_restoration(word_lower: str) -> str | None:
     """Return the restored apostrophe contraction if `word_lower` is an unambiguous contraction."""
     return UNAMBIGUOUS_CONTRACTIONS.get(word_lower)
+
+
+def lookup_ambiguous_contraction(word_lower: str, next_word_lower: str) -> str | None:
+    """
+    Return the contraction for a fused form that is also a real word ('ill',
+    'wed', 'well'...) when the following word makes that reading near-certain;
+    otherwise None. Used by the retroactive pass once the next word is known.
+    """
+    entry = AMBIGUOUS_CONTRACTIONS.get(word_lower)
+    if entry is None:
+        return None
+    contraction, followers = entry
+    if followers and next_word_lower in followers:
+        return contraction
+    return None
 
 
 def evaluate_space_before_punctuation(

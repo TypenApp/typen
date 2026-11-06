@@ -480,6 +480,35 @@ def evaluate_retroactive_two_word_confusion(
     c_low = current_word.lower()
     p2_low = prev2_word.lower() if prev2_word else ""
 
+    # Fused contractions that are also real words ('ill', 'wed', 'well', 'hell',
+    # 'shell'): restored only when the next word makes the contraction reading
+    # near-certain ('ill be there' -> "I'll be there", 'wed love to' -> "we'd love to").
+    # 'well' / 'hell' / 'shell' additionally need the phrase to start a clause,
+    # otherwise 'as well see' style sequences would be rewritten.
+    from autocorrect.core.punctuation import lookup_ambiguous_contraction
+
+    ambiguous = lookup_ambiguous_contraction(p_low, c_low)
+    if ambiguous is not None:
+        clause_start = p2_low in (
+            "",
+            ".",
+            "!",
+            "?",
+            ",",
+            ";",
+            ":",
+            "and",
+            "but",
+            "so",
+            "then",
+            "because",
+            "if",
+            "when",
+            "that",
+        )
+        if p_low in ("ill", "wed") or clause_start:
+            return ambiguous
+
     # Quantifier + singular countable noun, pluralised retroactively once the
     # following word confirms the noun is the phrase head rather than an adjunct.
     # 'many video calls' keeps 'video' (next word is a noun); 'These book are' and

@@ -13,7 +13,12 @@ from typing import Final, Protocol
 from autocorrect.core.capitalisation import SentenceCapitaliser
 from autocorrect.core.confusion_sets import evaluate_retroactive_two_word_confusion
 from autocorrect.core.engine import AutocorrectEngine
-from autocorrect.core.models import CorrectionDecision, CorrectionReason, EvaluationContext
+from autocorrect.core.models import (
+    CorrectionDecision,
+    CorrectionFeatures,
+    CorrectionReason,
+    EvaluationContext,
+)
 from autocorrect.core.punctuation import (
     evaluate_double_space_period,
     evaluate_space_before_punctuation,
@@ -27,6 +32,9 @@ from autocorrect.intelligence.schema import RegionFlag
 WORD_BOUNDARY_PUNCTUATION: Final[frozenset[str]] = frozenset(
     {".", ",", "!", "?", ";", ":", ")", "]", "}", '"', "\n"}
 )
+# Delimiters after which the n-gram / grammar context is reset: the next word
+# starts a new clause, so the word before the mark is not its grammatical neighbour.
+CLAUSE_BOUNDARY_DELIMITERS: Final[frozenset[str]] = frozenset({".", ",", "!", "?", ";", ":", "\n"})
 PREFIX_SYMBOLS: Final[frozenset[str]] = frozenset({"-", "/", "\\", "@", "#", "$", "~", ".", ";"})
 NAVIGATION_KEYS: Final[frozenset[str]] = frozenset(
     {
@@ -103,10 +111,7 @@ class InputSessionManager:
 
         self._paused: bool = False
         self._focus_context = FocusContext()
-        self._enable_punctuation_assist: bool = True
-        self._enable_double_space_period: bool = True
-        self._enable_auto_capitalise: bool = True
-        self._aggressiveness: float = 1.0
+        self._features: CorrectionFeatures = CorrectionFeatures()
 
         self._last_completed_word: str = ""
         self._last_space_timestamp_ms: float = 0.0
@@ -122,10 +127,18 @@ class InputSessionManager:
         # field: the state machine advances (context ring, sentence state, last
         # word) but nothing is ever corrected, expanded or injected.
         self._priming: bool = False
+        # Set after the session itself inserted the space that follows a
+        # sentence terminator ('word.' -> 'word. '); the user's own following
+        # Space is then swallowed, and a second closing mark re-attaches.
+        self._auto_space_pending: bool = False
 
     @property
     def word_buffer(self) -> ActiveWordBuffer:
         return self._word_buffer
+
+    @property
+    def features(self) -> CorrectionFeatures:
+        return self._features
 
     @property
     def transaction_ledger(self) -> TransactionLedger:
@@ -147,39 +160,92 @@ class InputSessionManager:
     def set_active_region(self, region: RegionFlag) -> None:
         self._active_region = region
 
+    def abandon_last_correction(self) -> None:
+        """
+        The caller decided not to apply the replacement plan it was just given
+        (e.g. the user had already moved the caret). Forget the undo
+        transaction so a double-Backspace can never 'revert' text that was
+        never changed. The field is left exactly as the user typed it.
+        """
+        self._tx_ledger.clear_active()
+        self._auto_space_pending = False
+
     def configure_features(
         self,
+        features: CorrectionFeatures | None = None,
         *,
-        enable_punctuation_assist: bool | None = None,
-        enable_double_space_period: bool | None = None,
-        enable_auto_capitalise: bool | None = None,
-        aggressiveness: float | None = None,
+        enable_auto_space: bool | None = None,
+        **overrides: object,
     ) -> None:
-        if enable_punctuation_assist is not None:
-            self._enable_punctuation_assist = enable_punctuation_assist
-        if enable_double_space_period is not None:
-            self._enable_double_space_period = enable_double_space_period
-        if enable_auto_capitalise is not None:
-            self._enable_auto_capitalise = enable_auto_capitalise
-        if aggressiveness is not None:
-            self._aggressiveness = aggressiveness
+        """
+        Replace the active feature set (`features`) and/or override individual
+        fields by setting-key (`configure_features(enable_grammar=False)`).
+        `enable_auto_space` is accepted as a short alias for
+        `enable_auto_space_after_sentence`.
+        """
+        base = features if features is not None else self._features
+        if enable_auto_space is not None:
+            overrides["enable_auto_space_after_sentence"] = enable_auto_space
+        self._features = base.with_overrides(overrides)
+        self._tx_ledger.set_undo_window_ms(self._features.undo_window_ms)
 
-    def on_mouse_click_or_caret_move(self) -> None:
-        """Invalidate word buffer, undo slot, and sentence state on mouse click."""
+    def on_mouse_click_or_caret_move(self, caret_text_before: str | None = None) -> None:
+        """
+        Invalidate word buffer, undo slot and sentence state after a mouse click
+        or caret move.
+
+        `caret_text_before`, when the platform can read it (Windows UI
+        Automation probe), is the text immediately before the new caret
+        position; the sentence state is then rebuilt from it so the first word
+        typed after a click is capitalised exactly when it should be. Without
+        it the capitaliser is suppressed (never wrongly capitalise mid-sentence).
+        """
         self._word_buffer.mark_tainted()
         self._tx_ledger.clear_active()
         self._tx_ledger.clear_suppression()
-        self._capitaliser.suppress()
         self._preceded_by_space = False
         self._double_space_eligible = False
         self._just_deleted_trailing_space = False
         self._last_completed_word = ""
         self._current_sentence_tokens.clear()
+        self._auto_space_pending = False
+        if caret_text_before is None:
+            self._capitaliser.suppress()
+        else:
+            self.resync_from_caret(caret_text_before)
 
-    def on_focus_changed(self, focus: FocusContext) -> None:
+    def resync_from_caret(self, text_before: str) -> None:
+        """
+        Rebuild sentence/context state from the text before the caret (field
+        gained focus, click, Tab). Empty text or text ending in a sentence
+        terminator (+ optional whitespace) means the next word starts a
+        sentence; anything else is mid-sentence. The word buffer is left empty
+        and tainted-free so the next word is evaluated normally.
+        """
+        tail = text_before[-256:]
+        self.prime_from_text(tail)
+        if not tail.strip():
+            self._word_buffer.clear_clean()
+            self._capitaliser.reset_to_sentence_start()
+            return
+        if tail != tail.rstrip():
+            # Caret sits after whitespace: the state machine has already seen
+            # the delimiter, so `is_sentence_start` is correct as is.
+            self._word_buffer.clear_clean()
+            return
+        # Caret directly after a non-space character ('Hello wor|ld'): the user
+        # may be inside a word we cannot see the end of. Never correct that
+        # word and never capitalise what they type next; the delimiter they
+        # eventually type still advances the sentence state machine.
+        self._word_buffer.mark_tainted()
+        self._capitaliser.suppress()
+
+    def on_focus_changed(self, focus: FocusContext, caret_text_before: str | None = None) -> None:
         """Flush all ephemeral buffers on window switch and update security/app profile flags."""
         self._focus_context = focus
         self.reset_all_state()
+        if caret_text_before is not None:
+            self.resync_from_caret(caret_text_before)
 
     def reset_all_state(self) -> None:
         self._word_buffer.clear_clean()
@@ -193,6 +259,7 @@ class InputSessionManager:
         self._double_space_eligible = False
         self._just_deleted_trailing_space = False
         self._current_sentence_tokens.clear()
+        self._auto_space_pending = False
 
     def prime_from_text(self, text: str, typed_at_ms: float | None = None) -> None:
         """
@@ -245,6 +312,67 @@ class InputSessionManager:
         """
         Process a single physical key event and return the required action and replacement plan.
         """
+        # Smart quotes: decide opening/closing from the state *before* the key is
+        # processed, run the ordinary path (which keeps the buffer in ASCII), then
+        # swap the straight mark on screen if nothing else touched the text.
+        smart = self._smart_quote_for(event) if self._features.smart_quotes else None
+        outcome = self._handle_key_event_inner(event, suppress_delimiter_on_replace)
+        if (
+            smart is not None
+            and outcome.action == KeyAction.PASS_THROUGH
+            and outcome.replacement_plan is None
+        ):
+            plan = ReplacementPlan(
+                backspaces_to_send=0 if suppress_delimiter_on_replace else 1,
+                text_to_inject=smart,
+                common_prefix_len=0,
+                original_full=event.char,
+                target_full=smart,
+            )
+            if self._injector is not None:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            return SessionEventOutcome(
+                action=KeyAction.SUPPRESS_AND_INJECT
+                if suppress_delimiter_on_replace
+                else KeyAction.PASS_THROUGH,
+                replacement_plan=plan,
+                reason_tag="SMART_QUOTE",
+            )
+        return outcome
+
+    def _smart_quote_for(self, event: KeyEvent) -> str | None:
+        """Typographic replacement for a straight quote key, or None when it must stay as typed."""
+        ch = event.char
+        if ch not in ("'", '"'):
+            return None
+        if (
+            event.is_injected
+            or self._priming
+            or self._paused
+            or self._focus_context.is_terminal_or_code
+            or self._focus_context.is_password_or_secure
+            or self._focus_context.is_excluded_app
+            or event.ctrl_pressed
+            or event.alt_pressed
+            or event.meta_pressed
+        ):
+            return None
+        word = self._word_buffer.current_word
+        if word and word[-1].isalnum():
+            # Inside or right after a word: apostrophe ("don't") or closing quote ('word"').
+            return "\u2019" if ch == "'" else "\u201d"
+        opening = self._preceded_by_space or (not word and not self._last_completed_word)
+        if word and word[-1] in "([{\u201c\u2018":
+            opening = True
+        if ch == "'":
+            return "\u2018" if opening else "\u2019"
+        return "\u201c" if opening else "\u201d"
+
+    def _handle_key_event_inner(
+        self,
+        event: KeyEvent,
+        suppress_delimiter_on_replace: bool,
+    ) -> SessionEventOutcome:
         # 1. Always ignore synthetic keystrokes injected by our own engine
         if event.is_injected:
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
@@ -256,6 +384,7 @@ class InputSessionManager:
         # 3. Check pause state, password/secure fields, and excluded applications
         if self._paused or self._focus_context.is_password_or_secure or self._focus_context.is_excluded_app:
             self._word_buffer.clear_clean()
+            self._auto_space_pending = False
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # 4. Any Ctrl, Alt, or Meta/Win/Cmd shortcut invalidates the active buffer
@@ -263,10 +392,19 @@ class InputSessionManager:
             self.on_mouse_click_or_caret_move()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
-        # 5. Cursor navigation keys invalidate the active buffer
+        # 5. Cursor navigation keys invalidate the active buffer. Tab almost
+        # always moves to another field, whose first word starts a sentence.
         if event.key_name in NAVIGATION_KEYS:
             self.on_mouse_click_or_caret_move()
+            if event.key_name == "Tab":
+                self._capitaliser.reset_to_sentence_start()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
+        # 5b. A space the session inserted after a sentence terminator is pending.
+        if self._auto_space_pending:
+            handled = self._handle_key_after_auto_space(event, suppress_delimiter_on_replace)
+            if handled is not None:
+                return handled
 
         # 6. Backspace handling: DELIBERATE double-Backspace correction reversal.
         # The first Backspace after a correction is an ordinary edit (it deletes
@@ -279,14 +417,11 @@ class InputSessionManager:
         # Space + Space + Backspace) can NEVER trigger a botched revert.
         if event.key_name == "Backspace":
             self._double_space_eligible = False
-            if self._tx_ledger.register_backspace(event.timestamp_ms):
+            if self._features.undo_enabled and self._tx_ledger.register_backspace(event.timestamp_ms):
                 reversal = self._tx_ledger.consume_for_reversal(backspace_was_suppressed=False)
                 if reversal is not None:
                     tx, plan = reversal
-                    # Quietly note single-word reverts as 'Add to Dictionary' suggestions
-                    prefs = self._engine.preferences
-                    if prefs is not None and hasattr(prefs, "note_reverted_word"):
-                        prefs.note_reverted_word(tx.original_token, tx.corrected_token)
+                    self._remember_undo(tx.original_token, tx.corrected_token)
                     # Restore only the final word of the reverted token into the
                     # active buffer (two-word retroactive transactions contain a
                     # space; the earlier word is no longer being edited).
@@ -331,7 +466,10 @@ class InputSessionManager:
                 timestamp_ms=event.timestamp_ms,
                 suppress_delimiter=suppress_delimiter_on_replace,
             )
-            self._capitaliser.reset_to_sentence_start()
+            if self._features.cap_after_newline:
+                self._capitaliser.reset_to_sentence_start()
+            else:
+                self._capitaliser.mark_mid_sentence()
             self._preceded_by_space = False
             return outcome
 
@@ -342,8 +480,7 @@ class InputSessionManager:
                 not self._word_buffer.current_word
                 and self._preceded_by_space
                 and self._double_space_eligible
-                and self._enable_punctuation_assist
-                and self._enable_double_space_period
+                and self._features.double_space_period
                 and not self._priming
             ):
                 inter_ms = event.timestamp_ms - self._last_space_timestamp_ms
@@ -351,6 +488,7 @@ class InputSessionManager:
                     prev_token=self._last_completed_word,
                     inter_key_ms=inter_ms,
                     is_code_context=self._focus_context.is_terminal_or_code,
+                    max_interval_ms=float(self._features.double_space_interval_ms),
                 )
                 if adj.should_modify:
                     plan = ReplacementPlan(
@@ -391,7 +529,7 @@ class InputSessionManager:
                 len(curr) == 1
                 and curr in (",", ".", "!", "?")
                 and self._preceded_by_space
-                and self._enable_punctuation_assist
+                and self._features.space_before_punct
                 and not self._priming
             ):
                 adj = evaluate_space_before_punctuation(
@@ -485,7 +623,7 @@ class InputSessionManager:
                 and curr in (",", ".", "!", "?")
                 and self._preceded_by_space
                 and event.char.isalnum()
-                and self._enable_punctuation_assist
+                and self._features.space_before_punct
                 and not self._priming
             ):
                 adj = evaluate_space_before_punctuation(
@@ -532,6 +670,147 @@ class InputSessionManager:
 
         return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
+    def _remember_undo(self, original: str, corrected: str) -> None:
+        """
+        What an undo means for the future, per `undo_remembers`:
+        never   - nothing is kept (the one-shot suppression still applies);
+        session - the word is quietly listed as an 'Add to Dictionary' suggestion;
+        always  - the pair is also rejected for good.
+        """
+        mode = self._features.undo_remembers
+        if mode == "never":
+            return
+        prefs = self._engine.preferences
+        if prefs is None:
+            return
+        if hasattr(prefs, "note_reverted_word"):
+            prefs.note_reverted_word(original, corrected)
+        if mode == "always" and " " not in original and hasattr(prefs, "add_rejected_correction"):
+            prefs.add_rejected_correction(original, corrected)
+
+    # ------------------------------------------------------------ auto-space
+
+    def _should_auto_space(self, word: str, delimiter: str, leading_prefix: str) -> bool:
+        """
+        Insert a space after `word<delimiter>`? Only for a real sentence end: a
+        word of at least two letters, closed by '.', '!' or '?', in prose (not
+        code/terminal), not an abbreviation/initial/number/URL part and not a
+        token with a symbol prefix ('--flag.' '/path.').
+        """
+        if not self._features.auto_space or self._priming:
+            return False
+        if delimiter not in (".", "!", "?"):
+            return False
+        if self._focus_context.is_terminal_or_code:
+            return False
+        # Opening quotes/brackets are prose ('"no."'); anything else ('--flag.',
+        # '/path.', '@handle.', '#tag.') is a token we must not reflow.
+        if leading_prefix.strip("\"'(\u2018\u201c["):
+            return False
+        if len(word) < 2 or not word[-1].isalpha():
+            return False
+        if not any(ch.isalpha() for ch in word[:-1]):
+            return False
+        if any(ch in word for ch in "./\\@:_") or word[0].isdigit():
+            return False
+        if delimiter == "." and self._capitaliser.is_abbreviation(word):
+            return False
+        return True
+
+    def _arm_auto_space(self, timestamp_ms: float) -> None:
+        """The field now ends with '<terminator> ' that we inserted."""
+        self._auto_space_pending = True
+        self._preceded_by_space = True
+        self._double_space_eligible = False
+        self._just_deleted_trailing_space = False
+        self._last_space_timestamp_ms = timestamp_ms
+        # The terminator left the capitaliser AWAITING_SPACE; the space we added fulfils it.
+        self._capitaliser.on_word_completed("", " ")
+
+    def _handle_key_after_auto_space(self, event: KeyEvent, suppress: bool) -> SessionEventOutcome | None:
+        """
+        Resolve the key typed right after an auto-inserted space. Returns None
+        when the key should go through normal processing (the pending flag is
+        then cleared and the auto space simply stays).
+        """
+        ch = event.char
+        self._auto_space_pending = False
+
+        # The user typed the space themselves: swallow it (passive mode: it has
+        # already landed, so delete the duplicate).
+        if event.key_name == "Space" or ch == " ":
+            plan = ReplacementPlan(
+                backspaces_to_send=0 if suppress else 1,
+                text_to_inject="",
+                common_prefix_len=0,
+                original_full="  ",
+                target_full=" ",
+            )
+            self._preceded_by_space = True
+            self._double_space_eligible = False
+            if self._injector is not None and not plan.is_noop:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            return SessionEventOutcome(
+                action=KeyAction.SUPPRESS_AND_INJECT if suppress else KeyAction.PASS_THROUGH,
+                replacement_plan=plan,
+                reason_tag="AUTO_SPACE_SWALLOWED",
+            )
+
+        # Backspace: the user is removing our space; let it go and remember the
+        # caret is back right after the terminator.
+        if event.key_name == "Backspace":
+            self._preceded_by_space = False
+            self._just_deleted_trailing_space = False
+            self._capitaliser.mark_after_terminal()
+            return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
+        # Another closing mark ('...', '?!', '."', '.)'): pull it back against the terminator.
+        if ch and ch in ".!?)\"'\u2019\u201d]":
+            plan = ReplacementPlan(
+                backspaces_to_send=1 if suppress else 2,
+                text_to_inject=ch,
+                common_prefix_len=0,
+                original_full=f" {ch}",
+                target_full=ch,
+            )
+            self._preceded_by_space = False
+            if ch == ".":
+                self._capitaliser.mark_mid_sentence()  # an ellipsis never forces a capital
+            else:
+                self._capitaliser.mark_after_terminal()
+            if self._injector is not None:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            return SessionEventOutcome(
+                action=KeyAction.SUPPRESS_AND_INJECT if suppress else KeyAction.PASS_THROUGH,
+                replacement_plan=plan,
+                reason_tag="AUTO_SPACE_REATTACH",
+            )
+
+        # A lowercase letter or digit straight after the terminator: the user is
+        # typing a URL, file name or version ('example.com', 'report.docx',
+        # 'v1.beta'); take the space back and never touch that token.
+        if ch and (ch.islower() or ch.isdigit()):
+            plan = ReplacementPlan(
+                backspaces_to_send=1 if suppress else 2,
+                text_to_inject=ch,
+                common_prefix_len=0,
+                original_full=f" {ch}",
+                target_full=ch,
+            )
+            self._preceded_by_space = False
+            self._word_buffer.mark_tainted()
+            self._capitaliser.suppress()
+            if self._injector is not None:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            return SessionEventOutcome(
+                action=KeyAction.SUPPRESS_AND_INJECT if suppress else KeyAction.PASS_THROUGH,
+                replacement_plan=plan,
+                reason_tag="AUTO_SPACE_UNDONE",
+            )
+
+        # Anything else (capital letter, Return, symbol): the space stays.
+        return None
+
     def _evaluate_boundary(
         self,
         delimiter: str,
@@ -561,16 +840,24 @@ class InputSessionManager:
             # Replaying existing text: advance context exactly as an accepted,
             # uncorrected word would, and never evaluate, expand or inject.
             self._context_ring.push(self._engine.resolve_word_id(token), token.lower())
+            if delimiter in CLAUSE_BOUNDARY_DELIMITERS:
+                self._context_ring.clear()
             self._capitaliser.on_word_completed(token, delimiter)
             self._last_completed_word = token
-            self._current_sentence_tokens.append(token)
+            self._current_sentence_tokens.append(token + delimiter if delimiter in (",", ";", ":") else token)
             if delimiter in (".", "!", "?", "\n"):
                 self._current_sentence_tokens.clear()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
+        # In passive mode (OS hooks that cannot block a key) a Return has already
+        # been delivered before we run: in chat apps the message is gone. Any
+        # injection now would land in the empty composer and send garbage, so a
+        # Return boundary only advances state and is never corrected after the fact.
+        passive_newline = delimiter == "\n" and not suppress_delimiter
+
         # Check Pro Snippet Expansion first (e.g. ';sig', '@@email')
         pro_active = self._entitlement_gate is None or self._entitlement_gate.is_pro_enabled()
-        if pro_active and self._snippet_matcher is not None:
+        if pro_active and self._snippet_matcher is not None and not passive_newline:
             full_trigger = f"{leading_prefix}{token}" if leading_prefix else token
             expanded = self._snippet_matcher.match_snippet(full_trigger)
             if expanded is not None:
@@ -599,7 +886,8 @@ class InputSessionManager:
         # Build evaluation context from the 5-token ID ring buffer
         p1 = self._context_ring.prev1()
         p2 = self._context_ring.prev2()
-        eval_ctx = EvaluationContext(
+        eval_ctx = EvaluationContext.with_features(
+            self._features,
             prev1_word=p1.normalized_in_vocab_word if p1 else None,
             prev2_word=p2.normalized_in_vocab_word if p2 else None,
             prev1_word_id=p1.word_id if p1 else None,
@@ -610,9 +898,6 @@ class InputSessionManager:
             trailing_delimiter=delimiter,
             active_region=self._active_region,
             is_code_or_terminal_app=self._focus_context.is_terminal_or_code,
-            enable_punctuation_assist=self._enable_punctuation_assist,
-            enable_auto_capitalise=self._enable_auto_capitalise,
-            aggressiveness=self._aggressiveness,
         )
 
         decision = self._engine.evaluate_token(token, eval_ctx)
@@ -639,7 +924,13 @@ class InputSessionManager:
         # 'a egg' -> 'an egg', 'a eggs' -> 'an egg', 'there is many' -> 'there are many')
         retro_plan: ReplacementPlan | None = None
         final_word = decision.replacement_token if decision.should_replace else token
-        if not self._focus_context.is_terminal_or_code and self._last_completed_word and p1 is not None:
+        if (
+            not passive_newline
+            and self._features.enable_retroactive
+            and not self._focus_context.is_terminal_or_code
+            and self._last_completed_word
+            and p1 is not None
+        ):
             retro_prev = evaluate_retroactive_two_word_confusion(
                 self._last_completed_word,
                 final_word,
@@ -676,9 +967,16 @@ class InputSessionManager:
         # Advance context ring buffer and sentence boundary tracker
         final_wid = self._engine.resolve_word_id(final_word)
         self._context_ring.push(final_wid, final_word.lower())
+        if delimiter in CLAUSE_BOUNDARY_DELIMITERS:
+            # Grammar / confusion context never crosses a clause boundary:
+            # 'Hi everyone, dont worry' must not see 'everyone' as the subject of 'dont'.
+            self._context_ring.clear()
         self._capitaliser.on_word_completed(final_word, delimiter)
         self._last_completed_word = final_word
-        self._current_sentence_tokens.append(final_word)
+        # Keep the clause mark on the token so grammar can see the boundary.
+        self._current_sentence_tokens.append(
+            final_word + delimiter if delimiter in (",", ";", ":") else final_word
+        )
 
         sentence_completed: str | None = None
         if delimiter in (".", "!", "?", "\n") and self._current_sentence_tokens:
@@ -688,7 +986,29 @@ class InputSessionManager:
             if self._capitaliser.is_sentence_start or delimiter in (".", "!", "?", "\n"):
                 self._current_sentence_tokens.clear()
 
+        if passive_newline:
+            # State is up to date (context ring, sentence start, last word); the
+            # text itself is left exactly as the user sent it.
+            self._tx_ledger.clear_active()
+            return SessionEventOutcome(
+                action=KeyAction.PASS_THROUGH,
+                decision=decision,
+                sentence_completed_text=sentence_completed,
+            )
+
+        # Sentence end: the field should read '<word><terminator> ' so the user
+        # can keep typing (a Space they type anyway is swallowed next).
+        auto_space = self._should_auto_space(final_word, delimiter, leading_prefix)
+        suffix = " " if auto_space else ""
+
         if retro_plan is not None and not retro_plan.is_noop:
+            if auto_space:
+                retro_plan = SuffixDiffPlanner.plan(
+                    original_full=retro_plan.original_full,
+                    target_full=retro_plan.target_full + suffix,
+                    delimiter_was_suppressed=suppress_delimiter,
+                )
+                self._arm_auto_space(timestamp_ms)
             if self._injector is not None:
                 self._injector.execute_replacement(retro_plan.backspaces_to_send, retro_plan.text_to_inject)
             return SessionEventOutcome(
@@ -701,7 +1021,7 @@ class InputSessionManager:
         if decision.should_replace:
             plan = SuffixDiffPlanner.plan(
                 original_full=decision.full_original,
-                target_full=decision.full_replacement,
+                target_full=decision.full_replacement + suffix,
                 delimiter_was_suppressed=suppress_delimiter,
             )
             self._tx_ledger.record_correction(
@@ -711,6 +1031,8 @@ class InputSessionManager:
                 reason=decision.reason,
                 timestamp_ms=timestamp_ms,
             )
+            if auto_space:
+                self._arm_auto_space(timestamp_ms)
             if self._injector is not None and not plan.is_noop:
                 self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
             return SessionEventOutcome(
@@ -722,6 +1044,25 @@ class InputSessionManager:
 
         # Any previous correction transaction expires once a subsequent word completes without correction
         self._tx_ledger.clear_active()
+
+        if auto_space:
+            original_full = f"{token}{delimiter}"
+            plan = SuffixDiffPlanner.plan(
+                original_full=original_full,
+                target_full=original_full + suffix,
+                delimiter_was_suppressed=suppress_delimiter,
+            )
+            self._arm_auto_space(timestamp_ms)
+            if self._injector is not None and not plan.is_noop:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            return SessionEventOutcome(
+                action=(KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH),
+                replacement_plan=plan,
+                decision=decision,
+                sentence_completed_text=sentence_completed,
+                reason_tag="AUTO_SPACE",
+            )
+
         return SessionEventOutcome(
             action=KeyAction.PASS_THROUGH,
             decision=decision,

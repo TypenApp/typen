@@ -14,7 +14,7 @@ from __future__ import annotations
 from pipeline.regression_runner import run_golden_corpus_regression
 
 from autocorrect.core.engine import AutocorrectEngine
-from autocorrect.core.models import EvaluationContext
+from autocorrect.core.models import CorrectionFeatures, EvaluationContext
 from autocorrect.input.ports import KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
@@ -52,7 +52,7 @@ def test_real_time_sentence_autocorrection() -> None:
     session = InputSessionManager(engine=engine)
     try:
         result = _type_string(session, "I recieved your mesage.")
-        assert result == "I received your message."
+        assert result == "I received your message. "
     finally:
         rm.close()
 
@@ -66,7 +66,10 @@ def test_capitalisation_and_brand_preservation() -> None:
             engine.evaluate_token("Recieved", EvaluationContext(is_sentence_start=True)).replacement_token
             == "Received"
         )
-        assert engine.evaluate_token("RECIEVED").replacement_token == "RECEIVED"
+        # ALL-CAPS words are left alone by default (acronyms / shouting); opt in to fix them.
+        assert engine.evaluate_token("RECIEVED").replacement_token == "RECIEVED"
+        all_caps_ctx = EvaluationContext.with_features(CorrectionFeatures(correct_all_caps=True))
+        assert engine.evaluate_token("RECIEVED", all_caps_ctx).replacement_token == "RECEIVED"
         assert engine.evaluate_token("THe").replacement_token == "The"
         assert engine.evaluate_token("iphone").replacement_token == "iPhone"
         assert engine.evaluate_token("javascript").replacement_token == "JavaScript"
@@ -89,15 +92,15 @@ def test_contextual_homophones_and_two_word_retroactive() -> None:
     engine = AutocorrectEngine(rm)
     session = InputSessionManager(engine=engine)
     try:
-        assert _type_string(session, "I went too the market.") == "I went to the market."
+        assert _type_string(session, "I went too the market.") == "I went to the market. "
         session.reset_all_state()
-        assert _type_string(session, "This is better then that.") == "This is better than that."
+        assert _type_string(session, "This is better then that.") == "This is better than that. "
         session.reset_all_state()
-        assert _type_string(session, "Look over their.") == "Look over there."
+        assert _type_string(session, "Look over their.") == "Look over there. "
         session.reset_all_state()
         assert _type_string(session, "your welcome ") == "You're welcome "
         session.reset_all_state()
-        assert _type_string(session, "its a great day.") == "It's a great day."
+        assert _type_string(session, "its a great day.") == "It's a great day. "
         session.reset_all_state()
         assert _type_string(session, "We visited there house ") == "We visited their house "
     finally:
@@ -115,7 +118,7 @@ def test_punctuation_assistance() -> None:
     engine = AutocorrectEngine(rm)
     session = InputSessionManager(engine=engine)
     try:
-        assert _type_string(session, "I dont think cant works.") == "I don't think can't works."
+        assert _type_string(session, "I dont think cant works.") == "I don't think can't works. "
         session.reset_all_state()
         assert _type_string(session, "Hello , world ") == "Hello, world "
         session.reset_all_state()
@@ -175,11 +178,11 @@ def test_automatic_sentence_capitalisation_and_abbreviation_guards() -> None:
         session.reset_all_state()
         # 'Dr.' is a known abbreviation so 'smith' (if lowercase common word 'tall') must NOT be auto-capitalised as a new sentence
         out_abbr = _type_string(session, "We met Dr. tall yesterday.")
-        assert out_abbr == "We met Dr. tall yesterday."
+        assert out_abbr == "We met Dr. tall yesterday. "
 
         session.reset_all_state()
         out_eg = _type_string(session, "Use tools e.g. python for scripts.")
-        assert out_eg == "Use tools e.g. python for scripts."
+        assert out_eg == "Use tools e.g. python for scripts. "
     finally:
         rm.close()
 

@@ -176,9 +176,9 @@ def test_app_profile_applies_settings_and_packs(tmp_path: Path) -> None:
         )
         d._on_focus_changed(FocusContext(process_name="code.exe", bundle_or_app_id="code.exe"))
         assert "programming" in d.resource_manager.active_bundle.domain_packs
-        assert d.session._enable_auto_capitalise is False
+        assert d.session.features.enable_auto_capitalise is False
         d._on_focus_changed(FocusContext(process_name="notepad.exe"))
-        assert d.session._enable_auto_capitalise is True
+        assert d.session.features.enable_auto_capitalise is True
         assert "programming" not in d.resource_manager.active_bundle.domain_packs
     finally:
         d.stop()

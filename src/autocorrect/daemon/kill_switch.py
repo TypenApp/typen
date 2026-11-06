@@ -1,6 +1,7 @@
 """
-Emergency kill switch: hold Esc for `hold_seconds` (default 15) anywhere and
-typing assistance is switched off.
+Hold-Esc switch: hold Esc for `hold_seconds` (default 10) anywhere and typing
+assistance toggles between paused and active (the daemon decides what the
+trigger means; this module only detects the hold).
 
 The watchdog is deliberately independent of the input hooks. It does not sit
 in the hook chain, it does not depend on the dispatcher worker, and it uses a
@@ -24,12 +25,36 @@ from typing import Final
 
 log = logging.getLogger(__name__)
 
-DEFAULT_HOLD_SECONDS: Final[float] = 15.0
+DEFAULT_HOLD_SECONDS: Final[float] = 10.0
+LEGACY_DEFAULT_HOLD_SECONDS: Final[float] = 15.0
 DEFAULT_POLL_INTERVAL_S: Final[float] = 0.1
-MIN_HOLD_SECONDS: Final[float] = 3.0
+MIN_HOLD_SECONDS: Final[float] = 5.0
 MAX_HOLD_SECONDS: Final[float] = 120.0
 PREF_KEY_HOLD_SECONDS: Final[str] = "panic_hold_seconds"
 PREF_KEY_ENABLED: Final[str] = "panic_hotkey_enabled"
+PREF_KEY_HOLD_MIGRATED: Final[str] = "panic_hold_seconds_migrated_v2"
+
+
+def migrate_hold_seconds(
+    get_setting: Callable[[str, str | None], str | None],
+    set_setting: Callable[[str, str], None],
+) -> float:
+    """
+    Read the stored hold time, moving a never-customised legacy 15 s default to
+    the new 10 s default exactly once. `get_setting(key, default)` and
+    `set_setting(key, value)` are the preference-store accessors.
+    """
+    raw = get_setting(PREF_KEY_HOLD_SECONDS, None)
+    if get_setting(PREF_KEY_HOLD_MIGRATED, "false") != "true":
+        set_setting(PREF_KEY_HOLD_MIGRATED, "true")
+        try:
+            stored = float(raw) if raw is not None else None
+        except (TypeError, ValueError):
+            stored = None
+        if stored is None or stored == LEGACY_DEFAULT_HOLD_SECONDS:
+            set_setting(PREF_KEY_HOLD_SECONDS, str(DEFAULT_HOLD_SECONDS))
+            return DEFAULT_HOLD_SECONDS
+    return clamp_hold_seconds(raw)
 
 
 def clamp_hold_seconds(value: float | str | None) -> float:
@@ -120,7 +145,10 @@ class KillSwitch:
     continuously for `hold_seconds`, call `on_trigger(reason)` once and
     require a release before it can fire again.
 
-    `hold_progress` (0..1) is exposed so a UI can show a countdown.
+    `hold_progress` (0..1) is exposed so a UI can show a countdown, and
+    `on_hold_progress(seconds_remaining)` (optional) is called on every poll
+    while Esc is down once the hold is at least a third of the way, then once
+    with None when the key is released or the switch fires.
     """
 
     def __init__(
@@ -132,9 +160,12 @@ class KillSwitch:
         poll_interval_s: float = DEFAULT_POLL_INTERVAL_S,
         clock: Callable[[], float] = time.monotonic,
         sleeper: Callable[[float], None] | None = None,
+        on_hold_progress: Callable[[float | None], None] | None = None,
     ) -> None:
         self._probe = is_escape_down
         self._on_trigger = on_trigger
+        self._on_hold_progress = on_hold_progress
+        self._progress_shown = False
         self._hold = clamp_hold_seconds(hold_seconds)
         self._poll = poll_interval_s
         self._clock = clock
@@ -172,7 +203,9 @@ class KillSwitch:
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="autocorrect-kill-switch", daemon=True)
         self._thread.start()
-        log.info("kill switch armed: hold Esc for %.0f s to disable typing assistance", self._hold)
+        log.info(
+            "hold-Esc switch armed: hold Esc for %.0f s to pause or resume typing assistance", self._hold
+        )
 
     def stop(self) -> None:
         self._stop.set()
@@ -199,21 +232,37 @@ class KillSwitch:
         if not down:
             self._held_since = None
             self._armed = True
+            self._report_progress(None)
             return False
         if self._held_since is None:
             self._held_since = now
             return False
-        if self._armed and now - self._held_since >= self._hold:
+        elapsed = now - self._held_since
+        if self._armed and elapsed >= self._hold:
             self._armed = False
             self.trigger_count += 1
+            self._report_progress(None)
             reason = f"Esc held for {self._hold:.0f} s"
-            log.warning("kill switch triggered: %s", reason)
+            log.info("hold-Esc switch triggered: %s", reason)
             try:
                 self._on_trigger(reason)
             except Exception:
-                log.exception("kill switch handler raised")
+                log.exception("hold-Esc handler raised")
             return True
+        if self._armed and elapsed >= self._hold / 3.0:
+            self._report_progress(max(0.0, self._hold - elapsed))
         return False
+
+    def _report_progress(self, remaining: float | None) -> None:
+        if self._on_hold_progress is None:
+            return
+        if remaining is None and not self._progress_shown:
+            return
+        self._progress_shown = remaining is not None
+        try:
+            self._on_hold_progress(remaining)
+        except Exception:
+            log.exception("hold progress handler raised")
 
     def _run(self) -> None:
         while not self._stop.is_set():

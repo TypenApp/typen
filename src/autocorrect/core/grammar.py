@@ -938,10 +938,15 @@ def _extract_active_clause_tokens(ctx: EvaluationContext) -> list[str]:
     else:
         raw = [t.lower() for t in (ctx.prev2_word, ctx.prev1_word) if t]
 
-    # Slice after the most recent subordinate/coordinate clause boundary
+    # Slice after the most recent subordinate/coordinate clause boundary. A token
+    # carrying a trailing ',', ';' or ':' (the session attaches the mark the word
+    # was completed with) closes the clause: 'Hi everyone, dont worry' must not
+    # read 'everyone' as the subject of 'dont'.
     clause: list[str] = []
     for tok in raw:
-        if tok in CLAUSE_BOUNDARY_TOKENS:
+        if tok and tok[-1] in ",;:":
+            clause = []
+        elif tok in CLAUSE_BOUNDARY_TOKENS:
             clause = [tok]
         else:
             clause.append(tok)

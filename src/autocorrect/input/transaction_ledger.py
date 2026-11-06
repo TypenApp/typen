@@ -54,6 +54,11 @@ class TransactionLedger:
         self._one_shot_suppression: tuple[str, str] | None = None
         self._suggested_words: dict[str, dict[str, object]] = {}
         self._max_suppressions = max_session_suppressions
+        self._undo_window_ms: float = MAX_DOUBLE_BACKSPACE_GAP_MS
+
+    def set_undo_window_ms(self, window_ms: float) -> None:
+        """Longest pause allowed between the two Backspaces of an undo gesture."""
+        self._undo_window_ms = max(100.0, float(window_ms))
 
     @property
     def suggested_dictionary_words(self) -> list[dict[str, object]]:
@@ -127,7 +132,7 @@ class TransactionLedger:
         if (
             timestamp_ms > 0.0
             and self._active.first_backspace_ms > 0.0
-            and (timestamp_ms - self._active.first_backspace_ms) > MAX_DOUBLE_BACKSPACE_GAP_MS
+            and (timestamp_ms - self._active.first_backspace_ms) > self._undo_window_ms
         ):
             # Too long a pause between first and second Backspace: disarm undo.
             self._active = None
@@ -165,7 +170,7 @@ class TransactionLedger:
         if orig_clean and " " not in orig_clean and orig_clean.lower() != corr_clean.lower():
             low = orig_clean.lower()
             prev = self._suggested_words.get(low)
-            prev_count = int(prev["revert_count"]) if prev is not None else 0
+            prev_count = int(str(prev["revert_count"])) if prev is not None else 0
             self._suggested_words[low] = {
                 "word": orig_clean,
                 "corrected_to": corr_clean,

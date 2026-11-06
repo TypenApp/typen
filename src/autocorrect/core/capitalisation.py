@@ -105,6 +105,11 @@ BUILTIN_ABBREVIATIONS: Final[frozenset[str]] = frozenset(
         "m.a",
         "b.sc",
         "m.sc",
+        "ph",  # 'Ph.D.' typed one dot at a time
+        "www",
+        "http",
+        "https",
+        "ftp",
     }
 )
 
@@ -142,6 +147,13 @@ class SentenceCapitaliser:
     def suppress(self) -> None:
         """Suppress sentence capitalisation when caret is moved or buffer is tainted."""
         self._state = SentenceBoundaryState.SUPPRESSED
+
+    def mark_after_terminal(self) -> None:
+        """The caret sits right after '.', '!' or '?': the next Space starts a sentence."""
+        self._state = SentenceBoundaryState.AWAITING_SPACE_AFTER_TERMINAL
+
+    def mark_mid_sentence(self) -> None:
+        self._state = SentenceBoundaryState.MID_SENTENCE
 
     def is_abbreviation(self, token_before_dot: str) -> bool:
         """

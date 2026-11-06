@@ -98,10 +98,24 @@ def is_all_caps_acronym(token: str) -> bool:
     return alpha_only.isupper()
 
 
-def should_skip_token(token: str, leading_prefix: str = "") -> bool:
+MENTION_PREFIXES: Final[tuple[str, ...]] = ("@", "#")
+
+
+def should_skip_token(
+    token: str,
+    leading_prefix: str = "",
+    *,
+    ignore_digits: bool = True,
+    ignore_acronyms: bool = True,
+    ignore_symbols: bool = True,
+    ignore_mentions: bool = True,
+    ignore_longer_than: int = 0,
+) -> bool:
     """
     Evaluate all zero-touch lexical guards.
     Returns True if the token must be preserved verbatim without spelling correction.
+    The `ignore_*` switches are the user's "Ignore rules"; the structural guards
+    (URLs, code symbols, camelCase, hex) are always on.
     """
     if not token:
         return True
@@ -110,9 +124,17 @@ def should_skip_token(token: str, leading_prefix: str = "") -> bool:
     if len(token) == 1 and token != "i":
         return True
 
-    # 2. Protected leading prefixes (CLI flags, paths, mentions, hashtags, env vars)
-    if leading_prefix and any(leading_prefix.endswith(p) for p in PROTECTED_PREFIXES):
+    # 1a. Very long tokens are identifiers, hashes or pasted keys, never prose.
+    if ignore_longer_than and len(token) > ignore_longer_than:
         return True
+
+    # 2. Protected leading prefixes (CLI flags, paths, mentions, hashtags, env vars)
+    if leading_prefix:
+        if any(leading_prefix.endswith(p) for p in MENTION_PREFIXES):
+            if ignore_mentions:
+                return True
+        elif any(leading_prefix.endswith(p) for p in PROTECTED_PREFIXES):
+            return True
 
     # 2a. Trailing possessive apostrophe on a plural/sibilant noun ("dogs'", "James'",
     #     "programs'"): leave the word verbatim rather than treating the bare stem as OOV.
@@ -122,17 +144,19 @@ def should_skip_token(token: str, leading_prefix: str = "") -> bool:
     # 2b. Internal hyphenated compound with alphabetic parts on both sides
     #     ("world-wide", "state-of-the-art", "non-profit", "re-evaluated"): intentional
     #     user formatting, never collapse it into a single word.
-    if "-" in token.strip("-"):
+    if ignore_symbols and "-" in token.strip("-"):
         parts = token.split("-")
         if len(parts) >= 2 and all(p.isalpha() for p in parts if p):
             return True
 
     # 3. Any token containing digits (v2, covid19, mp4, 3d, sha256, passwords)
-    if any(ch.isdigit() for ch in token):
+    if ignore_digits and any(ch.isdigit() for ch in token):
         return True
 
     # 4. Snake_case, paths, or embedded code symbols
-    if any(sym in token for sym in ("_", "/", "\\", "@", "$", "=", "+", "*", "<", ">", "|", "`")):
+    if any(sym in token for sym in ("/", "\\", "@", "$", "=", "+", "*", "<", ">", "|", "`")):
+        return True
+    if ignore_symbols and "_" in token:
         return True
 
     # 5. URLs, domains, or email addresses
@@ -140,7 +164,7 @@ def should_skip_token(token: str, leading_prefix: str = "") -> bool:
         return True
 
     # 6. Internal dots (e.g. file.py, config.json, U.S.A, node.js)
-    if "." in token.strip("."):
+    if ignore_symbols and "." in token.strip("."):
         return True
 
     # 7. camelCase or PascalCase identifiers (e.g. useEffect, TypeScript)
@@ -150,7 +174,7 @@ def should_skip_token(token: str, leading_prefix: str = "") -> bool:
     # 8. Short ALL_CAPS acronyms (2..5 chars like HTML, WSGI, CORS, НАТО)
     # Note: Longer all-caps typos (e.g. RECIEVED) can be corrected if unambiguous,
     # so we only guard short acronyms <= 5 letters unless in direct typo table.
-    if is_all_caps_acronym(token) and len(token) <= 5:
+    if ignore_acronyms and is_all_caps_acronym(token) and len(token) <= 5:
         return True
 
     # 9. Hex strings
