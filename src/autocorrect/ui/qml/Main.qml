@@ -1,583 +1,231 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Typen
 
 ApplicationWindow {
-    id: window
-    width: 1060
-    height: 720
-    minimumWidth: 920
-    minimumHeight: 620
+    id: win
+    width: 1120
+    height: 760
+    minimumWidth: 880
+    minimumHeight: 560
     visible: true
-    title: "Typen — Settings"
-    color: "#0b0f19"
+    title: "Typen"
+    color: Theme.paper
 
-    // Design Tokens
-    readonly property color bgPrimary: "#0b0f19"
-    readonly property color bgSidebar: "#111827"
-    readonly property color bgCard: "#1e293b"
-    readonly property color bgInput: "#090d16"
-    readonly property color borderSubtle: "#334155"
-    readonly property color textPrimary: "#f8fafc"
-    readonly property color textSecondary: "#94a3b8"
-    readonly property color accentBlue: "#3b82f6"
-    readonly property color accentGreen: "#10b981"
-    readonly property color accentAmber: "#f59e0b"
-    readonly property color accentRed: "#ef4444"
+    // Theme follows the bridge (system/light/dark + Syne).
+    Binding { target: Theme; property: "dark"; value: bridge.themeIsDark }
+    Binding { target: Theme; property: "displayFamily"; value: bridge.fontFamily }
 
-    property int currentScreenIndex: 0
+    // Screens. `title` strings here match SettingsController.SCREEN_NAMES exactly.
+    ListModel {
+        id: screens
+        ListElement { title: "Overview";       number: "01"; file: "OverviewPage.qml" }
+        ListElement { title: "General";        number: "02"; file: "GeneralPage.qml" }
+        ListElement { title: "Language";       number: "03"; file: "LanguagePage.qml" }
+        ListElement { title: "Corrections";    number: "04"; file: "CorrectionsPage.qml" }
+        ListElement { title: "Dictionary";     number: "05"; file: "DictionaryPage.qml" }
+        ListElement { title: "Apps";           number: "06"; file: "AppsPage.qml" }
+        ListElement { title: "Text Expansion"; number: "07"; file: "SnippetsPage.qml" }
+        ListElement { title: "Intelligence";   number: "08"; file: "IntelligencePage.qml" }
+        ListElement { title: "Updates";        number: "09"; file: "UpdatesPage.qml" }
+        ListElement { title: "Feedback";       number: "10"; file: "FeedbackPage.qml" }
+        ListElement { title: "About";          number: "11"; file: "AboutPage.qml" }
+    }
 
-    readonly property var navItems: [
-        { title: "Overview", subtitle: "Status & typing insights", badge: "" },
-        { title: "General", subtitle: "Startup, hotkeys & privacy", badge: "" },
-        { title: "Dictionary", subtitle: "Custom & suggested words", badge: "" },
-        { title: "Languages", subtitle: "Regions & 6 domain packs", badge: "" },
-        { title: "Corrections", subtitle: "Sensitivity, rules & undo", badge: "" },
-        { title: "Intelligence", subtitle: "Local AI & BYOK Cloud AI", badge: "" },
-        { title: "Profiles", subtitle: "Per-application behaviour", badge: "" },
-        { title: "Text Expansion", subtitle: "Snippets & macros", badge: "" },
-        { title: "Updates", subtitle: "App, lexicon & AI models", badge: "" },
-        { title: "About", subtitle: "Version, licence & support", badge: "" }
-    ]
+    property int currentIndex: 0
+
+    function indexForScreen(name) {
+        var wanted = String(name || "").trim().toLowerCase().replace(/[-_ ]+/g, " ")
+        for (var i = 0; i < screens.count; i++) {
+            var t = screens.get(i).title.toLowerCase()
+            if (t === wanted || t.replace(/\s+/g, "") === wanted.replace(/\s+/g, "")) return i
+        }
+        if (wanted === "snippets" || wanted === "expansion") return 6
+        if (wanted === "ai") return 7
+        return 0
+    }
+    Component.onCompleted: {
+        var initial = (typeof initialScreen === "string" && initialScreen) ? initialScreen : bridge.initialScreen
+        if (initial) currentIndex = indexForScreen(initial)
+    }
 
     RowLayout {
         anchors.fill: parent
         spacing: 0
 
-        // --- Left Sidebar Navigation Rail (240px) ---
+        // ---------------------------------------------------------------- Sidebar
         Rectangle {
-            Layout.preferredWidth: 248
             Layout.fillHeight: true
-            color: window.bgSidebar
+            Layout.preferredWidth: Theme.sidebarWidth
+            color: Theme.paper1
 
             ColumnLayout {
                 anchors.fill: parent
-                anchors.margins: 16
-                spacing: 8
+                anchors.margins: 20
+                spacing: 0
 
-                // Brand Header
                 RowLayout {
-                    Layout.fillWidth: true
                     spacing: 10
+                    BrandMark { tileHeight: 28; paused: bridge.isPaused }
+                    Text {
+                        text: "Typen"
+                        color: Theme.ink
+                        font.family: Theme.display
+                        font.pixelSize: 20
+                        font.weight: Font.Bold
+                        font.letterSpacing: -0.5
+                    }
+                    Item { Layout.fillWidth: true }
+                }
+                Item { height: 28 }
+
+                Repeater {
+                    model: screens
                     Rectangle {
-                        width: 34
-                        height: 34
-                        radius: 9
-                        color: window.accentBlue
-                        Text {
-                            anchors.centerIn: parent
-                            text: "✓"
-                            color: "#ffffff"
-                            font.pixelSize: 18
-                            font.bold: true
+                        required property int index
+                        required property string title
+                        required property string number
+                        readonly property bool selected: index === win.currentIndex
+                        Layout.fillWidth: true
+                        implicitHeight: 34
+                        radius: Theme.radiusSm
+                        color: selected ? Theme.paper3 : (navHover.hovered ? Theme.paper2 : "transparent")
+                        HoverHandler { id: navHover }
+                        TapHandler { onTapped: win.currentIndex = index }
+                        Rectangle {
+                            visible: selected
+                            width: 3; height: 16; radius: 1.5
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            color: Theme.proof
                         }
-                    }
-                    ColumnLayout {
-                        spacing: 1
-                        Text {
-                            text: "Typen"
-                            color: window.textPrimary
-                            font.pixelSize: 16
-                            font.bold: true
-                        }
-                        Text {
-                            text: "v" + bridge.appVersion + " • free & open source"
-                            color: window.textSecondary
-                            font.pixelSize: 11
-                        }
-                    }
-                }
-
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: window.borderSubtle
-                    Layout.topMargin: 6
-                    Layout.bottomMargin: 6
-                }
-
-                // 10-Screen Navigation List
-                ListView {
-                    id: navList
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    model: window.navItems
-                    spacing: 4
-                    clip: true
-
-                    delegate: Rectangle {
-                        width: navList.width
-                        height: 46
-                        radius: 8
-                        color: index === window.currentScreenIndex ? "#1d4ed8" : "transparent"
-
                         RowLayout {
                             anchors.fill: parent
                             anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 8
-
-                            ColumnLayout {
+                            anchors.rightMargin: 10
+                            spacing: 10
+                            Text {
+                                text: number
+                                color: selected ? Theme.proof : Theme.inkFaint
+                                font.family: Theme.mono
+                                font.pixelSize: 11
+                            }
+                            Text {
+                                text: title
+                                color: selected ? Theme.ink : Theme.inkMuted
+                                font.family: Theme.sans
+                                font.pixelSize: Theme.fsBody
+                                font.weight: selected ? Font.DemiBold : Font.Normal
                                 Layout.fillWidth: true
-                                spacing: 1
-                                Text {
-                                    text: modelData.title
-                                    color: window.textPrimary
-                                    font.pixelSize: 13
-                                    font.bold: index === window.currentScreenIndex
-                                }
-                                Text {
-                                    text: modelData.subtitle
-                                    color: index === window.currentScreenIndex ? "#bfdbfe" : window.textSecondary
-                                    font.pixelSize: 10
-                                }
+                                elide: Text.ElideRight
                             }
-
-                            Rectangle {
-                                visible: modelData.badge !== ""
-                                width: 34
-                                height: 18
-                                radius: 9
-                                color: "#312e81"
-                                Text {
-                                    anchors.centerIn: parent
-                                    text: modelData.badge
-                                    color: "#a5b4fc"
-                                    font.pixelSize: 9
-                                    font.bold: true
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: window.currentScreenIndex = index
                         }
                     }
                 }
 
-                // IPC Connection Health Footer
+                Item { Layout.fillHeight: true }
+
+                // Status footer
                 Rectangle {
                     Layout.fillWidth: true
-                    height: 52
-                    radius: 8
-                    color: window.bgCard
-                    border.color: window.borderSubtle
-                    border.width: 1
-
-                    RowLayout {
+                    implicitHeight: footCol.implicitHeight + 24
+                    radius: Theme.radius
+                    color: Theme.paper
+                    border.color: Theme.line
+                    ColumnLayout {
+                        id: footCol
                         anchors.fill: parent
-                        anchors.margins: 10
-                        spacing: 8
-                        Rectangle {
-                            width: 10
-                            height: 10
-                            radius: 5
-                            color: bridge.isPaused ? window.accentAmber : window.accentGreen
+                        anchors.margins: 12
+                        spacing: 6
+                        RowLayout {
+                            spacing: 8
+                            Rectangle {
+                                width: 8; height: 8; radius: 4
+                                color: !bridge.ipcConnected ? Theme.proof : (bridge.isPaused ? Theme.inkFaint : Theme.ok)
+                            }
+                            Text {
+                                text: !bridge.ipcConnected ? "Not running" : (bridge.isPaused ? "Paused" : "Active")
+                                color: Theme.ink
+                                font.family: Theme.sans
+                                font.pixelSize: Theme.fsSmall
+                                font.weight: Font.DemiBold
+                            }
+                            Item { Layout.fillWidth: true }
+                            Text { text: "v" + bridge.appVersion; color: Theme.inkFaint; font.family: Theme.mono; font.pixelSize: 11 }
                         }
-                        ColumnLayout {
+                        SecondaryButton {
                             Layout.fillWidth: true
-                            spacing: 1
-                            Text {
-                                text: bridge.isPaused ? "Assistance Paused" : "System Hook Active"
-                                color: window.textPrimary
-                                font.pixelSize: 11
-                                font.bold: true
-                            }
-                            Text {
-                                text: bridge.ipcTransportLabel
-                                color: window.textSecondary
-                                font.pixelSize: 10
-                            }
+                            text: bridge.isPaused ? "Resume" : "Pause"
+                            onClicked: bridge.togglePause()
                         }
                     }
                 }
             }
+            Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.line }
         }
 
-        // --- Main Content Stack (10 Screens) ---
-        StackLayout {
+        // ---------------------------------------------------------------- Content
+        Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            currentIndex: window.currentScreenIndex
 
-            // =================================================================
-            // SCREEN 1: OVERVIEW
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-
-                    Text {
-                        text: "1. Overview & Live Typing Insights"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 90
-                        radius: 12
-                        color: window.bgCard
-                        border.color: window.borderSubtle
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 20
-                            ColumnLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: bridge.statusMessage
-                                    color: window.textPrimary
-                                    font.pixelSize: 15
-                                    font.bold: true
-                                }
-                                Text {
-                                    text: "Active Region: " + bridge.activeRegion + "  •  Lexicon (mmap): " + bridge.lexiconWordCount + " words  •  Custom Words: " + bridge.customWordCount
-                                    color: window.textSecondary
-                                    font.pixelSize: 12
-                                }
-                            }
-                            Button {
-                                text: bridge.isPaused ? "Resume Typing Assistance" : "Pause Assistance"
-                                onClicked: bridge.togglePause()
-                            }
-                        }
-                    }
-
-                    // Custom LGPL-Safe QML Bar Chart for Local Insights (Zero QtCharts GPL module)
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 240
-                        radius: 12
-                        color: window.bgCard
-                        border.color: window.borderSubtle
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 20
-                            spacing: 10
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "Privacy-Preserving Local Typing Insights (Aggregate Counters Only)"
-                                    color: window.textPrimary
-                                    font.pixelSize: 14
-                                    font.bold: true
-                                    Layout.fillWidth: true
-                                }
-                                Button {
-                                    text: "Reset Counters"
-                                    onClicked: bridge.resetInsights()
-                                }
-                            }
-                            Text {
-                                text: bridge.insightsSummaryText
-                                color: window.textSecondary
-                                font.pixelSize: 13
-                                wrapMode: Text.WordWrap
-                                Layout.fillWidth: true
-                            }
-                        }
+            StackLayout {
+                id: stack
+                anchors.fill: parent
+                currentIndex: win.currentIndex
+                Repeater {
+                    model: screens
+                    Loader {
+                        required property int index
+                        required property string file
+                        // Lazy: instantiate on first show, keep alive afterwards.
+                        property bool shown: index === win.currentIndex
+                        onShownChanged: if (shown) active = true
+                        active: index === win.currentIndex
+                        source: "pages/" + file
+                        visible: shown
                     }
                 }
             }
 
-            // =================================================================
-            // SCREEN 2: GENERAL
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "2. General Preferences & Privacy Controls"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Rectangle {
-                        Layout.fillWidth: true
-                        height: 220
-                        radius: 12
-                        color: window.bgCard
-                        border.color: window.borderSubtle
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 20
-                            spacing: 12
-                            CheckBox {
-                                text: "Launch the Typen background service automatically at OS login"
-                                checked: bridge.launchAtLogin
-                                onToggled: bridge.setLaunchAtLogin(checked)
-                            }
-                            Text {
-                                text: "Sentence Rewrite Hotkey: " + bridge.rewriteHotkey + "  |  Pause Hotkey: " + bridge.pauseHotkey
-                                color: window.textSecondary
-                                font.pixelSize: 13
-                            }
-                            Button {
-                                text: "One-Click Privacy Wipe (Clear All Custom Words & Preferences)"
-                                onClicked: bridge.privacyWipe()
-                            }
-                        }
-                    }
+            // Toast overlay
+            Rectangle {
+                id: toastBox
+                property bool isError: false
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 24
+                width: toastText.implicitWidth + 32
+                height: 38
+                radius: 19
+                color: isError ? Theme.proof : Theme.ink
+                opacity: 0
+                visible: opacity > 0
+                Behavior on opacity { NumberAnimation { duration: 180 } }
+                Text {
+                    id: toastText
+                    anchors.centerIn: parent
+                    color: Theme.paper
+                    font.family: Theme.sans
+                    font.pixelSize: Theme.fsSmall
+                    font.weight: Font.DemiBold
                 }
-            }
-
-            // =================================================================
-            // SCREEN 3: DICTIONARY
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "3. My Custom Dictionary & Reverted Suggestions"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-                        TextField {
-                            id: newWordField
-                            Layout.fillWidth: true
-                            placeholderText: "Enter a word, name, or technical term to never correct..."
-                            onAccepted: {
-                                bridge.addCustomWord(newWordField.text)
-                                newWordField.text = ""
-                            }
-                        }
-                        Button {
-                            text: "Add Word"
-                            onClicked: {
-                                bridge.addCustomWord(newWordField.text)
-                                newWordField.text = ""
-                            }
-                        }
-                    }
-                    Text {
-                        text: "Active Custom Words (" + bridge.customWordCount + "): " + bridge.customWordsPreview
-                        color: window.textPrimary
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                    Text {
-                        text: "Suggested Words from Double-Backspace Reverts: " + bridge.suggestedWordsPreview
-                        color: window.accentAmber
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 4: LANGUAGES
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "4. Regional English & Domain Vocabulary Packs"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    RowLayout {
-                        spacing: 8
-                        Repeater {
-                            model: ["EN_GB", "EN_US", "EN_CA", "EN_AU", "UNIVERSAL"]
-                            Button {
-                                text: modelData
-                                highlighted: bridge.activeRegion === modelData
-                                onClicked: bridge.setRegion(modelData)
-                            }
-                        }
-                    }
-                    Text {
-                        text: "Enabled Domain Vocabulary Packs: " + bridge.enabledDomainPacksText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 5: CORRECTIONS
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "5. Correction Behaviour, Punctuation & Undo"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.correctionsSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 6: INTELLIGENCE
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "6. Intelligence: Local AI & BYOK Cloud AI"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.aiSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 7: PROFILES
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "7. Application-Specific Typing Profiles"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.profilesSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 8: TEXT EXPANSION
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "8. Text Expansion Snippets"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.snippetsSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 9: UPDATES
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "9. Independent Updates: App, Language Library & AI Models"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.updatesSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                    Button {
-                        text: "Rollback Language Library to Last Known Good"
-                        onClicked: bridge.rollbackResources()
-                    }
-                }
-            }
-
-            // =================================================================
-            // SCREEN 10: ABOUT
-            // =================================================================
-            ScrollView {
-                clip: true
-                ColumnLayout {
-                    width: parent.width - 48
-                    anchors.margins: 24
-                    spacing: 16
-                    Text {
-                        text: "10. About Typen"
-                        color: window.textPrimary
-                        font.pixelSize: 22
-                        font.bold: true
-                    }
-                    Text {
-                        text: bridge.aboutSummaryText
-                        color: window.textSecondary
-                        font.pixelSize: 13
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-                    RowLayout {
-                        spacing: 10
-                        Button {
-                            text: "Sponsor Typen on GitHub Sponsors"
-                            onClicked: bridge.openDonatePage()
-                        }
-                        Button {
-                            text: "View Source on GitHub"
-                            onClicked: bridge.openSourcePage()
-                        }
-                    }
-                }
+                Timer { id: toastTimer; interval: 3200; onTriggered: toastBox.opacity = 0 }
             }
         }
     }
+
+    Connections {
+        target: bridge
+        function onToast(message, isError) {
+            toastText.text = message
+            toastBox.isError = isError
+            toastBox.opacity = 1
+            toastTimer.restart()
+        }
+    }
+
+    Shortcut { sequences: [StandardKey.Close]; onActivated: win.close() }
+    Shortcut { sequence: "Ctrl+R"; onActivated: bridge.refresh() }
 }

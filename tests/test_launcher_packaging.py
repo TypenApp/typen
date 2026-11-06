@@ -75,11 +75,45 @@ def test_tray_controller_builds_menu_without_display() -> None:
     )
     menu = tray._build_menu()
     labels = [str(item) for item in menu.items if str(item).strip() and str(item) != "- - - -"]
-    assert any("Open Settings" in label for label in labels)
-    assert any("Pause typing assistance" in label for label in labels)
-    assert any("Quit" in label for label in labels)
+    assert labels[0] == "Open Typen"
+    assert "Pause" in labels
+    assert any("Send feedback" in label for label in labels)
+    assert labels[-1] == "Quit Typen"
     img = SystemTrayController.create_tray_icon_image(active=True)
     assert img.size == (64, 64)
+    # The pulse variant is visibly different (proof-red tile).
+    assert SystemTrayController.create_tray_icon_image(active=True, accent=True).tobytes() != img.tobytes()
+
+
+def test_tray_tooltip_is_short_and_menu_offers_resume_when_paused() -> None:
+    from autocorrect.daemon.tray import tooltip_for
+
+    assert tooltip_for(paused=False, needs_attention=False) == "Typen"
+    assert tooltip_for(paused=True, needs_attention=False) == "Typen - Paused"
+    assert tooltip_for(paused=True, needs_attention=True) == "Typen - Not correcting"
+    assert (
+        tooltip_for(paused=False, needs_attention=False, hold_remaining=3.6)
+        == "Typen - keep holding Esc (4 s)"
+    )
+    assert (
+        tooltip_for(paused=False, needs_attention=False, hold_remaining=0.2)
+        == "Typen - keep holding Esc (1 s)"
+    )
+
+    pytest.importorskip("pystray")
+    tray = SystemTrayController(on_toggle_pause=lambda: True, on_quit=lambda: None, is_paused=lambda: True)
+    labels = [str(item) for item in tray._build_menu().items]
+    assert "Resume" in labels and "Pause" not in labels
+    assert tray.tooltip() == "Typen - Paused"
+    # Pulse and countdown are harmless before the icon exists.
+    tray.pulse()
+    tray.show_hold_countdown(4.0)
+    tray.show_hold_countdown(None)
+
+
+def test_settings_command_can_target_a_screen(tmp_path: Path) -> None:
+    cmd = build_settings_command(tmp_path, screen="feedback")
+    assert cmd[-2:] == ["--screen", "feedback"]
 
 
 def test_bundled_resources_prefer_meipass_when_frozen(

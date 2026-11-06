@@ -22,6 +22,7 @@ Typen is free and open source: every screen is available to everyone.
 from __future__ import annotations
 
 import argparse
+import logging
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,9 @@ from autocorrect.licensing.entitlement_manager import (
     GITHUB_SPONSORS_URL,
     EntitlementManager,
 )
+from autocorrect.preferences import settings_schema
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
+from autocorrect.preferences.system_locale import detect_english_region
 from autocorrect.productivity.app_profiles import (
     ApplicationProfile,
     ApplicationProfileManager,
@@ -52,15 +55,32 @@ from autocorrect.version import APP_RELEASE_TIMESTAMP, APP_VERSION, BINARY_SCHEM
 SCREEN_NAMES: tuple[str, ...] = (
     "Overview",
     "General",
-    "Dictionary",
-    "Languages",
+    "Language",
     "Corrections",
-    "Intelligence",
-    "Profiles",
+    "Dictionary",
+    "Apps",
     "Text Expansion",
+    "Intelligence",
     "Updates",
+    "Feedback",
     "About",
 )
+
+
+def _bundled_manifest() -> dict[str, Any]:
+    """
+    The shipped `resources/en_base/manifest.json` (version, word_count, released_at),
+    used for the offline fallbacks when the daemon is not running. Empty when unreadable.
+    """
+    try:
+        import json
+
+        from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR
+
+        data = json.loads((DEFAULT_BUNDLED_DIR / "manifest.json").read_text(encoding="utf-8"))
+        return dict(data) if isinstance(data, dict) else {}
+    except Exception:
+        return {}
 
 
 class SettingsController:
@@ -81,11 +101,92 @@ class SettingsController:
         self._usage_tracker = UsageTracker(self._data_dir / "ai_usage.sqlite3")
         self._spending = SpendingController(usage_tracker=self._usage_tracker)
         self._local_ai = LocalModelManager(is_pro_entitled=True)
-        self._profiles = ApplicationProfileManager()
-        self._snippets = SnippetEngine()
-        self._insights = LocalInsightsStore(enabled=True)
+        # Offline fallbacks read and write the same tables as the daemon.
+        prefs = self._prefs
+        self._profiles = ApplicationProfileManager(
+            load=prefs.list_app_profiles, save=prefs.save_app_profile, delete=prefs.delete_app_profile
+        )
+        self._snippets = SnippetEngine(
+            load=prefs.list_snippets, save=prefs.save_snippet, delete=prefs.delete_snippet
+        )
+        self._insights = LocalInsightsStore(
+            enabled=bool(prefs.get_typed("insights_enabled")),
+            retention_days=int(prefs.get_typed("insights_retention_days")),
+            load=prefs.load_insights,
+            save_day=None,  # read-only mirror of the daemon's counters
+            prune=None,
+            clear=prefs.clear_insights,
+        )
         # Typen is free software: the entitlement manager always answers "allowed".
         self._entitlement_mgr = EntitlementManager()
+
+    # =========================================================================
+    # GENERIC SETTINGS (schema-driven; every screen's toggles go through here)
+    # =========================================================================
+    def get_settings_schema(self, group: str | None = None) -> list[dict[str, Any]]:
+        return settings_schema.schema_as_dicts(group)
+
+    def get_all_settings(self, group: str | None = None) -> dict[str, Any]:
+        ipc_res = self._call_ipc_if_online("settings.get_all", {"group": group} if group else {})
+        if ipc_res is not None and isinstance(ipc_res.get("values"), dict):
+            return dict(ipc_res["values"])
+        return self._prefs.get_all_typed(group)
+
+    def set_settings(self, values: dict[str, Any]) -> dict[str, Any]:
+        """Store (and, when the daemon is running, apply live) any schema keys in `values`."""
+        clean = {k: v for k, v in values.items() if k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("settings.set", {"values": clean})
+        if ipc_res is not None:
+            self._prefs.reload_into_overlay()
+            return dict(ipc_res.get("values") or self._prefs.get_all_typed())
+        for key, value in clean.items():
+            if key == "region":
+                self._prefs.set_region_preference(str(settings_schema.coerce(key, value)))
+            else:
+                self._prefs.set_typed(key, value)
+        return self._prefs.get_all_typed()
+
+    def set_setting(self, key: str, value: Any) -> dict[str, Any]:
+        return self.set_settings({key: value})
+
+    def try_text(self, text: str) -> str:
+        """Overview 'Try it': what the engine would make of `text` (daemon first, offline engine otherwise)."""
+        ipc_res = self._call_ipc_if_online("corrections.try_text", {"text": text})
+        if ipc_res is not None and "result" in ipc_res:
+            return str(ipc_res["result"])
+        return self._offline_try_text(text)
+
+    def _offline_try_text(self, text: str) -> str:
+        from autocorrect.core.engine import AutocorrectEngine
+        from autocorrect.core.models import CorrectionFeatures
+        from autocorrect.input.ports import KeyAction, KeyEvent
+        from autocorrect.input.session_state import InputSessionManager
+        from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
+
+        self._prefs.reload_into_overlay()
+        rm = ResourceManager(bundled_dir=DEFAULT_BUNDLED_DIR)
+        try:
+            engine = AutocorrectEngine(rm, preferences=self._prefs.overlay)
+            session = InputSessionManager(engine=engine, active_region=self._prefs.overlay.active_region)
+            session.configure_features(CorrectionFeatures.from_mapping(self._prefs.get_all_typed()))
+            out: list[str] = []
+            ts = 0.0
+            for ch in text[:400]:
+                ts += 80.0
+                key = "Space" if ch == " " else ("Return" if ch == "\n" else ch)
+                res = session.handle_key_event(
+                    KeyEvent(key_name=key, char=ch, timestamp_ms=ts), suppress_delimiter_on_replace=True
+                )
+                if res.action == KeyAction.PASS_THROUGH:
+                    out.append(ch)
+                elif res.action == KeyAction.SUPPRESS_AND_INJECT and res.replacement_plan is not None:
+                    for _ in range(res.replacement_plan.backspaces_to_send):
+                        if out:
+                            out.pop()
+                    out.extend(res.replacement_plan.text_to_inject)
+            return "".join(out)
+        finally:
+            rm.close()
 
     def _offline_pro_enabled(self) -> bool:
         """Feature-gate seam for the offline path; always True in Typen."""
@@ -98,6 +199,10 @@ class SettingsController:
     @property
     def preferences(self) -> SQLitePreferenceStore:
         return self._prefs
+
+    @property
+    def data_dir(self) -> Path:
+        return self._data_dir
 
     @property
     def api_keys(self) -> ApiKeyManager:
@@ -148,8 +253,9 @@ class SettingsController:
         self._prefs.reload_into_overlay()
         snap = self._entitlement_mgr.evaluate()
         ins = self._insights.get_summary()
-        enabled_packs_raw = self._prefs.get_setting("enabled_domain_packs", "")
-        enabled_packs = [p for p in enabled_packs_raw.split(",") if p]
+        enabled_packs = list(self._prefs.get_typed("enabled_domain_packs"))
+        stored_region = self._prefs.stored_region_name()
+        bundle = _bundled_manifest()
         return {
             "app_version": APP_VERSION,
             "hooks_active": False,
@@ -161,11 +267,14 @@ class SettingsController:
             },
             "is_paused": self._prefs.get_setting("is_paused", "false") == "true",
             "safe_mode": (self._data_dir / "safe_mode").exists(),
-            "active_region": self._prefs.overlay.active_region.name or "EN_GB",
+            "active_region": detect_english_region().name if stored_region == "AUTO" else stored_region,
+            "hold_esc_seconds": float(self._prefs.get_typed("panic_hold_seconds")),
+            "listening": None,
+            "session": {"corrections": 0, "last_correction": None},
             "custom_word_count": len(self._prefs.list_custom_words()),
             "suggested_word_count": len(self._prefs.list_suggested_words()),
-            "lexicon_word_count": 100_000,
-            "resource_version": "1.2.0",
+            "lexicon_word_count": int(bundle.get("word_count", 0) or 0),
+            "resource_version": str(bundle.get("version", "")),
             "enabled_domain_packs": enabled_packs,
             "entitlement": {
                 "mode": snap.mode,
@@ -208,6 +317,12 @@ class SettingsController:
         self._insights.reset()
         return {"ok": True}
 
+    def get_insights_daily(self) -> dict[str, Any]:
+        ipc_res = self._call_ipc_if_online("insights.get_daily")
+        if ipc_res is not None:
+            return ipc_res
+        return {"days": self._insights.get_daily(), "retention_days": self._insights.retention_days}
+
     # =========================================================================
     # SCREEN 2: GENERAL
     # =========================================================================
@@ -215,49 +330,18 @@ class SettingsController:
         ipc_res = self._call_ipc_if_online("general.get_settings")
         if ipc_res is not None:
             return ipc_res
-        return {
-            "launch_at_login": self._prefs.get_setting("launch_at_login", "false") == "true",
-            "show_tray_icon": self._prefs.get_setting("show_tray_icon", "true") == "true",
-            "rewrite_hotkey": self._prefs.get_setting("rewrite_hotkey", "Ctrl+Shift+R"),
-            "pause_hotkey": self._prefs.get_setting("pause_hotkey", "Ctrl+Alt+P"),
-            "settings_hotkey": self._prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"),
-        }
+        out = self._prefs.get_all_typed("general")
+        out["panic_hotkey_supported"] = False
+        out["schema"] = settings_schema.schema_as_dicts("general")
+        return out
 
-    def update_general_settings(
-        self,
-        *,
-        launch_at_login: bool | None = None,
-        show_tray_icon: bool | None = None,
-        rewrite_hotkey: str | None = None,
-        pause_hotkey: str | None = None,
-        settings_hotkey: str | None = None,
-    ) -> dict[str, Any]:
-        params: dict[str, Any] = {}
-        if launch_at_login is not None:
-            params["launch_at_login"] = launch_at_login
-        if show_tray_icon is not None:
-            params["show_tray_icon"] = show_tray_icon
-        if rewrite_hotkey is not None:
-            params["rewrite_hotkey"] = rewrite_hotkey
-        if pause_hotkey is not None:
-            params["pause_hotkey"] = pause_hotkey
-        if settings_hotkey is not None:
-            params["settings_hotkey"] = settings_hotkey
-
+    def update_general_settings(self, **changes: Any) -> dict[str, Any]:
+        """Any general-group key (launch_at_login, hotkeys, Esc switch, toasts, theme, insights, updates)."""
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
         ipc_res = self._call_ipc_if_online("general.update_settings", params)
         if ipc_res is not None:
             return ipc_res
-
-        if launch_at_login is not None:
-            self._prefs.set_setting("launch_at_login", "true" if launch_at_login else "false")
-        if show_tray_icon is not None:
-            self._prefs.set_setting("show_tray_icon", "true" if show_tray_icon else "false")
-        if rewrite_hotkey is not None and rewrite_hotkey.strip():
-            self._prefs.set_setting("rewrite_hotkey", rewrite_hotkey.strip())
-        if pause_hotkey is not None and pause_hotkey.strip():
-            self._prefs.set_setting("pause_hotkey", pause_hotkey.strip())
-        if settings_hotkey is not None and settings_hotkey.strip():
-            self._prefs.set_setting("settings_hotkey", settings_hotkey.strip())
+        self.set_settings(params)
         return self.get_general_settings()
 
     def privacy_wipe(self) -> dict[str, Any]:
@@ -276,10 +360,28 @@ class SettingsController:
         ipc_res = self._call_ipc_if_online("dictionary.get_state")
         if ipc_res is not None:
             return ipc_res
+        dict_settings = self._prefs.get_all_typed("dictionary")
         return {
             "words": self._prefs.list_custom_words(),
-            "suggested": self._prefs.list_suggested_words(),
+            "suggested": self._prefs.list_suggested_words_detailed(
+                min_reverts=int(dict_settings["suggest_after_reverts"]),
+                repeated_threshold=(
+                    int(dict_settings["learn_repeated_threshold"])
+                    if dict_settings["learn_repeated_oov"]
+                    else 0
+                ),
+            ),
+            "settings": dict_settings,
+            "schema": settings_schema.schema_as_dicts("dictionary"),
         }
+
+    def update_dictionary_settings(self, **changes: Any) -> dict[str, Any]:
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("dictionary.update_settings", params)
+        if ipc_res is not None:
+            return ipc_res
+        self.set_settings(params)
+        return self.get_dictionary_state()
 
     def list_custom_words(self) -> list[str]:
         """Return the user's custom dictionary words, sorted alphabetically."""
@@ -367,11 +469,19 @@ class SettingsController:
         if ipc_res is not None:
             return ipc_res
         self._prefs.reload_into_overlay()
-        enabled_raw = self._prefs.get_setting("enabled_domain_packs", "")
-        enabled_set = {p.strip() for p in enabled_raw.split(",") if p.strip()}
+        lang = self._prefs.get_all_typed("language")
+        enabled_set = set(lang["enabled_domain_packs"])
+        stored = self._prefs.stored_region_name()
+        system_region = detect_english_region().name
         return {
-            "active_region": self._prefs.overlay.active_region.name or "EN_GB",
+            "region_setting": stored,
+            "active_region": system_region if stored == "AUTO" else stored,
+            "system_region": system_region,
+            "variant_enforcement": lang["variant_enforcement"],
+            "uk_ize_spelling": lang["uk_ize_spelling"],
+            "schema": settings_schema.schema_as_dicts("language"),
             "available_regions": [
+                {"code": "AUTO", "name": "Follow system language"},
                 {"code": "EN_GB", "name": "British English (UK)"},
                 {"code": "EN_US", "name": "American English (US)"},
                 {"code": "EN_CA", "name": "Canadian English (CA)"},
@@ -398,6 +508,14 @@ class SettingsController:
         self._prefs.set_region_preference(region_code)
         return self.get_languages_state()
 
+    def update_language_settings(self, **changes: Any) -> dict[str, Any]:
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("languages.update_settings", params)
+        if ipc_res is not None:
+            return ipc_res
+        self.set_settings(params)
+        return self.get_languages_state()
+
     def set_enabled_domain_packs(self, pack_ids: list[str] | set[str]) -> dict[str, Any]:
         norm = sorted({str(p).strip().lower() for p in pack_ids if str(p).strip()})
         ipc_res = self._call_ipc_if_online("languages.set_domain_packs", {"pack_ids": norm})
@@ -405,7 +523,7 @@ class SettingsController:
             return ipc_res
         if norm:
             self._offline_require_pro("Domain vocabulary packs")
-        self._prefs.set_setting("enabled_domain_packs", ",".join(norm))
+        self._prefs.set_typed("enabled_domain_packs", norm)
         return self.get_languages_state()
 
     # =========================================================================
@@ -415,56 +533,22 @@ class SettingsController:
         ipc_res = self._call_ipc_if_online("corrections.get_state")
         if ipc_res is not None:
             return ipc_res
-        return {
-            "enable_punctuation_assist": self._prefs.get_setting("enable_punctuation_assist", "true")
-            == "true",
-            "enable_double_space_period": self._prefs.get_setting("enable_double_space_period", "true")
-            == "true",
-            "enable_auto_capitalise": self._prefs.get_setting("enable_auto_capitalise", "true") == "true",
-            "aggressiveness": float(self._prefs.get_setting("aggressiveness", "1.0")),
-            "rejected_corrections": self._prefs.list_rejected_corrections(),
-            "preferred_variants": [
-                {"source": k, "preferred": v} for k, v in self._prefs.list_preferred_variants().items()
-            ],
-        }
+        state: dict[str, Any] = self._prefs.get_all_typed("correction")
+        state["rejected_corrections"] = self._prefs.list_rejected_corrections()
+        state["preferred_variants"] = [
+            {"source": k, "preferred": v} for k, v in self._prefs.list_preferred_variants().items()
+        ]
+        state["schema"] = settings_schema.schema_as_dicts("correction")
+        state["effective"] = dict(state)
+        return state
 
-    def update_correction_features(
-        self,
-        *,
-        enable_punctuation_assist: bool | None = None,
-        enable_double_space_period: bool | None = None,
-        enable_auto_capitalise: bool | None = None,
-        aggressiveness: float | None = None,
-    ) -> dict[str, Any]:
-        params: dict[str, Any] = {}
-        if enable_punctuation_assist is not None:
-            params["enable_punctuation_assist"] = enable_punctuation_assist
-        if enable_double_space_period is not None:
-            params["enable_double_space_period"] = enable_double_space_period
-        if enable_auto_capitalise is not None:
-            params["enable_auto_capitalise"] = enable_auto_capitalise
-        if aggressiveness is not None:
-            params["aggressiveness"] = aggressiveness
-
+    def update_correction_features(self, **changes: Any) -> dict[str, Any]:
+        """Any correction-group key (see `settings_schema.CORRECTION_KEYS`)."""
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
         ipc_res = self._call_ipc_if_online("corrections.update_features", params)
         if ipc_res is not None:
             return ipc_res
-
-        if enable_punctuation_assist is not None:
-            self._prefs.set_setting(
-                "enable_punctuation_assist",
-                "true" if enable_punctuation_assist else "false",
-            )
-        if enable_double_space_period is not None:
-            self._prefs.set_setting(
-                "enable_double_space_period",
-                "true" if enable_double_space_period else "false",
-            )
-        if enable_auto_capitalise is not None:
-            self._prefs.set_setting("enable_auto_capitalise", "true" if enable_auto_capitalise else "false")
-        if aggressiveness is not None:
-            clamped = max(0.5, min(1.5, float(aggressiveness)))
-            self._prefs.set_setting("aggressiveness", f"{clamped:.2f}")
+        self.set_settings(params)
         return self.get_corrections_state()
 
     def add_rejected_correction(self, original: str, candidate: str) -> dict[str, Any]:
@@ -626,23 +710,33 @@ class SettingsController:
     # =========================================================================
     # SCREEN 7: APPLICATION PROFILES
     # =========================================================================
-    def list_app_profiles(self) -> list[dict[str, Any]]:
+    def get_apps_state(self) -> dict[str, Any]:
+        """Profiles plus the excluded / code process lists and (daemon only) the running apps."""
         ipc_res = self._call_ipc_if_online("profiles.list")
         if ipc_res is not None and isinstance(ipc_res.get("profiles"), list):
-            return list(ipc_res["profiles"])
-        return [
-            {
-                "app_identifier": p.app_identifier,
-                "display_name": p.display_name,
-                "enabled": p.enabled,
-                "enable_punctuation_assist": p.enable_punctuation_assist,
-                "enable_double_space_period": p.enable_double_space_period,
-                "enable_auto_capitalise": p.enable_auto_capitalise,
-                "aggressiveness": p.aggressiveness,
-                "active_domain_packs": sorted(p.active_domain_packs),
-            }
-            for p in self._profiles.list_profiles()
-        ]
+            return ipc_res
+        apps = self._prefs.get_all_typed("apps")
+        return {
+            "profiles": [p.to_dict() for p in self._profiles.list_profiles()],
+            "overridable_keys": list(settings_schema.PROFILE_OVERRIDABLE_KEYS),
+            "schema": [s for s in settings_schema.schema_as_dicts() if s["profile_overridable"]],
+            "excluded_processes": apps["excluded_processes"],
+            "code_processes": apps["code_processes"],
+            "browser_url_rules": apps["browser_url_rules"],
+            "foreground_process": "",
+            "running_apps": [],
+        }
+
+    def update_apps_settings(self, **changes: Any) -> dict[str, Any]:
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("profiles.update_settings", params)
+        if ipc_res is not None:
+            return ipc_res
+        self.set_settings(params)
+        return self.get_apps_state()
+
+    def list_app_profiles(self) -> list[dict[str, Any]]:
+        return list(self.get_apps_state()["profiles"])
 
     def upsert_app_profile(
         self,
@@ -654,7 +748,10 @@ class SettingsController:
         enable_double_space_period: bool = True,
         enable_auto_capitalise: bool = True,
         aggressiveness: float = 1.0,
-        active_domain_packs: list[str] | set[str] = (),
+        active_domain_packs: list[str] | set[str] | tuple[str, ...] = (),
+        enable_auto_space_after_sentence: bool = True,
+        overrides: dict[str, Any] | None = None,
+        region: str = "",
     ) -> list[dict[str, Any]]:
         payload = {
             "app_identifier": app_identifier,
@@ -663,25 +760,17 @@ class SettingsController:
             "enable_punctuation_assist": enable_punctuation_assist,
             "enable_double_space_period": enable_double_space_period,
             "enable_auto_capitalise": enable_auto_capitalise,
+            "enable_auto_space_after_sentence": enable_auto_space_after_sentence,
             "aggressiveness": aggressiveness,
             "active_domain_packs": list(active_domain_packs),
+            "overrides": dict(overrides or {}),
+            "region": region,
         }
         ipc_res = self._call_ipc_if_online("profiles.upsert", payload)
         if ipc_res is not None and isinstance(ipc_res.get("profiles"), list):
             return list(ipc_res["profiles"])
         self._offline_require_pro("Per-application profiles")
-        self._profiles.set_profile(
-            ApplicationProfile(
-                app_identifier=app_identifier.strip().lower(),
-                display_name=display_name.strip() or app_identifier.strip(),
-                enabled=enabled,
-                enable_punctuation_assist=enable_punctuation_assist,
-                enable_double_space_period=enable_double_space_period,
-                enable_auto_capitalise=enable_auto_capitalise,
-                aggressiveness=aggressiveness,
-                active_domain_packs=frozenset(active_domain_packs),
-            )
-        )
+        self._profiles.set_profile(ApplicationProfile.from_dict(payload))
         return self.list_app_profiles()
 
     def delete_app_profile(self, app_identifier: str) -> list[dict[str, Any]]:
@@ -694,18 +783,31 @@ class SettingsController:
     # =========================================================================
     # SCREEN 8: TEXT EXPANSION SNIPPETS
     # =========================================================================
-    def list_snippets(self) -> list[dict[str, str]]:
+    def get_snippets_state(self) -> dict[str, Any]:
         ipc_res = self._call_ipc_if_online("snippets.list")
         if ipc_res is not None and isinstance(ipc_res.get("snippets"), list):
-            return list(ipc_res["snippets"])
-        return [
-            {
-                "trigger": s.trigger,
-                "expansion": s.expansion,
-                "description": s.description,
-            }
-            for s in self._snippets.list_snippets()
-        ]
+            return ipc_res
+        exp = self._prefs.get_all_typed("expansion")
+        return {
+            "snippets": [
+                {"trigger": s.trigger, "expansion": s.expansion, "description": s.description}
+                for s in self._snippets.list_snippets()
+            ],
+            "snippet_prefix": exp["snippet_prefix"],
+            "snippet_case_matching": exp["snippet_case_matching"],
+            "schema": settings_schema.schema_as_dicts("expansion"),
+        }
+
+    def update_snippet_settings(self, **changes: Any) -> dict[str, Any]:
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("snippets.update_settings", params)
+        if ipc_res is not None:
+            return ipc_res
+        self.set_settings(params)
+        return self.get_snippets_state()
+
+    def list_snippets(self) -> list[dict[str, str]]:
+        return list(self.get_snippets_state()["snippets"])
 
     def upsert_snippet(self, trigger: str, expansion: str, description: str = "") -> list[dict[str, str]]:
         ipc_res = self._call_ipc_if_online(
@@ -734,17 +836,22 @@ class SettingsController:
             return ipc_res
         hw = self._local_ai.detect_hardware_profile()
         snap = self._entitlement_mgr.evaluate()
+        bundle = _bundled_manifest()
         return {
             "app": {
                 "current_version": APP_VERSION,
                 "released_at": APP_RELEASE_TIMESTAMP,
-                "channel": "stable",
+                "channel": self._prefs.get_typed("update_channel"),
+                "check_on_launch": self._prefs.get_typed("updates_check_on_launch"),
+                "auto_language_data": self._prefs.get_typed("updates_auto_language_data"),
             },
             "language_resources": {
-                "active_version": "1.2.0",
-                "schema_version": BINARY_SCHEMA_VERSION,
-                "released_at": APP_RELEASE_TIMESTAMP,
-                "word_count": 100_000,
+                "active_version": str(bundle.get("version", "")),
+                "schema_version": int(
+                    bundle.get("schema_version", BINARY_SCHEMA_VERSION) or BINARY_SCHEMA_VERSION
+                ),
+                "released_at": str(bundle.get("released_at", APP_RELEASE_TIMESTAMP)),
+                "word_count": int(bundle.get("word_count", 0) or 0),
                 "bundle_dir": "resources/en_base",
             },
             "local_models": {
@@ -757,6 +864,14 @@ class SettingsController:
                 "updates_expire_at": (snap.updates_expire_at.isoformat() if snap.updates_expire_at else None),
             },
         }
+
+    def update_updates_settings(self, **changes: Any) -> dict[str, Any]:
+        params = {k: v for k, v in changes.items() if v is not None and k in settings_schema.SCHEMA_BY_KEY}
+        ipc_res = self._call_ipc_if_online("updates.update_settings", params)
+        if ipc_res is not None:
+            return ipc_res
+        self.set_settings(params)
+        return self.get_updates_state()
 
     def rollback_language_resources(self) -> dict[str, Any]:
         ipc_res = self._call_ipc_if_online("updates.rollback_resources")
@@ -810,8 +925,18 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
     from tkinter import ttk
 
     root = tk.Tk()
-    root.title("Typen — Settings")
+    root.title("Typen")
     root.geometry("920x640")
+    # Never show Tk's stock feather: use the Typen mark (same drawing as the tray/app icon).
+    try:
+        from autocorrect.branding import draw_mark
+
+        icon_file = controller.data_dir / "typen-window-icon.png"
+        if not icon_file.exists():
+            draw_mark(256).save(icon_file)
+        root.iconphoto(True, tk.PhotoImage(file=str(icon_file)))
+    except Exception:
+        logging.getLogger(__name__).debug("fallback window icon unavailable", exc_info=True)
 
     notebook = ttk.Notebook(root)
     notebook.pack(fill="both", expand=True, padx=12, pady=12)
@@ -845,7 +970,7 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
                 refresh_list()
 
             def on_delete() -> None:
-                sel = listbox.curselection()
+                sel = listbox.curselection()  # type: ignore[no-untyped-call]
                 if sel:
                     controller.delete_custom_word(listbox.get(sel[0]))
                     refresh_list()
@@ -895,6 +1020,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Typen Settings")
     parser.add_argument("--data-dir", type=Path, default=None)
     parser.add_argument("--headless-check", action="store_true")
+    parser.add_argument("--screen", default=None, help="Screen to open on (e.g. overview, feedback)")
     args = parser.parse_args(argv)
 
     from autocorrect.platform_paths import resolve_data_dir
@@ -908,11 +1034,15 @@ def main(argv: list[str] | None = None) -> int:
     try:
         from autocorrect.ui.qml_bridge import launch_pyside6_qml_ui
 
-        return launch_pyside6_qml_ui(controller)
-    except ImportError:
+        return launch_pyside6_qml_ui(controller, initial_screen=args.screen)
+    except ImportError as exc:
+        logging.getLogger(__name__).warning(
+            "PySide6/QML Settings window unavailable (%s); using the native fallback window", exc
+        )
         try:
             return _launch_native_fallback_ui(controller)
         except Exception:
+            logging.getLogger(__name__).exception("native fallback Settings window failed")
             return 0
 
 
