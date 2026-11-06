@@ -98,6 +98,9 @@ Write-Host "==> Typen $FullVersion (win64, release $ReleaseTag)" -ForegroundColo
 # 0. Tooling
 python -c "import PyInstaller" 2>$null
 if ($LASTEXITCODE -ne 0) { python -m pip install --quiet pyinstaller }
+# The Settings window is PySide6/QML; without it the frozen app would ship the tkinter fallback.
+python -c "import PySide6.QtQml, comtypes" 2>$null
+if ($LASTEXITCODE -ne 0) { python -m pip install --quiet -e ".[ui]" "comtypes>=1.4.0" }
 
 # 1. Icon
 python (Join-Path $PSScriptRoot "make_icon.py")
@@ -106,6 +109,12 @@ python (Join-Path $PSScriptRoot "make_icon.py")
 if (Test-Path $AppDir) { Remove-Item $AppDir -Recurse -Force }
 python -m PyInstaller --noconfirm --clean --distpath $DistDir --workpath (Join-Path $DistDir "build") (Join-Path $PSScriptRoot "autocorrect.spec")
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
+# Licence gate: no GPLv3-only Qt module may ship (see ui/lgpl_compliance.py).
+$env:PYTHONPATH = "src"
+python -c "import sys; from pathlib import Path; from autocorrect.ui.lgpl_compliance import scan_distribution_dir_for_gpl_binaries as s; bad = s(Path(sys.argv[1])); print('    GPL scan: ' + ('clean' if not bad else str(bad))); sys.exit(1 if bad else 0)" $AppDir
+$gplOk = ($LASTEXITCODE -eq 0)
+Remove-Item Env:PYTHONPATH
+if (-not $gplOk) { throw "GPLv3-only Qt binaries found in the frozen build" }
 
 # 2b. Authenticode-sign the frozen executable (no-op unless AC_WIN_SIGN_* is set)
 $Exe = Join-Path $AppDir "AutoCorrectDesktop.exe"
@@ -120,6 +129,19 @@ Write-Host "    $($ver.Trim())"
 $check = & $Exe --headless-check --data-dir $SmokeData 2>&1 | Out-String
 Write-Host "    $($check.Trim())"
 if ($check -notmatch "OK") { throw "Frozen executable failed --headless-check" }
+# The Settings window must come up as the QML UI, not the tkinter fallback: start it on the
+# offscreen Qt platform, give it a few seconds, and fail if it died or logged the fallback.
+$env:QT_QPA_PLATFORM = "offscreen"
+$ui = Start-Process -FilePath $Exe -ArgumentList "--settings", "--data-dir", $SmokeData -PassThru
+Start-Sleep -Seconds 8
+$uiAlive = -not $ui.HasExited
+if ($uiAlive) { Stop-Process -Id $ui.Id -Force }
+Remove-Item Env:QT_QPA_PLATFORM
+$uiLog = Join-Path $SmokeData "logs\typen.log"
+$uiLogText = if (Test-Path $uiLog) { Get-Content $uiLog -Raw } else { "" }
+if (-not $uiAlive) { throw "Frozen Settings window exited early (see $uiLog)" }
+if ($uiLogText -match "native fallback") { throw "Frozen Settings window fell back to tkinter: PySide6/QML is not bundled correctly (see $uiLog)" }
+Write-Host "    Settings window (QML) OK"
 
 # 4. Portable ZIP
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null

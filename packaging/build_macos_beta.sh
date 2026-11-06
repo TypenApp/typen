@@ -47,6 +47,8 @@ echo "==> Typen $FULL_VERSION ($PLATFORM)"
 # 0. Tooling
 $PY -c "import PyInstaller" 2>/dev/null || $PY -m pip install --quiet pyinstaller
 $PY -c "import Quartz, ApplicationServices, AppKit" 2>/dev/null || $PY -m pip install --quiet -e ".[macos]"
+# The Settings window is PySide6/QML; without it the frozen app would ship the tkinter fallback.
+$PY -c "import PySide6.QtQml" 2>/dev/null || $PY -m pip install --quiet -e ".[ui]"
 
 # 1. Icons
 $PY packaging/make_icon.py --icns

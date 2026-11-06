@@ -1,9 +1,9 @@
 ; Inno Setup Installer Script for Typen (Windows 10 & Windows 11)
-; Build: ISCC.exe /DMyAppVersion=1.2.0 /DMyChannel=stable packaging\windows_installer.iss
-; MyChannel "stable" (the Windows build) yields plain 1.2.0; anything else is a
-; pre-release suffix (beta.1 -> 1.2.0-beta.1).
+; Build: ISCC.exe /DMyAppVersion=1.3.0 /DMyChannel=stable packaging\windows_installer.iss
+; MyChannel "stable" (the Windows build) yields plain 1.3.0; anything else is a
+; pre-release suffix (beta.1 -> 1.3.0-beta.1).
 #ifndef MyAppVersion
-  #define MyAppVersion "1.2.0"
+  #define MyAppVersion "1.3.0"
 #endif
 #ifndef MyChannel
   #define MyChannel "stable"
@@ -53,16 +53,17 @@ SignedUninstaller=yes
 
 [Tasks]
 Name: "startup"; Description: "Start {#MyAppName} automatically when Windows starts"; GroupDescription: "Startup Options:"
-Name: "desktopicon"; Description: "Create a desktop shortcut to Settings"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
 Source: "..\dist\AutoCorrectDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+; One entry, "Typen": starts the background service when it is not running, and
+; opens the Typen window when it already is (see launcher._run_daemon).
 [Icons]
-Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "Start the background autocorrect service"
-Name: "{group}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"; Comment: "Dictionary, Languages, Corrections, Profiles, Text Expansion, Licence"
+Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Comment: "System-wide autocorrect. Opens Typen when it is already running."
 Name: "{group}\Uninstall {#MyAppName}"; Filename: "{uninstallexe}"
-Name: "{autodesktop}\{#MyAppName} Settings"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--settings"; Tasks: desktopicon
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AutoCorrectDesktop"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
