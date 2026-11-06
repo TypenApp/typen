@@ -86,7 +86,7 @@ class PreferenceMemoryOverlay:
             if low in self._custom_words:
                 return
             existing = self._suggested_words.get(low)
-            prev_count = int(existing["revert_count"]) if existing is not None else 0
+            prev_count = int(str(existing["revert_count"])) if existing is not None else 0
             self._suggested_words[low] = {
                 "word": cleaned,
                 "corrected_to": corr_cleaned,
@@ -117,6 +117,12 @@ class PreferenceMemoryOverlay:
     def list_suggested_words(self) -> list[dict[str, object]]:
         with self._lock:
             return [dict(v) for v in self._suggested_words.values()]
+
+    def revert_count(self, word: str) -> int:
+        """How many times the user has reverted a correction of `word` (0 if never)."""
+        with self._lock:
+            entry = self._suggested_words.get(word.strip().lower())
+            return int(str(entry["revert_count"])) if entry is not None else 0
 
     def add_rejected_pair(self, original: str, candidate: str) -> None:
         with self._lock:

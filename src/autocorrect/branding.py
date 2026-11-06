@@ -113,12 +113,14 @@ def draw_mark(
     theme: Theme = "light",
     active: bool = True,
     square: bool = True,
+    accent: bool = False,
 ) -> Image.Image:
     """
     Render the mark. `square=True` centres the 88x64 tile on a `size`x`size`
     transparent canvas (app icons); `square=False` returns the bare tile at
     `size` px high (wordmarks). `theme="dark"` swaps ink and paper, `active=False`
-    greys the tile (paused).
+    greys the tile (paused) and `accent=True` paints the tile proof-red (the
+    tray's brief "just corrected something" pulse).
     """
     if square:
         canvas_w = canvas_h = size
@@ -142,6 +144,10 @@ def draw_mark(
     if not active:
         tile = PAUSED_TILE
         glyph = PAPER
+    elif accent:
+        tile = PROOF_RED
+        glyph = PAPER
+    squiggle = PAPER if accent and active else PROOF_RED
 
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -155,7 +161,7 @@ def draw_mark(
     if small:
         # Too small for letters: tile + a bolder squiggle, vertically centred.
         pts = _squiggle_points(s, ox, oy - 14.0 * s)
-        _stroke_polyline(d, pts, 5.0 * s, PROOF_RED)
+        _stroke_polyline(d, pts, 5.0 * s, squiggle)
     else:
         font = _load_font(max(1, round(24 * s)))
         x = ox + 19.75 * s
@@ -172,7 +178,7 @@ def draw_mark(
             radius=1.0 * s,
             fill=glyph,
         )
-        _stroke_polyline(d, _squiggle_points(s, ox, oy), 3.2 * s, PROOF_RED)
+        _stroke_polyline(d, _squiggle_points(s, ox, oy), 3.2 * s, squiggle)
 
     return img.resize((canvas_w, canvas_h), Image.Resampling.LANCZOS)
 

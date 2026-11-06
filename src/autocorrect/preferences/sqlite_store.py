@@ -16,8 +16,10 @@ import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any, overload
 
 from autocorrect.intelligence.schema import RegionFlag
+from autocorrect.preferences import settings_schema
 from autocorrect.preferences.memory_overlay import PreferenceMemoryOverlay
 
 REGION_NAME_TO_FLAG: dict[str, RegionFlag] = {
@@ -99,8 +101,32 @@ class SQLitePreferenceStore:
                     revert_count INTEGER NOT NULL DEFAULT 1,
                     updated_at REAL NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS app_profiles (
+                    app_identifier TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS snippets (
+                    trigger TEXT PRIMARY KEY,
+                    expansion TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS insights_daily (
+                    day TEXT PRIMARY KEY,
+                    payload_json TEXT NOT NULL
+                );
                 """
             )
+            # Older databases: columns added after 1.2.
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(suggested_dictionary_words)")}
+            if "source" not in cols:
+                conn.execute(
+                    "ALTER TABLE suggested_dictionary_words ADD COLUMN source TEXT NOT NULL DEFAULT 'revert'"
+                )
+            if "seen_count" not in cols:
+                conn.execute(
+                    "ALTER TABLE suggested_dictionary_words ADD COLUMN seen_count INTEGER NOT NULL DEFAULT 0"
+                )
 
     def reload_into_overlay(self) -> None:
         """Load all persisted preferences into the zero-latency in-memory overlay."""
@@ -290,11 +316,17 @@ class SQLitePreferenceStore:
         return {str(r[0]): str(r[1]) for r in rows}
 
     def set_region_preference(self, region_code: str) -> None:
+        """Store an explicit variant, or "AUTO" (resolved from the system locale by the daemon)."""
         norm = region_code.strip().upper().replace("-", "_")
-        if norm not in REGION_NAME_TO_FLAG:
+        if norm != "AUTO" and norm not in REGION_NAME_TO_FLAG:
             raise ValueError(f"Unsupported region code: {region_code}")
         self.set_setting("region", norm)
-        self._overlay.set_active_region(REGION_NAME_TO_FLAG[norm])
+        self._apply_region_to_overlay(norm)
+
+    def stored_region_name(self) -> str:
+        """The stored choice: an explicit variant name or "AUTO"."""
+        raw = self.get_setting("region", None)
+        return str(settings_schema.coerce("region", raw)) if raw else "AUTO"
 
     def set_setting(self, key: str, value: str) -> None:
         with self._connect() as conn:
@@ -303,10 +335,54 @@ class SQLitePreferenceStore:
                 (key, value),
             )
 
-    def get_setting(self, key: str, default: str = "") -> str:
+    @overload
+    def get_setting(self, key: str, default: str = "") -> str: ...
+
+    @overload
+    def get_setting(self, key: str, default: None) -> str | None: ...
+
+    def get_setting(self, key: str, default: str | None = "") -> str | None:
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM user_settings WHERE key = ?", (key,)).fetchone()
         return str(row[0]) if row else default
+
+    # Typed, schema-validated access -------------------------------------
+
+    def get_typed(self, key: str) -> Any:
+        """Validated value for a schema key (its default when unset or invalid)."""
+        raw = self.get_setting(key, None)
+        if raw is None:
+            return settings_schema.default_for(key)
+        return settings_schema.coerce(key, raw)
+
+    def set_typed(self, key: str, value: Any) -> Any:
+        """Validate `value` against the schema, store it, and return what was stored (typed)."""
+        if key not in settings_schema.SCHEMA_BY_KEY:
+            raise KeyError(f"unknown setting: {key}")
+        self.set_setting(key, settings_schema.to_storage(key, value))
+        if key == "region":
+            self._apply_region_to_overlay(str(settings_schema.coerce(key, value)))
+        return self.get_typed(key)
+
+    def get_all_typed(self, group: str | None = None) -> dict[str, Any]:
+        with self._connect() as conn:
+            rows = dict(conn.execute("SELECT key, value FROM user_settings").fetchall())
+        out: dict[str, Any] = {}
+        for spec in settings_schema.SETTINGS_SCHEMA:
+            if group is not None and spec.group != group:
+                continue
+            raw = rows.get(spec.key)
+            out[spec.key] = spec.default if raw is None else settings_schema.coerce(spec.key, raw)
+        return out
+
+    def _apply_region_to_overlay(self, region_name: str) -> None:
+        if region_name in REGION_NAME_TO_FLAG:
+            self._overlay.set_active_region(REGION_NAME_TO_FLAG[region_name])
+        # "AUTO" is resolved by the daemon (system locale) and pushed with set_resolved_region.
+
+    def set_resolved_region(self, region: RegionFlag) -> None:
+        """The daemon resolved an AUTO region from the system locale; apply it without storing it."""
+        self._overlay.set_active_region(region)
 
     def clear_all_preferences(self) -> None:
         """One-click privacy wipe of all local preferences and custom vocabulary."""
@@ -318,6 +394,9 @@ class SQLitePreferenceStore:
                 DELETE FROM preferred_variants;
                 DELETE FROM user_settings;
                 DELETE FROM suggested_dictionary_words;
+                DELETE FROM app_profiles;
+                DELETE FROM snippets;
+                DELETE FROM insights_daily;
                 """
             )
         self._overlay.clear_all()
@@ -337,6 +416,166 @@ class SQLitePreferenceStore:
             self.add_rejected_correction(str(pair.get("original", "")), str(pair.get("candidate", "")))
         for src, pref in data.get("preferred_variants", {}).items():
             self.set_preferred_variant(str(src), str(pref))
+
+    # Application profiles ------------------------------------------------
+
+    def list_app_profiles(self) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT payload_json FROM app_profiles ORDER BY app_identifier").fetchall()
+        out: list[dict[str, Any]] = []
+        for (payload,) in rows:
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict):
+                out.append(data)
+        return out
+
+    def save_app_profile(self, payload: dict[str, Any]) -> None:
+        app_id = str(payload.get("app_identifier", "")).strip().lower()
+        if not app_id:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO app_profiles (app_identifier, payload_json, updated_at) VALUES (?, ?, ?)",
+                (app_id, json.dumps(payload), time.time()),
+            )
+
+    def delete_app_profile(self, app_identifier: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM app_profiles WHERE app_identifier = ?", (app_identifier.strip().lower(),)
+            )
+
+    # Snippets -----------------------------------------------------------
+
+    def list_snippets(self) -> list[tuple[str, str]]:
+        with self._connect() as conn:
+            rows = conn.execute("SELECT trigger, expansion FROM snippets ORDER BY trigger").fetchall()
+        return [(str(t), str(e)) for t, e in rows]
+
+    def save_snippet(self, trigger: str, expansion: str) -> None:
+        trig = trigger.strip()
+        if not trig:
+            return
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO snippets (trigger, expansion, updated_at) VALUES (?, ?, ?)",
+                (trig, expansion, time.time()),
+            )
+
+    def delete_snippet(self, trigger: str) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM snippets WHERE trigger = ?", (trigger.strip(),))
+
+    # Insights -----------------------------------------------------------
+
+    def load_insights(self) -> dict[str, dict[str, int]]:
+        """{day: counters} for every stored day."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT day, payload_json FROM insights_daily").fetchall()
+        out: dict[str, dict[str, int]] = {}
+        for day, payload in rows:
+            try:
+                data = json.loads(payload)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(data, dict):
+                out[str(day)] = {str(k): int(v) for k, v in data.items()}
+        return out
+
+    def save_insights_day(self, day: str, counters: dict[str, int]) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO insights_daily (day, payload_json) VALUES (?, ?)",
+                (day, json.dumps(counters)),
+            )
+
+    def prune_insights(self, keep_days: list[str]) -> None:
+        with self._connect() as conn:
+            if not keep_days:
+                conn.execute("DELETE FROM insights_daily")
+                return
+            marks = ",".join("?" for _ in keep_days)
+            conn.execute(f"DELETE FROM insights_daily WHERE day NOT IN ({marks})", keep_days)  # noqa: S608
+
+    def clear_insights(self) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM insights_daily")
+
+    # Repeated out-of-vocabulary words -------------------------------------
+
+    def note_repeated_oov(self, word: str, threshold: int) -> bool:
+        """
+        Count an uncorrected out-of-vocabulary word; once it has been typed
+        `threshold` times it becomes a suggested dictionary word (source
+        'repeated'). Returns True the moment it crosses the threshold.
+        Counts older than a week are forgotten.
+        """
+        cleaned = word.strip()
+        low = cleaned.lower()
+        if not low or self._overlay.is_custom_word(low):
+            return False
+        now = time.time()
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT seen_count, updated_at, source FROM suggested_dictionary_words WHERE word_lower = ?",
+                (low,),
+            ).fetchone()
+            if row is None:
+                seen = 1
+                conn.execute(
+                    """
+                    INSERT INTO suggested_dictionary_words
+                        (word_lower, display_word, corrected_to, revert_count, updated_at, source, seen_count)
+                    VALUES (?, ?, '', 0, ?, 'repeated', 1)
+                    """,
+                    (low, cleaned, now),
+                )
+            else:
+                seen, updated_at, _source = int(row[0]), float(row[1]), str(row[2])
+                seen = 1 if now - updated_at > 7 * 86400 else seen + 1
+                conn.execute(
+                    "UPDATE suggested_dictionary_words SET seen_count = ?, updated_at = ? WHERE word_lower = ?",
+                    (seen, now, low),
+                )
+        if seen >= threshold:
+            self._overlay.load_suggested_word(cleaned, "", 0)
+            return seen == threshold
+        return False
+
+    def list_suggested_words_detailed(
+        self, min_reverts: int = 1, repeated_threshold: int = 0
+    ) -> list[dict[str, Any]]:
+        """Suggestions that have reached their threshold: reverts >= `min_reverts`, or repeated >= threshold."""
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT display_word, corrected_to, revert_count, source, seen_count, updated_at
+                FROM suggested_dictionary_words
+                ORDER BY updated_at DESC, word_lower ASC
+                """
+            ).fetchall()
+        out: list[dict[str, Any]] = []
+        for word, corrected_to, reverts, source, seen, updated_at in rows:
+            reverts_i, seen_i = int(reverts), int(seen)
+            if source == "repeated":
+                if repeated_threshold <= 0 or seen_i < repeated_threshold:
+                    continue
+            elif reverts_i < min_reverts:
+                continue
+            out.append(
+                {
+                    "word": str(word),
+                    "corrected_to": str(corrected_to),
+                    "revert_count": reverts_i,
+                    "source": str(source),
+                    "seen_count": seen_i,
+                    "updated_at": float(updated_at),
+                }
+            )
+        return out
 
     def export_custom_words_csv(self) -> str:
         buf = io.StringIO()

@@ -104,14 +104,22 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run the IBus engine and register its component on the fly (developer testing)",
     )
+    parser.add_argument(
+        "--screen",
+        default=None,
+        help="With --settings: the screen to open on (e.g. overview, feedback)",
+    )
     parser.add_argument("--version", action="version", version=f"{APP_DISPLAY_NAME} {VERSION_LABEL}")
     return parser
 
 
-def _run_settings(data_dir: Path) -> int:
+def _run_settings(data_dir: Path, screen: str | None = None) -> int:
     from autocorrect.ui.settings_main import main as settings_main
 
-    return settings_main(["--data-dir", str(data_dir)])
+    argv = ["--data-dir", str(data_dir)]
+    if screen:
+        argv += ["--screen", screen]
+    return settings_main(argv)
 
 
 def _run_headless_check(data_dir: Path) -> int:
@@ -201,7 +209,7 @@ def _run_daemon(data_dir: Path, with_tray: bool, *, safe_mode: bool = False, res
                     print(f"  -> {hook.remediation}")
                 print("Press Ctrl+C to stop.")
             if daemon.kill_switch.is_supported:
-                print(f"Emergency stop: hold Esc for {daemon.kill_switch.hold_seconds:.0f} s.")
+                print(f"Hold Esc for {daemon.kill_switch.hold_seconds:.0f} s to pause or resume.")
             daemon.on_quit_requested = quit_event.set
             try:
                 while not quit_event.wait(0.5):
@@ -220,6 +228,8 @@ def _run_daemon(data_dir: Path, with_tray: bool, *, safe_mode: bool = False, res
         )
         daemon.on_state_changed = tray.refresh
         daemon.on_notify = tray.notify
+        daemon.on_correction = lambda _o, _r, _reason: tray.pulse()
+        daemon.on_hold_progress = tray.show_hold_countdown
 
         def open_settings() -> None:
             tray.launch_settings_subprocess()
@@ -265,8 +275,7 @@ def _first_run(daemon: object, tray: object) -> None:
     log.info("first run: opening Settings")
     tray.notify(
         f"{APP_DISPLAY_NAME} is running",
-        "Look for the Aa icon in the system tray. Right-click it to pause, open Settings or quit. "
-        f"Emergency stop: hold Esc for {daemon.kill_switch.hold_seconds:.0f} seconds.",
+        f"Type anywhere; the Aa icon blinks when a fix lands. Hold Esc {daemon.kill_switch.hold_seconds:.0f} s to pause.",
     )
     tray.launch_settings_subprocess()
 
@@ -279,7 +288,7 @@ def main(argv: list[str] | None = None) -> int:
     mode = "settings" if args.settings else ("check" if args.headless_check else "daemon")
     configure_logging(data_dir, mode=mode)
     if args.settings:
-        return _run_settings(data_dir)
+        return _run_settings(data_dir, args.screen)
     if args.headless_check:
         return _run_headless_check(data_dir)
     if args.stop:

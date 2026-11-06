@@ -35,6 +35,8 @@ from autocorrect.licensing.entitlement_manager import (
     GITHUB_REPO_URL,
     GITHUB_SPONSORS_URL,
 )
+from autocorrect.preferences import settings_schema
+from autocorrect.preferences.system_locale import detect_english_region
 from autocorrect.productivity.app_profiles import ApplicationProfile
 from autocorrect.version import APP_RELEASE_TIMESTAMP, APP_VERSION, BINARY_SCHEMA_VERSION
 
@@ -285,12 +287,35 @@ class LocalIPCServer:
             snap = d.entitlement_manager.evaluate()
             ins = d.insights.get_summary()
             bundle = d.resource_manager.active_bundle
+            focus = d.focus_monitor.last_focus
+            last = d.last_correction
             return {
                 "app_version": APP_VERSION,
                 "hooks_active": d.hooks_active,
                 "hook_status": d.hook_status.to_dict(),
                 "is_paused": d.session.is_paused,
                 "safe_mode": d.in_safe_mode,
+                "hold_esc_seconds": d.kill_switch.hold_seconds,
+                "listening": {
+                    "process_name": focus.process_name if focus else "",
+                    "window_title": focus.window_title if focus else "",
+                    "is_excluded": bool(focus.is_excluded_app) if focus else False,
+                    "is_code_or_terminal": bool(focus.is_terminal_or_code) if focus else False,
+                    "is_secure": bool(focus.is_password_or_secure) if focus else False,
+                },
+                "session": {
+                    "corrections": d.session_correction_count,
+                    "last_correction": (
+                        {
+                            "original": last[0],
+                            "replacement": last[1],
+                            "reason": last[2],
+                            "age_s": max(0.0, time.time() - last[3]),
+                        }
+                        if last
+                        else None
+                    ),
+                },
                 "active_region": prefs.overlay.active_region.name or "EN_GB",
                 "custom_word_count": len(prefs.list_custom_words()),
                 "suggested_word_count": len(prefs.list_suggested_words()),
@@ -340,71 +365,72 @@ class LocalIPCServer:
             enabled = bool(params.get("enabled", True))
             if enabled:
                 self._require_pro("Local typing insights")
-            d.insights.set_enabled(enabled)
+            d.apply_settings({"insights_enabled": enabled})
             return {"enabled": d.insights.enabled}
 
         if method == "insights.reset":
             d.insights.reset()
             return {"ok": True}
 
-        # --- 2. General Settings & Privacy Wipe ------------------------------
-        if method == "general.get_settings":
+        if method == "insights.get_daily":
+            return {"days": d.insights.get_daily(), "retention_days": d.insights.retention_days}
+
+        # --- 2. Settings (schema-driven) & Privacy Wipe ----------------------
+        if method == "settings.schema":
+            group = params.get("group")
+            return {"schema": settings_schema.schema_as_dicts(str(group) if group else None)}
+
+        if method == "settings.get_all":
+            group = params.get("group")
             return {
-                "launch_at_login": prefs.get_setting("launch_at_login", "false") == "true",
-                "show_tray_icon": prefs.get_setting("show_tray_icon", "true") == "true",
-                "rewrite_hotkey": prefs.get_setting("rewrite_hotkey", "Ctrl+Shift+R"),
-                "pause_hotkey": prefs.get_setting("pause_hotkey", "Ctrl+Alt+P"),
-                "settings_hotkey": prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"),
-                "panic_hotkey_enabled": prefs.get_setting("panic_hotkey_enabled", "true") == "true",
-                "panic_hold_seconds": float(prefs.get_setting("panic_hold_seconds", "15")),
-                "panic_hotkey_supported": d.kill_switch.is_supported,
+                "values": prefs.get_all_typed(str(group) if group else None),
+                "schema": settings_schema.schema_as_dicts(str(group) if group else None),
             }
 
+        if method == "settings.set":
+            changes = params.get("values")
+            if not isinstance(changes, dict):
+                changes = {k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY}
+            applied = d.apply_settings(changes)
+            return {"applied": applied, "values": prefs.get_all_typed()}
+
+        if method == "general.get_settings":
+            out = prefs.get_all_typed("general")
+            out["panic_hold_seconds"] = d.kill_switch.hold_seconds
+            out["panic_hotkey_supported"] = d.kill_switch.is_supported
+            out["schema"] = settings_schema.schema_as_dicts("general")
+            return out
+
         if method == "general.update_settings":
-            if "launch_at_login" in params:
-                from autocorrect.daemon.startup import StartupManager
-
-                enabled = bool(params["launch_at_login"])
-                prefs.set_setting("launch_at_login", "true" if enabled else "false")
-                if not d.dry_run_hooks:
-                    StartupManager.set_launch_at_login(enabled)
-            if "show_tray_icon" in params:
-                prefs.set_setting("show_tray_icon", "true" if params["show_tray_icon"] else "false")
-            hotkeys_changed = False
-            for hk_key in ("rewrite_hotkey", "pause_hotkey", "settings_hotkey"):
-                if hk_key in params and str(params[hk_key]).strip():
-                    new_val = str(params[hk_key]).strip()
-                    if new_val != prefs.get_setting(hk_key, ""):
-                        hotkeys_changed = True
-                    prefs.set_setting(hk_key, new_val)
-            if "panic_hotkey_enabled" in params:
-                enabled = bool(params["panic_hotkey_enabled"])
-                prefs.set_setting("panic_hotkey_enabled", "true" if enabled else "false")
-                if enabled:
-                    d.kill_switch.start()
-                else:
-                    d.kill_switch.stop()
-            if "panic_hold_seconds" in params:
-                from autocorrect.daemon.kill_switch import clamp_hold_seconds
-
-                secs = clamp_hold_seconds(params["panic_hold_seconds"])
-                prefs.set_setting("panic_hold_seconds", str(secs))
-                d.kill_switch.set_hold_seconds(secs)
-            if hotkeys_changed:
-                d.reload_hotkeys()
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
             return self._dispatch("general.get_settings", {})
 
         if method == "general.privacy_wipe":
             prefs.clear_all_preferences()
             d.insights.reset()
+            d.apply_global_correction_settings()
             return {"wiped": True, "custom_word_count": 0}
 
         # --- 3. Custom Dictionary & Suggested Words --------------------------
         if method == "dictionary.get_state":
+            dict_settings = prefs.get_all_typed("dictionary")
             return {
                 "words": prefs.list_custom_words(),
-                "suggested": prefs.list_suggested_words(),
+                "suggested": prefs.list_suggested_words_detailed(
+                    min_reverts=int(dict_settings["suggest_after_reverts"]),
+                    repeated_threshold=(
+                        int(dict_settings["learn_repeated_threshold"])
+                        if dict_settings["learn_repeated_oov"]
+                        else 0
+                    ),
+                ),
+                "settings": dict_settings,
+                "schema": settings_schema.schema_as_dicts("dictionary"),
             }
+
+        if method == "dictionary.update_settings":
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
+            return self._dispatch("dictionary.get_state", {})
 
         if method == "dictionary.add_word":
             word = str(params.get("word", "")).strip()
@@ -482,9 +508,20 @@ class LocalIPCServer:
                     }
                 )
 
+            lang_settings = prefs.get_all_typed("language")
             return {
-                "active_region": prefs.overlay.active_region.name or "EN_GB",
+                "region_setting": prefs.stored_region_name(),
+                "active_region": d.resolved_region_name(),
+                "system_region": detect_english_region().name,
+                "variant_enforcement": lang_settings["variant_enforcement"],
+                "uk_ize_spelling": lang_settings["uk_ize_spelling"],
+                "schema": settings_schema.schema_as_dicts("language"),
                 "available_regions": [
+                    {
+                        "code": "AUTO",
+                        "name": "Follow system language",
+                        "examples": f"Currently {str(detect_english_region().name).replace('_', '-')}",
+                    },
                     {
                         "code": "EN_GB",
                         "name": "British English (UK)",
@@ -498,7 +535,7 @@ class LocalIPCServer:
                     {
                         "code": "EN_CA",
                         "name": "Canadian English (CA)",
-                        "examples": "colour, organize, centre,alyze",
+                        "examples": "colour, organize, centre, analyze",
                     },
                     {
                         "code": "EN_AU",
@@ -516,9 +553,12 @@ class LocalIPCServer:
             }
 
         if method == "languages.set_region":
-            region_code = str(params.get("region", "EN_GB"))
-            prefs.set_region_preference(region_code)
-            d.session.set_active_region(prefs.overlay.active_region)
+            region_code = str(params.get("region", "AUTO"))
+            d.apply_settings({"region": region_code})
+            return self._dispatch("languages.get_state", {})
+
+        if method == "languages.update_settings":
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
             return self._dispatch("languages.get_state", {})
 
         if method == "languages.set_domain_packs":
@@ -526,48 +566,27 @@ class LocalIPCServer:
             pack_set = {str(p).strip().lower() for p in raw_packs if str(p).strip()}
             if pack_set:
                 self._require_pro("Domain vocabulary packs")
-            d.set_user_domain_packs(pack_set)
-            prefs.set_setting("enabled_domain_packs", ",".join(sorted(pack_set)))
+            d.apply_settings({"enabled_domain_packs": sorted(pack_set)})
             return self._dispatch("languages.get_state", {})
 
         # --- 5. Corrections, Sensitivity, Rejected & Preferred Variants ------
         if method == "corrections.get_state":
-            return {
-                "enable_punctuation_assist": prefs.get_setting("enable_punctuation_assist", "true") == "true",
-                "enable_double_space_period": prefs.get_setting("enable_double_space_period", "true")
-                == "true",
-                "enable_auto_capitalise": prefs.get_setting("enable_auto_capitalise", "true") == "true",
-                "aggressiveness": float(prefs.get_setting("aggressiveness", "1.0")),
-                "rejected_corrections": prefs.list_rejected_corrections(),
-                "preferred_variants": [
-                    {"source": k, "preferred": v} for k, v in prefs.list_preferred_variants().items()
-                ],
-            }
+            state = prefs.get_all_typed("correction")
+            state["rejected_corrections"] = prefs.list_rejected_corrections()
+            state["preferred_variants"] = [
+                {"source": k, "preferred": v} for k, v in prefs.list_preferred_variants().items()
+            ]
+            state["schema"] = settings_schema.schema_as_dicts("correction")
+            state["effective"] = d.session.features.as_dict()
+            return state
 
         if method == "corrections.update_features":
-            punct = params.get("enable_punctuation_assist")
-            dbl = params.get("enable_double_space_period")
-            cap = params.get("enable_auto_capitalise")
-            agg = params.get("aggressiveness")
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
+            return self._dispatch("corrections.get_state", {})
 
-            if punct is not None:
-                prefs.set_setting("enable_punctuation_assist", "true" if punct else "false")
-            if dbl is not None:
-                prefs.set_setting("enable_double_space_period", "true" if dbl else "false")
-            if cap is not None:
-                prefs.set_setting("enable_auto_capitalise", "true" if cap else "false")
-            if agg is not None:
-                agg_val = max(0.5, min(1.5, float(agg)))
-                prefs.set_setting("aggressiveness", f"{agg_val:.2f}")
-
-            state = self._dispatch("corrections.get_state", {})
-            d.session.configure_features(
-                enable_punctuation_assist=bool(state["enable_punctuation_assist"]),
-                enable_double_space_period=bool(state["enable_double_space_period"]),
-                enable_auto_capitalise=bool(state["enable_auto_capitalise"]),
-                aggressiveness=float(state["aggressiveness"]),
-            )
-            return state
+        if method == "corrections.try_text":
+            # Overview "Try it" field: evaluate a sentence offline, never touching the real session.
+            return {"result": d.try_text(str(params.get("text", "")))}
 
         if method == "corrections.add_rejected":
             orig = str(params.get("original", "")).strip()
@@ -690,20 +709,17 @@ class LocalIPCServer:
 
         # --- 7. Application-Specific Profiles --------------------------------
         if method == "profiles.list":
+            focus = d.focus_monitor.last_focus
+            apps_settings = prefs.get_all_typed("apps")
             return {
-                "profiles": [
-                    {
-                        "app_identifier": p.app_identifier,
-                        "display_name": p.display_name,
-                        "enabled": p.enabled,
-                        "enable_punctuation_assist": p.enable_punctuation_assist,
-                        "enable_double_space_period": p.enable_double_space_period,
-                        "enable_auto_capitalise": p.enable_auto_capitalise,
-                        "aggressiveness": p.aggressiveness,
-                        "active_domain_packs": sorted(p.active_domain_packs),
-                    }
-                    for p in d.app_profiles.list_profiles()
-                ]
+                "profiles": [p.to_dict() for p in d.app_profiles.list_profiles()],
+                "overridable_keys": list(settings_schema.PROFILE_OVERRIDABLE_KEYS),
+                "schema": [s for s in settings_schema.schema_as_dicts() if s["profile_overridable"]],
+                "excluded_processes": apps_settings["excluded_processes"],
+                "code_processes": apps_settings["code_processes"],
+                "browser_url_rules": apps_settings["browser_url_rules"],
+                "foreground_process": (focus.process_name if focus else ""),
+                "running_apps": d.list_running_apps(),
             }
 
         if method == "profiles.upsert":
@@ -711,27 +727,26 @@ class LocalIPCServer:
             app_id = str(params.get("app_identifier", "")).strip().lower()
             if not app_id:
                 raise ValueError("app_identifier is required")
-            prof = ApplicationProfile(
-                app_identifier=app_id,
-                display_name=str(params.get("display_name") or app_id).strip(),
-                enabled=bool(params.get("enabled", True)),
-                enable_punctuation_assist=bool(params.get("enable_punctuation_assist", True)),
-                enable_double_space_period=bool(params.get("enable_double_space_period", True)),
-                enable_auto_capitalise=bool(params.get("enable_auto_capitalise", True)),
-                aggressiveness=float(params.get("aggressiveness", 1.0)),
-                active_domain_packs=frozenset(str(x) for x in params.get("active_domain_packs", [])),
-            )
+            prof = ApplicationProfile.from_dict(dict(params, app_identifier=app_id))
             d.app_profiles.set_profile(prof)
+            d._reapply_features()
             return self._dispatch("profiles.list", {})
 
         if method == "profiles.delete":
             app_id = str(params.get("app_identifier", "")).strip().lower()
             if app_id:
                 d.app_profiles.remove_profile(app_id)
+                d._reapply_features()
+            return self._dispatch("profiles.list", {})
+
+        if method == "profiles.update_settings":
+            # excluded_processes / code_processes / browser_url_rules
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
             return self._dispatch("profiles.list", {})
 
         # --- 8. Text Expansion Snippets --------------------------------------
         if method == "snippets.list":
+            exp_settings = prefs.get_all_typed("expansion")
             return {
                 "snippets": [
                     {
@@ -740,8 +755,15 @@ class LocalIPCServer:
                         "description": s.description,
                     }
                     for s in d.snippet_engine.list_snippets()
-                ]
+                ],
+                "snippet_prefix": exp_settings["snippet_prefix"],
+                "snippet_case_matching": exp_settings["snippet_case_matching"],
+                "schema": settings_schema.schema_as_dicts("expansion"),
             }
+
+        if method == "snippets.update_settings":
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
+            return self._dispatch("snippets.list", {})
 
         if method == "snippets.upsert":
             self._require_pro("Text-expansion snippets")
@@ -766,7 +788,9 @@ class LocalIPCServer:
                 "app": {
                     "current_version": APP_VERSION,
                     "released_at": APP_RELEASE_TIMESTAMP,
-                    "channel": "stable",
+                    "channel": prefs.get_typed("update_channel"),
+                    "check_on_launch": prefs.get_typed("updates_check_on_launch"),
+                    "auto_language_data": prefs.get_typed("updates_auto_language_data"),
                 },
                 "language_resources": {
                     "active_version": bundle.version,
@@ -787,6 +811,10 @@ class LocalIPCServer:
                     ),
                 },
             }
+
+        if method == "updates.update_settings":
+            d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})
+            return self._dispatch("updates.get_state", {})
 
         if method == "updates.rollback_resources":
             d.resource_updater.rollback_to_last_known_good()
