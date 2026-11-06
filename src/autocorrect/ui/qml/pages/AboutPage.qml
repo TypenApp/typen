@@ -33,7 +33,7 @@ Page {
             spacing: 8
             SecondaryButton { text: "Source on GitHub"; onClicked: bridge.call("open_source_repository", "{}") }
             SecondaryButton { text: "Sponsor"; onClicked: bridge.call("open_sponsors_page", "{}") }
-            GhostButton { text: "Website"; onClicked: bridge.openUrl("https://autocorrect-desktop.vercel.app") }
+            GhostButton { text: "Website"; onClicked: bridge.openUrl("https://autocorrect-desktop-six.vercel.app") }
         }
     }
 

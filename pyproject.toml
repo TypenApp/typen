@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://autocorrect-desktop.vercel.app"
+Homepage = "https://autocorrect-desktop-six.vercel.app"
 Organisation = "https://github.com/TypenApp"
 Repository = "https://github.com/TypenApp/typen"
 Documentation = "https://github.com/TypenApp/docs"

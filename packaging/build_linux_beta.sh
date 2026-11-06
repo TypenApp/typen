@@ -144,7 +144,7 @@ Installed-Size: ${INSTALLED_KB}
 Maintainer: Omnii <https://github.com/TypenApp/typen/issues>
 Depends: libc6 (>= 2.31), libx11-6, libxtst6, libxext6
 Recommends: ibus, python3-gi, gir1.2-ibus-1.0, gnome-shell-extension-appindicator | libayatana-appindicator3-1
-Homepage: https://autocorrect-desktop.vercel.app
+Homepage: https://autocorrect-desktop-six.vercel.app
 Description: System-wide offline autocorrect and writing assistant
  Corrects spelling, contextual confusions, punctuation and capitalisation as
  you type in any application. Works via XRecord/XTest on X11 and as an IBus

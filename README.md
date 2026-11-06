@@ -8,7 +8,7 @@ type leaves the machine.
 Typen is free and open source (MIT) and funded by donations only. There are no editions,
 trials or licence keys: every feature is available to everyone.
 
-- Website: <https://autocorrect-desktop.vercel.app> (live demo runs the real engine)
+- Website: <https://autocorrect-desktop-six.vercel.app> (live demo runs the real engine)
 - Organisation: <https://github.com/TypenApp>
 - Downloads: GitHub Releases (<https://github.com/TypenApp/typen/releases>)
 - Donate: <https://github.com/sponsors/TypenApp>

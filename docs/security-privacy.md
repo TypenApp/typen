@@ -36,4 +36,4 @@ If any check fails, or if you click 'Rollback to Last Known Good' in the Updates
 
 ---
 
-*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop.vercel.app/docs/security-privacy) · [TypenApp on GitHub](https://github.com/TypenApp)*
+*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop-six.vercel.app/docs/security-privacy) · [TypenApp on GitHub](https://github.com/TypenApp)*

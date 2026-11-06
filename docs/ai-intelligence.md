@@ -39,4 +39,4 @@ Cloud AI is never invoked during ordinary background typing. Even when explicitl
 
 ---
 
-*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop.vercel.app/docs/ai-intelligence) · [TypenApp on GitHub](https://github.com/TypenApp)*
+*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop-six.vercel.app/docs/ai-intelligence) · [TypenApp on GitHub](https://github.com/TypenApp)*

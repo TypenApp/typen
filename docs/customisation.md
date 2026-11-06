@@ -43,4 +43,4 @@ GPLv3-only modules (such as QtCharts, QtGraphs, QtQuick3D, and QtVirtualKeyboard
 
 ---
 
-*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop.vercel.app/docs/customisation) · [TypenApp on GitHub](https://github.com/TypenApp)*
+*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop-six.vercel.app/docs/customisation) · [TypenApp on GitHub](https://github.com/TypenApp)*
