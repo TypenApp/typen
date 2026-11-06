@@ -39,7 +39,7 @@ const FAQ: Array<[string, string]> = [
   ],
   [
     "Can I help without money?",
-    "Yes: report a misspelling the engine misses or a correction it should not have made, test a platform, or send a pull request. The repository is public.",
+    "Yes: report a misspelling the engine misses or a correction it should not have made through the Feedback page (or Settings › Feedback in the app), test a platform, or send a pull request. The repository is public.",
   ],
 ];
 

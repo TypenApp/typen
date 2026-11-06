@@ -1,6 +1,6 @@
 {
   "name": "autocorrect-site",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "private": true,
   "description": "Official Downloads, Pricing, and Documentation Portal for AutoCorrect Desktop",
   "scripts": {

@@ -18,6 +18,7 @@ const NAV_LINKS = [
   { href: "/download", label: "Download" },
   { href: "/docs", label: "Docs" },
   { href: "/donate", label: "Donate" },
+  { href: "/feedback", label: "Feedback" },
 ];
 
 export function Navbar() {
@@ -63,6 +64,18 @@ export function Navbar() {
       subtitle: "Free and open source · funded by donations only",
       href: "/donate",
       category: "Donate",
+    });
+    items.push({
+      title: "Send a suggestion",
+      subtitle: "Opens a GitHub Discussion",
+      href: "/feedback",
+      category: "Feedback",
+    });
+    items.push({
+      title: "Report a bug",
+      subtitle: "Opens a GitHub Issue",
+      href: "/feedback?kind=bug",
+      category: "Feedback",
     });
     for (const doc of DOC_ARTICLES) {
       items.push({

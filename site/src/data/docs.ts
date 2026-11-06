@@ -94,7 +94,7 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
         ],
         bullets: [
           "Pause hotkey — Ctrl+Alt+P (changeable under Settings -> General). Toggles pause from any application; the tray icon turns grey while paused. Ctrl+Alt+, opens Settings.",
-          "Esc kill switch — hold Esc for 15 seconds. If anything ever feels wrong, hold the Escape key down for 15 seconds (adjustable between 3 and 120 seconds in Settings -> General, or switch it off there). Typen releases its keyboard hook immediately, pauses, shows a notification, and writes a safe-mode marker. The kill switch is watched independently of the keyboard hook, so it works even if the hook itself is the problem. It is available on Windows, macOS and X11 (not on Wayland, where Typen never holds a global hook).",
+          "Esc switch — hold Esc for 10 seconds. If anything ever feels wrong, hold the Escape key down for 10 seconds (adjustable between 5 and 60 seconds in Settings -> General, or switch it off there). Typen pauses and shows a notification; hold Esc again for 10 seconds to resume, or use the tray menu or the Settings window. The switch is watched independently of the keyboard hook, so it works even if the hook itself is the problem. It is available on Windows, macOS and X11 (not on Wayland, where Typen never holds a global hook).",
           "Quit from the tray menu, or --stop from a terminal (see below).",
         ],
       },
