@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Typen — site styles.
+  Tokens live in tailwind.config.ts and resolve to the RGB channel variables
+  below. Light theme: black text on white paper. Dark theme: the same two
+  colours, reversed, chosen by the device (`prefers-color-scheme`) with no
+  toggle or stored choice. This file holds the few primitives every
+  page shares, so the visual grammar is identical everywhere: one container,
+  one card, two buttons, one eyebrow, one squiggle.
+*/
+
+:root {
+  color-scheme: light;
+  --ink: 0 0 0;
+  --ink-1: 10 10 10;
+  --ink-2: 23 23 23;
+  --ink-3: 38 38 38;
+  --ink-muted: 89 89 89;
+  --ink-faint: 138 138 138;
+  --paper: 255 255 255;
+  --paper-1: 250 250 250;
+  --paper-2: 244 244 244;
+  --paper-3: 236 236 236;
+  --line: 228 228 228;
+  --line-strong: 201 201 201;
+  --proof: 229 52 26;
+  --proof-strong: 196 42 18;
+  --proof-soft: 253 236 232;
+  /* The proofreader's squiggle, drawn as an SVG so it scales with the font. */
+  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23e5341a' stroke-width='1.3'/%3E%3C/svg%3E");
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+  color-scheme: dark;
+  --ink: 255 255 255;
+  --ink-1: 245 245 245;
+  --ink-2: 232 232 232;
+  --ink-3: 217 217 217;
+  --ink-muted: 166 166 166;
+  --ink-faint: 117 117 117;
+  --paper: 0 0 0;
+  --paper-1: 10 10 10;
+  --paper-2: 17 17 17;
+  --paper-3: 26 26 26;
+  --line: 38 38 38;
+  --line-strong: 58 58 58;
+  --proof: 255 90 60;
+  --proof-strong: 255 123 97;
+  --proof-soft: 42 18 12;
+  --squiggle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='4' viewBox='0 0 12 4'%3E%3Cpath d='M0 3 Q1.5 1 3 3 T6 3 T9 3 T12 3' fill='none' stroke='%23ff5a3c' stroke-width='1.3'/%3E%3C/svg%3E");
+  }
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* No scrollbars anywhere; scrolling still works with wheel, keys and touch. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+body {
+  background-color: rgb(var(--paper));
+  color: rgb(var(--ink));
+  font-family: theme("fontFamily.sans");
+  font-feature-settings: "liga", "kern";
+  overflow-x: hidden;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+code,
+kbd,
+pre,
+samp {
+  font-family: theme("fontFamily.mono");
+}
+
+/* Selection is literal inverse video. */
+::selection {
+  background: rgb(var(--ink));
+  color: rgb(var(--paper));
+}
+
+@layer components {
+  .container-site {
+    @apply mx-auto w-full max-w-site px-5 sm:px-8;
+  }
+
+  /* Headline type: Syne at its heavier end, tight tracking, large but calm. */
+  .display {
+    @apply font-display font-semibold tracking-[-0.03em] text-ink;
+  }
+
+  /* Numbered mono eyebrow used above every section: "01 — Try it". */
+  .eyebrow {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-ink-faint;
+  }
+
+  .card {
+    @apply rounded-lg border border-line bg-paper;
+  }
+
+  .btn {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded px-4 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-ink text-paper hover:bg-ink-3;
+  }
+  .btn-secondary {
+    @apply btn border border-ink bg-transparent text-ink hover:bg-paper-2;
+  }
+  .btn-ghost {
+    @apply btn px-2 text-ink-muted hover:text-ink;
+  }
+  /* A square icon-only button: GitHub in the hero, social links in the footer. */
+  .icon-btn {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-line text-ink-muted transition-colors hover:border-ink-faint hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-proof focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+  }
+
+  .link {
+    @apply text-ink underline decoration-line-strong underline-offset-4 transition-colors hover:decoration-proof;
+  }
+
+  /* A word the engine would flag: muted text with the squiggle under it.
+     The squiggle hugs the baseline (just under it, inside the descender
+     zone) rather than the bottom of the line box, so it never drifts away
+     from the word at large sizes. */
+  .typo {
+    @apply text-ink-muted;
+    background-image: var(--squiggle);
+    background-repeat: repeat-x;
+    background-position: 0 calc(100% - 0.16em);
+    padding-bottom: 0;
+  }
+
+  .hash {
+    @apply break-all font-mono text-[11px] leading-relaxed text-ink-faint;
+  }
+
+  .field {
+    @apply w-full rounded border border-line bg-paper px-3 py-2 text-sm text-ink placeholder-ink-faint transition-colors focus:border-ink focus:outline-none disabled:opacity-60;
+  }
+
+  .kbd {
+    @apply rounded border border-line-strong bg-paper-2 px-1.5 py-0.5 font-mono text-[10px] text-ink-muted;
+  }
+
+  .rule {
+    @apply border-t border-line;
+  }
+
+  .prose-site p {
+    @apply leading-relaxed text-ink-muted;
+  }
+  .prose-site strong {
+    @apply font-medium text-ink;
+  }
+}

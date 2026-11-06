@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "npm ci && node scripts/vendor-engine.mjs",
+  "functions": {
+    "api/demo.py": {
+      "includeFiles": "api/_vendor/**",
+      "maxDuration": 30
+    }
+  }
+}

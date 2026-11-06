@@ -1,0 +1,16 @@
+{
+  "version": "1.1.0",
+  "schema_version": 1,
+  "released_at": "2026-11-02T00:00:00Z",
+  "word_count": 166475,
+  "artifacts": {
+    "lexicon.bin": "f6a5f1a7398e7eb262a0e023f65b76ec05d88d1a294a5689cc52dd06e7bd46f2",
+    "lexicon_meta.bin": "85c3e61b3207ce21881cd7e79664b139379a48b48764c09bd24f71c349a41147",
+    "symspell_idx.bin": "36fe5f9aa7773bfb8cd66aa73e03bd0fd621cf9fc546c51ae49405a6bd7675b4",
+    "direct_typos.bin": "4c050f7f525a5801520c7d927316313c2d6475efcd9862fc36c6d981ae2556ff",
+    "context_ngram.bin": "8b36032f29f5a1e60c868a309428eaac158c5809f6cefff9bfc34aac16f8266a",
+    "abbreviations.bin": "54b9e6554c260935aa471e3ba15a26620475c90f2d27d5a957a5fa3e4c5f5692",
+    "exact_casing.json": "be304603df9644e5ce2b9023414fe4447a725648c067dc624993adfe10df84b2",
+    "confusion_sets.json": "c2cb06c0be0e8a709131ba554b91e8bbca20797a7369b66eee0ccd639f74b9c4"
+  }
+}
