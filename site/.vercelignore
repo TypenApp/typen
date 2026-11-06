@@ -1,0 +1,6 @@
+# Vercel CLI upload rules (Git deploys use .gitignore).
+.next
+node_modules
+.env
+.env.*
+!.env.example

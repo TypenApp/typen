@@ -1,0 +1,31 @@
+name: Feature Request
+description: Propose a new feature or improvement for Typen.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Repository / Component Area
+      options:
+        - Desktop App & OS Hooks (TypenApp/typen)
+        - Settings UI & Customisation (TypenApp/typen)
+        - Global Language Library & Domain Packs (TypenApp/language-data)
+        - Local AI / BYOK Cloud AI (TypenApp/model-resources)
+        - Documentation & Website (TypenApp/docs)
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or Use Case
+      description: What workflow or problem would this improvement solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: How should this work while keeping Typen fast, offline-first, and privacy-preserving?
+    validations:
+      required: true

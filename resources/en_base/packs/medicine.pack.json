@@ -1,0 +1,36 @@
+{
+  "pack_id": "medicine",
+  "version": "1.0.2",
+  "released_at": "2026-11-02T00:00:00Z",
+  "words": {
+    "cardiovascular": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hypertension": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pathophysiology": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pharmacokinetics": {
+      "log_freq": -6.5,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "arrhythmia": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    }
+  },
+  "direct_typos": {
+    "arythmia": "arrhythmia",
+    "hypertention": "hypertension"
+  }
+}

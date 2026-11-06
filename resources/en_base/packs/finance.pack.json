@@ -1,0 +1,41 @@
+{
+  "pack_id": "finance",
+  "version": "1.0.2",
+  "released_at": "2026-11-02T00:00:00Z",
+  "words": {
+    "amortization": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "collateralized": {
+      "log_freq": -6.2,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "reconciliation": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "chargeback": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "chargebacks": {
+      "log_freq": -6.0,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ebitda": {
+      "log_freq": -6.2,
+      "casing_flag": 2,
+      "exact_casing": "EBITDA"
+    }
+  },
+  "direct_typos": {
+    "reconcilation": "reconciliation",
+    "ammortization": "amortization"
+  }
+}

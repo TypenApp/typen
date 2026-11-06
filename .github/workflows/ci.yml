@@ -1,0 +1,132 @@
+name: CI
+
+on:
+  push:
+    branches: [master, cooking-pot]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint (ruff) & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev,ui]"
+      - run: ruff check src pipeline tests
+      # The whole tree is mypy-clean as of 1.3.0; keep it that way.
+      - run: mypy src
+
+  test:
+    name: Tests (${{ matrix.os }}, py${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        python: ["3.12"]
+        include:
+          - os: ubuntu-latest
+            python: "3.11"
+          - os: ubuntu-latest
+            python: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Linux system libraries (X11 headers for python-xlib tests, D-Bus for keyring)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-6 libxtst6 dbus
+      - run: python -m pip install -e ".[dev]"
+      - name: Platform extras
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then python -m pip install -e ".[macos]"; fi
+          if [ "$RUNNER_OS" = "Linux" ]; then python -m pip install "python-xlib>=0.33"; fi
+      - run: python -m pytest tests -q -p no:cacheprovider --cov=autocorrect --cov-report=term-missing:skip-covered
+        env:
+          PYTHONUTF8: "1"
+          # No X server on the runner: pystray's xorg backend connects to $DISPLAY at import.
+          PYSTRAY_BACKEND: ${{ runner.os == 'Linux' && 'dummy' || '' }}
+      - name: Headless launcher smoke test
+        run: python -m autocorrect.launcher --headless-check --data-dir "${{ runner.temp }}/ac-smoke"
+        env:
+          PYSTRAY_BACKEND: ${{ runner.os == 'Linux' && 'dummy' || '' }}
+
+  freeze:
+    name: PyInstaller smoke (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -e ".[dev]"
+      - name: Platform extras
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then python -m pip install -e ".[macos]"; fi
+          if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get update && sudo apt-get install -y --no-install-recommends libx11-6 libxtst6; python -m pip install "python-xlib>=0.33"; fi
+      - run: python packaging/make_icon.py --all
+      - run: python -m PyInstaller --noconfirm --clean --distpath dist --workpath dist/build packaging/autocorrect.spec
+      - name: Run the frozen binary
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Windows) BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop.exe" ;;
+            macOS)   BIN="dist/Typen.app/Contents/MacOS/AutoCorrectDesktop" ;;
+            Linux)   BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop" ;;
+          esac
+          "$BIN" --version
+          "$BIN" --headless-check --data-dir "${{ runner.temp }}/ac-frozen" | tee check.txt
+          grep -q " OK " check.txt
+
+  site:
+    name: Site (Next.js build + live-demo function)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: npm ci && node scripts/vendor-engine.mjs
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npx next build
+      - name: Live-demo function answers from the vendored engine
+        run: |
+          python -m pip install -r requirements.txt
+          python - <<'PY'
+          import importlib.util, sys
+          spec = importlib.util.spec_from_file_location("demo", "api/demo.py")
+          mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+          import autocorrect
+          assert "_vendor" in autocorrect.__file__, autocorrect.__file__
+          status, body = mod.HOST.handle("GET", "health", None, "")
+          assert status == 200 and body["word_count"] > 100_000, body
+          status, body = mod.HOST.handle("POST", "key", {"key_name": "Space", "char": " ", "text": "I recieved"}, "ci-session-00000001")
+          assert body["plan"]["target_full"] == "received ", body
+          print("demo function OK:", body["plan"])
+          PY
