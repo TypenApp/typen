@@ -38,6 +38,7 @@ from typing import Any, Final
 from autocorrect.adapters.windows import win32_api as w32
 from autocorrect.adapters.windows.win32_injector import AUTOCORRECT_EXTRA_INFO_TAG
 from autocorrect.adapters.windows.win_keymap import (
+    VK_CAPITAL,
     VK_CONTROL,
     VK_LWIN,
     VK_MENU,
@@ -442,6 +443,10 @@ class Win32KeyboardMouseHook:
         state = (ctypes.c_ubyte * 256)()
         if shift:
             state[VK_SHIFT] = 0x80
+        # Caps Lock is a *toggle* (low bit of GetKeyState); without it every
+        # letter typed with Caps Lock on was seen (and re-injected) lowercase.
+        if user32.GetKeyState(VK_CAPITAL) & 0x0001:
+            state[VK_CAPITAL] = 0x01
         buf = ctypes.create_unicode_buffer(8)
         hwnd = user32.GetForegroundWindow()
         tid = user32.GetWindowThreadProcessId(hwnd, None) if hwnd else 0

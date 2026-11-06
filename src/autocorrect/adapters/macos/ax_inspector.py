@@ -92,6 +92,7 @@ class MacAXFocusInspector:
         ax_role: str = "",
         ax_subrole: str = "",
         secure_event_input_enabled: bool = False,
+        control_id: str = "",
     ) -> FocusContext:
         """Pure classification logic testable across all operating systems."""
         b_low = bundle_id.lower()
@@ -108,6 +109,7 @@ class MacAXFocusInspector:
             is_password_or_secure=is_password,
             is_terminal_or_code=is_terminal,
             is_excluded_app=is_excluded,
+            control_id=control_id,
         )
 
     @staticmethod
@@ -145,11 +147,15 @@ class MacAXFocusInspector:
             )
             role = ""
             subrole = ""
+            control_id = ""
             if err == 0 and focused_elem is not None:
                 _, r_val = ApplicationServices.AXUIElementCopyAttributeValue(focused_elem, "AXRole", None)
                 _, sr_val = ApplicationServices.AXUIElementCopyAttributeValue(focused_elem, "AXSubrole", None)
                 role = str(r_val or "")
                 subrole = str(sr_val or "")
+                # AXUIElementRef is hashable and stable for the lifetime of the element.
+                pid = int(front_app.processIdentifier()) if front_app else 0
+                control_id = f"{pid}:{hash(focused_elem)}"
 
             return self.classify_macos_metadata(
                 bundle_id=bundle_id,
@@ -157,6 +163,7 @@ class MacAXFocusInspector:
                 ax_role=role,
                 ax_subrole=subrole,
                 secure_event_input_enabled=secure_input,
+                control_id=control_id,
             )
         except Exception:
             return FocusContext()

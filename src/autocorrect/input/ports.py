@@ -41,6 +41,25 @@ class FocusContext:
     is_password_or_secure: bool = False
     is_terminal_or_code: bool = False
     is_excluded_app: bool = False
+    # Stable identity of the focused text control (Windows: "pid:hwndFocus",
+    # macOS: "pid:AXUIElement hash", X11: "window id"). Empty when unknown.
+    # Window titles change while you type (Notepad's '*', browser tab titles,
+    # unread counters), so they must never count as a focus change.
+    control_id: str = ""
+
+    @property
+    def focus_key(self) -> tuple[str, str, bool, bool, bool]:
+        """What actually constitutes a *focus change* for the typing session."""
+        return (
+            self.process_name,
+            self.control_id,
+            self.is_password_or_secure,
+            self.is_terminal_or_code,
+            self.is_excluded_app,
+        )
+
+    def same_target(self, other: FocusContext | None) -> bool:
+        return other is not None and self.focus_key == other.focus_key
 
 
 class TextInjectorPort(Protocol):

@@ -49,13 +49,16 @@ class FocusMonitor:
             focus = self._inspector.get_current_focus()
         except Exception:
             return None
-        if focus != self._last:
+        if self._last is None or not focus.same_target(self._last):
             self._last = focus
             try:
                 self._on_change(focus)
             except Exception:
                 pass
             return focus
+        # Same control, only cosmetic metadata (window title) changed: remember
+        # the fresh title for display, but do not disturb the typing session.
+        self._last = focus
         return None
 
     def start(self) -> None:

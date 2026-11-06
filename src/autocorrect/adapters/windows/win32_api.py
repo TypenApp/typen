@@ -228,6 +228,24 @@ if IS_WINDOWS:
     user32.GetGUIThreadInfo.restype = wt.BOOL
     user32.GetWindowLongW.argtypes = [wt.HWND, ctypes.c_int]
     user32.GetWindowLongW.restype = wt.LONG
+    user32.GetKeyState.argtypes = [ctypes.c_int]
+    user32.GetKeyState.restype = ctypes.c_short
+    user32.GetClassNameW.argtypes = [wt.HWND, wt.LPWSTR, ctypes.c_int]
+    user32.GetClassNameW.restype = ctypes.c_int
+    user32.SendMessageTimeoutW.argtypes = [
+        wt.HWND,
+        wt.UINT,
+        wt.WPARAM,
+        wt.LPARAM,
+        wt.UINT,
+        wt.UINT,
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+    user32.SendMessageTimeoutW.restype = wt.LPARAM
+    user32.EnumWindows.argtypes = [ctypes.c_void_p, wt.LPARAM]
+    user32.EnumWindows.restype = wt.BOOL
+    user32.IsWindowVisible.argtypes = [wt.HWND]
+    user32.IsWindowVisible.restype = wt.BOOL
 
     # --- injection ---------------------------------------------------------
     user32.SendInput.argtypes = [wt.UINT, ctypes.POINTER(INPUT), ctypes.c_int]

@@ -340,7 +340,7 @@ class X11FocusInspector:
         self._atoms: dict[str, int] = {}
         self._last = FocusContext()
 
-    def classify_x11_window(self, wm_class: str, wm_name: str) -> FocusContext:
+    def classify_x11_window(self, wm_class: str, wm_name: str, control_id: str = "") -> FocusContext:
         cls_low = wm_class.lower()
         name_low = wm_name.lower()
         is_password = any(
@@ -356,6 +356,7 @@ class X11FocusInspector:
             is_password_or_secure=is_password,
             is_terminal_or_code=is_terminal,
             is_excluded_app=is_excluded,
+            control_id=control_id,
         )
 
     def _atom(self, disp: Any, name: str) -> int:
@@ -363,14 +364,14 @@ class X11FocusInspector:
             self._atoms[name] = disp.intern_atom(name)
         return self._atoms[name]
 
-    def _read_active_window(self, disp: Any) -> tuple[str, str]:
+    def _read_active_window(self, disp: Any) -> tuple[str, str, int]:
         root = disp.screen().root
         prop = root.get_full_property(self._atom(disp, "_NET_ACTIVE_WINDOW"), 0)
         if prop is None or not prop.value:
-            return "", ""
+            return "", "", 0
         win_id = int(prop.value[0])
         if not win_id:
-            return "", ""
+            return "", "", 0
         win = disp.create_resource_object("window", win_id)
         wm_class = ""
         try:
@@ -396,7 +397,7 @@ class X11FocusInspector:
                     )
         except Exception:
             pass
-        return wm_class, wm_name
+        return wm_class, wm_name, win_id
 
     def get_current_focus(self) -> FocusContext:
         if not sys.platform.startswith("linux"):
@@ -406,8 +407,8 @@ class X11FocusInspector:
                 from Xlib import display as xdisplay  # type: ignore[import-not-found]
 
                 self._display = xdisplay.Display()
-            wm_class, wm_name = self._read_active_window(self._display)
-            self._last = self.classify_x11_window(wm_class, wm_name)
+            wm_class, wm_name, win_id = self._read_active_window(self._display)
+            self._last = self.classify_x11_window(wm_class, wm_name, control_id=str(win_id) if win_id else "")
         except Exception:
             # Treat a broken X connection as "unknown app": keep the last
             # classification rather than silently re-enabling corrections in a

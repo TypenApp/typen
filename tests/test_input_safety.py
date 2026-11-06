@@ -146,6 +146,31 @@ def _drain(dispatcher: InputDispatcher, timeout: float = 3.0) -> None:
     dispatcher.run_sync(lambda: None)
 
 
+def test_pending_printable_skips_internal_calls_but_stops_on_input() -> None:
+    """
+    A settings push / pause toggle queued behind the delimiter is not user input:
+    it must neither cancel the correction nor be consumed. A click, focus change
+    or non-printable key still does cancel it.
+    """
+    d = InputDispatcher(lambda e: None, lambda: None, lambda f: None)
+    d._running = True  # queue without a worker so the items stay put
+    try:
+        d.post_key(KeyEvent(key_name="x", char="x", timestamp_ms=1.0))
+        d.post_call(lambda: None)
+        d.post_key(KeyEvent(key_name="y", char="y", timestamp_ms=2.0))
+        taken = d.take_pending_printable()
+        assert taken is not None and [e.char for e in taken] == ["x", "y"]
+        assert d.queue_depth == 1 and d._queue[0][0] == "call"
+
+        d.post_mouse_click()
+        assert d.take_pending_printable() is None
+        d._queue.clear()
+        d.post_key(KeyEvent(key_name="Backspace", char="", timestamp_ms=3.0))
+        assert d.take_pending_printable() is None
+    finally:
+        d._running = False
+
+
 def test_dispatcher_runs_session_passively_on_worker(session_with_injector) -> None:
     session, injector = session_with_injector
     worker_threads: set[str] = set()
@@ -293,10 +318,58 @@ def test_kill_switch_unsupported_without_probe() -> None:
 
 
 def test_kill_switch_hold_seconds_clamped() -> None:
-    assert clamp_hold_seconds("0.5") == 3.0
+    assert clamp_hold_seconds("0.5") == 5.0
     assert clamp_hold_seconds(99999) == 120.0
-    assert clamp_hold_seconds("garbage") == 15.0
-    assert KillSwitch(lambda: False, lambda r: None, hold_seconds=1).hold_seconds == 3.0
+    assert clamp_hold_seconds("garbage") == 10.0
+    assert KillSwitch(lambda: False, lambda r: None, hold_seconds=1).hold_seconds == 5.0
+
+
+def test_kill_switch_reports_countdown_while_held() -> None:
+    clock = _FakeClock()
+    down = {"v": False}
+    progress: list[float | None] = []
+    ks = KillSwitch(
+        lambda: down["v"], lambda r: None, hold_seconds=10, clock=clock, on_hold_progress=progress.append
+    )
+    down["v"] = True
+    ks.poll_once()
+    clock.t = 2.0
+    ks.poll_once()
+    assert progress == []  # nothing until a third of the hold has passed
+    clock.t = 5.0
+    ks.poll_once()
+    assert progress == [5.0]
+    clock.t = 8.0
+    ks.poll_once()
+    assert progress[-1] == 2.0
+    down["v"] = False
+    ks.poll_once()
+    assert progress[-1] is None
+    # Releasing without ever having shown a countdown stays silent.
+    down["v"] = True
+    ks.poll_once()
+    down["v"] = False
+    ks.poll_once()
+    assert progress.count(None) == 1
+
+
+def test_hold_seconds_migration_moves_untouched_15_to_10_once() -> None:
+    from autocorrect.daemon.kill_switch import migrate_hold_seconds
+
+    store: dict[str, str] = {"panic_hold_seconds": "15.0"}
+    get = lambda k, default=None: store.get(k, default)  # noqa: E731
+    put = lambda k, v: store.__setitem__(k, v)  # noqa: E731
+    assert migrate_hold_seconds(get, put) == 10.0
+    assert store["panic_hold_seconds"] == "10.0"
+    # A later explicit choice of 15 is respected.
+    store["panic_hold_seconds"] = "15"
+    assert migrate_hold_seconds(get, put) == 15.0
+    # A customised value is never touched by the migration.
+    store2: dict[str, str] = {"panic_hold_seconds": "30"}
+    assert migrate_hold_seconds(lambda k, d=None: store2.get(k, d), store2.__setitem__) == 30.0
+    # Fresh install: default.
+    store3: dict[str, str] = {}
+    assert migrate_hold_seconds(lambda k, d=None: store3.get(k, d), store3.__setitem__) == 10.0
 
 
 # ------------------------------------------------- daemon: safe mode / health
@@ -312,18 +385,37 @@ def daemon(tmp_path: Path):
         d.stop()
 
 
+def test_hold_esc_toggles_pause_without_safe_mode(daemon: AutoCorrectDaemon) -> None:
+    notes: list[tuple[str, str]] = []
+    daemon.on_notify = lambda t, m: notes.append((t, m))
+    assert daemon.kill_switch.hold_seconds == 10.0
+
+    daemon.on_escape_held("Esc held for 10 s")
+    assert daemon.session.is_paused
+    assert not daemon.in_safe_mode
+    assert not daemon.hook_status.needs_attention
+    assert notes[-1][0] == "Typen paused" and "10 s" in notes[-1][1]
+
+    daemon.on_escape_held("Esc held for 10 s")
+    assert not daemon.session.is_paused
+    assert notes[-1][0] == "Typen resumed"
+
+    # The marker is only ever written by an explicit emergency stop.
+    assert not daemon.safe_mode_path.exists()
+
+
 def test_emergency_disable_enters_safe_mode_and_resume_clears_it(daemon: AutoCorrectDaemon) -> None:
     notes: list[tuple[str, str]] = []
     changes: list[int] = []
     daemon.on_notify = lambda t, m: notes.append((t, m))
     daemon.on_state_changed = lambda: changes.append(1)
 
-    daemon.emergency_disable("Esc held for 15 s")
+    daemon.emergency_disable("input watchdog")
     assert daemon.in_safe_mode
     assert daemon.session.is_paused
     assert daemon.hook_status.state is HookState.DISABLED
     assert daemon.hook_status.needs_attention
-    assert notes and "Esc held" in notes[0][1]
+    assert notes and "input watchdog" in notes[0][1]
 
     # Marker survives a restart...
     d2 = AutoCorrectDaemon(data_dir=daemon.data_dir, dry_run_hooks=True)
@@ -356,6 +448,33 @@ def test_daemon_dispatch_is_passive_and_never_blocks_hook_thread(daemon: AutoCor
     tx = daemon.session.transaction_ledger.active_transaction
     assert tx is not None and tx.corrected_token.lower() == "receive"
     assert daemon.health_snapshot()["dispatcher"]["handled"] >= 8
+
+
+def test_first_correction_is_announced_once_and_counted(daemon: AutoCorrectDaemon) -> None:
+    notes: list[tuple[str, str]] = []
+    pulses: list[tuple[str, str, str]] = []
+    daemon.on_notify = lambda t, m: notes.append((t, m))
+    daemon.on_correction = lambda o, r, why: pulses.append((o, r, why))
+
+    def type_text(text: str, start: float) -> float:
+        ts = start
+        for ch in text:
+            ts += 50
+            daemon._dispatch_os_key(KeyEvent(key_name="Space" if ch == " " else ch, char=ch, timestamp_ms=ts))
+        _drain(daemon.dispatcher)
+        return ts
+
+    ts = type_text("recieve ", 0.0)
+    assert pulses and pulses[0][:2] == ("recieve", "Receive")
+    assert daemon.session_correction_count == 1
+    assert daemon.last_correction is not None and daemon.last_correction[1] == "Receive"
+    assert [t for t, _ in notes] == ["Typen is working"]
+    assert "'recieve' became 'Receive'" in notes[0][1]
+
+    type_text("teh ", ts)
+    assert daemon.session_correction_count == 2
+    assert len(notes) == 1  # announced only once per installation
+    assert daemon.preference_store.get_setting("first_correction_seen", "false") == "true"
 
 
 def test_hook_thread_death_degrades_status_instead_of_lying(daemon: AutoCorrectDaemon) -> None:
@@ -407,8 +526,19 @@ def test_ipc_health_safe_mode_and_shutdown(tmp_path: Path) -> None:
         assert "dispatcher" in health and "kill_switch" in health
         assert health["safe_mode"] is False
 
+        overview = c.call("system.get_overview")
+        assert overview["hold_esc_seconds"] == 10.0
+        assert overview["session"] == {"corrections": 0, "last_correction": None}
+        assert set(overview["listening"]) == {
+            "process_name",
+            "window_title",
+            "is_excluded",
+            "is_code_or_terminal",
+            "is_secure",
+        }
+
         settings = c.call("general.get_settings")
-        assert settings["panic_hold_seconds"] == 15.0
+        assert settings["panic_hold_seconds"] == 10.0
         c.call("general.update_settings", {"panic_hold_seconds": "30", "pause_hotkey": "Ctrl+Shift+P"})
         assert d.kill_switch.hold_seconds == 30.0
         assert d.configured_hotkeys()[1] == Hotkey(key="P", ctrl=True, shift=True)

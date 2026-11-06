@@ -18,9 +18,9 @@ hooks rather than let typing degrade.
 from __future__ import annotations
 
 import logging
-import queue
 import threading
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, Final
@@ -87,7 +87,8 @@ class InputDispatcher:
         self._max_depth = max_queue_depth
         self._slow_limit = slow_handler_limit
         self._clock = clock
-        self._queue: queue.SimpleQueue[tuple[str, Any] | None] = queue.SimpleQueue()
+        self._queue: deque[tuple[str, Any] | None] = deque()
+        self._cv = threading.Condition()
         self._depth = 0
         self._depth_lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -117,10 +118,58 @@ class InputDispatcher:
         if not self._running:
             return
         self._running = False
-        self._queue.put(None)
+        self._enqueue(None)
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=timeout)
         self._thread = None
+
+    def _enqueue(self, item: tuple[str, Any] | None) -> None:
+        with self._cv:
+            self._queue.append(item)
+            self._cv.notify()
+
+    def _dequeue(self) -> tuple[str, Any] | None:
+        with self._cv:
+            while not self._queue:
+                self._cv.wait()
+            return self._queue.popleft()
+
+    # ------------------------------------------------- late-keystroke peek
+
+    def take_pending_printable(self) -> list[KeyEvent] | None:
+        """
+        Called on the worker while it is about to inject a replacement.
+
+        Keys the user typed *after* the delimiter that triggered the correction
+        may already be in the queue (and already on screen). Returns those
+        leading printable key events, removing them from the queue, so the
+        caller can fold them into the replacement; returns None when anything
+        non-printable (Backspace, navigation, modifiers, a click, a focus
+        change) is pending, in which case the caller must not inject at all.
+        """
+        taken: list[KeyEvent] = []
+        with self._cv:
+            i = 0
+            while i < len(self._queue):
+                item = self._queue[i]
+                if item is None:
+                    break
+                kind, payload = item
+                if kind == "call":
+                    # Internal work (settings push, pause toggle, run_sync): not user
+                    # input, so it neither blocks the injection nor is consumed here.
+                    i += 1
+                    continue
+                if kind != "key":
+                    return None
+                ev: KeyEvent = payload
+                if not _is_plain_printable(ev):
+                    return None
+                taken.append(ev)
+                del self._queue[i]
+                with self._depth_lock:
+                    self._depth = max(0, self._depth - 1)
+        return taken
 
     # ---------------------------------------------------------------- posting
 
@@ -181,13 +230,13 @@ class InputDispatcher:
             if self._depth > self.stats.max_queue_depth:
                 self.stats.max_queue_depth = self._depth
         self.stats.posted += 1
-        self._queue.put((kind, payload))
+        self._enqueue((kind, payload))
 
     # ----------------------------------------------------------------- worker
 
     def _run(self) -> None:
         while True:
-            item = self._queue.get()
+            item = self._dequeue()
             if item is None:
                 break
             with self._depth_lock:
@@ -247,3 +296,14 @@ class InputDispatcher:
             fn(*args)
         except Exception:
             log.exception("inline input handler raised")
+
+
+def _is_plain_printable(ev: KeyEvent) -> bool:
+    """A single visible character typed without Ctrl/Alt/Win, incl. Space (not Return/Tab)."""
+    if ev.is_injected or ev.ctrl_pressed or ev.alt_pressed or ev.meta_pressed:
+        return False
+    if ev.key_name in ("Backspace", "Return", "Enter", "Tab", "Escape", "Delete", "Insert"):
+        return False
+    if ev.key_name in ("Left", "Right", "Up", "Down", "Home", "End", "PageUp", "PageDown"):
+        return False
+    return len(ev.char) == 1 and ev.char.isprintable()
