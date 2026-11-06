@@ -95,6 +95,10 @@ addopts = "-q"
 python_version = "3.12"
 strict = true
 mypy_path = ["src", "."]
+# Type-check as Windows everywhere (CI lints on Linux): the Windows adapters use
+# ctypes.WinDLL/winreg, while the macOS/Linux adapters only touch modules that
+# ignore_missing_imports already covers.
+platform = "win32"
 ignore_missing_imports = true
 # Cross-platform adapters carry `# type: ignore[import-not-found]` for frameworks that only
 # exist on one OS; those ignores are legitimately unused on the other two.
