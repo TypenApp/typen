@@ -424,9 +424,8 @@ def launch_pyside6_qml_ui(controller: SettingsController, initial_screen: str | 
     try:
         from autocorrect.branding import draw_mark
 
-        icon_file = controller.data_dir / "typen-window-icon.png"
-        if not icon_file.exists():
-            draw_mark(256).save(icon_file)
+        icon_file = controller.data_dir / "typen-window-icon-v2.png"
+        draw_mark(256).save(icon_file)
         app.setWindowIcon(QIcon(str(icon_file)))  # type: ignore[attr-defined]
     except Exception:
         log.debug("window icon unavailable", exc_info=True)

@@ -880,10 +880,19 @@ class SettingsController:
         return self.get_updates_state()
 
     def check_for_updates(self) -> dict[str, Any]:
-        ipc_res = self._call_ipc_if_online("updates.check")
-        if ipc_res is not None:
-            return ipc_res
-        return self.get_updates_state()
+        """Check, then download and install when a signed newer build exists.
+
+        The launch-time check stays check-only. This is the button.
+        """
+        checked = self._call_ipc_if_online("updates.check")
+        if checked is None:
+            return self.get_updates_state()
+        app = checked.get("app") if isinstance(checked, dict) else None
+        if isinstance(app, dict) and app.get("status") == "available":
+            applied = self._call_ipc_if_online("updates.apply_app")
+            if applied is not None:
+                return applied
+        return checked
 
     def apply_app_update(self) -> dict[str, Any]:
         ipc_res = self._call_ipc_if_online("updates.apply_app")
@@ -943,9 +952,8 @@ def _launch_native_fallback_ui(controller: SettingsController) -> int:
     try:
         from autocorrect.branding import draw_mark
 
-        icon_file = controller.data_dir / "typen-window-icon.png"
-        if not icon_file.exists():
-            draw_mark(256).save(icon_file)
+        icon_file = controller.data_dir / "typen-window-icon-v2.png"
+        draw_mark(256).save(icon_file)
         root.iconphoto(True, tk.PhotoImage(file=str(icon_file)))
     except Exception:
         logging.getLogger(__name__).debug("fallback window icon unavailable", exc_info=True)

@@ -13,9 +13,9 @@ from pipeline.sign_release import sign_manifest_payload
 
 from autocorrect.updates.application_updater import ApplicationReleaseDescriptor, ApplicationUpdater
 from autocorrect.updates.apply_update import windows_installer_command
-from autocorrect.updates.coordinator import AppUpdateCoordinator
+from autocorrect.updates.coordinator import UPDATE_CHECK_ERROR, AppUpdateCoordinator
 from autocorrect.updates.install_layout import InstallLayout, preferred_artifact_kind
-from autocorrect.updates.release_client import select_app_update
+from autocorrect.updates.release_client import fetch_manifest, select_app_update
 from autocorrect.updates.update_policy import UpdatePolicyEngine
 
 
@@ -273,6 +273,78 @@ def test_coordinator_check_and_unsigned(tmp_path: Path, monkeypatch: pytest.Monk
         apply_state = coord.apply()
         assert "not Ed25519-signed" in (apply_state.get("error") or "")
         assert not shutdown_calls
+
+
+def test_fetch_manifest_follows_github_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "github.com":
+            return httpx.Response(302, headers={"Location": "https://cdn.test/release-manifest.json"})
+        return httpx.Response(200, json={"product": "Typen", "version": "1.3.1"})
+
+    transport = httpx.MockTransport(handler)
+    original = httpx.Client
+
+    def factory(*args: object, **kwargs: object) -> httpx.Client:
+        kwargs["transport"] = transport
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr("autocorrect.updates.release_client.httpx.Client", factory)
+    data = fetch_manifest("https://github.com/TypenApp/typen/releases/download/v1.3.1-beta.1/release-manifest.json")
+    assert data["version"] == "1.3.1"
+
+
+def _coordinator(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, manifest: dict | None, *, fail: bool = False) -> AppUpdateCoordinator:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+    _priv, pub = _key_pair()
+
+    def fake_fetch(**kwargs: object) -> dict:
+        if fail:
+            raise RuntimeError(
+                "Redirect response '302 Found' for url "
+                "'https://github.com/TypenApp/typen/releases/download/v1.3.0-beta.6/release-manifest.json'"
+            )
+        assert manifest is not None
+        return manifest
+
+    monkeypatch.setattr("autocorrect.updates.coordinator.fetch_manifest_with_fallback", fake_fetch)
+    monkeypatch.setattr(
+        "autocorrect.updates.coordinator.detect_install_layout",
+        lambda: InstallLayout.WINDOWS_INSTALLED,
+    )
+    monkeypatch.setattr("autocorrect.updates.coordinator.platform_key", lambda: "win64")
+    return AppUpdateCoordinator(
+        updater=ApplicationUpdater(tmp_path, Ed25519PublicKey.from_public_bytes(pub)),
+        state_path=tmp_path / "state.json",
+        get_channel=lambda: "stable",
+        get_updates_expire_at=lambda: None,
+        request_shutdown=lambda: None,
+    )
+
+
+def test_check_reports_up_to_date_for_same_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from autocorrect.version import APP_VERSION
+
+    coord = _coordinator(tmp_path, monkeypatch, _sample_manifest(version=APP_VERSION))
+    state = coord.check()
+    assert state["status"] == "up_to_date"
+    assert "302" not in (state.get("error") or "")
+
+
+def test_check_reports_available_for_newer_signed_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    coord = _coordinator(tmp_path, monkeypatch, _sample_manifest(version="9.9.9"))
+    state = coord.check()
+    assert state["status"] == "available"
+    assert state["available_version"] == "9.9.9"
+    assert state["signed"] is True
+
+
+def test_check_failure_stores_a_short_message(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    coord = _coordinator(tmp_path, monkeypatch, None, fail=True)
+    state = coord.check()
+    assert state["status"] == "error"
+    assert state["error"] == UPDATE_CHECK_ERROR
+    assert "github.com" not in state["error"]
 
 
 def test_attach_app_updates_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -33,8 +33,8 @@ Page {
             return "Update available: v" + (app.available_version || "—")
         if (status === "unsigned")
             return "v" + (app.available_version || "—") + " is available but not signed for in-app install"
-        if (status === "up_to_date") return "You are up to date"
-        if (status === "error") return String(app.error || "Update check failed")
+        if (status === "up_to_date") return "You're up to date"
+        if (status === "error") return String(app.error || "Couldn't check for updates. Try again.")
         return app.reason ? String(app.reason) : ""
     }
 
@@ -49,12 +49,16 @@ Page {
             Layout.fillWidth: true
             spacing: 28
             ColumnLayout {
+                Layout.fillWidth: true
+                Layout.maximumWidth: 420
                 spacing: 2
                 Eyebrow { label: "Typen" }
                 Text { text: "v" + (app.current_version || bridge.appVersion); color: Theme.ink; font.family: Theme.display; font.pixelSize: Theme.fsTitle; font.weight: Font.Bold; font.letterSpacing: -0.5 }
                 Body { text: "Released " + page.dateOnly(app.released_at); font.pixelSize: Theme.fsSmall }
                 Body {
                     visible: page.statusLine().length > 0
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
                     text: page.statusLine()
                     font.pixelSize: Theme.fsSmall
                     color: page.status === "error" ? Theme.proof : Theme.inkMuted
@@ -63,7 +67,7 @@ Page {
             Item { Layout.fillWidth: true }
             Pill { label: String(app.channel || "stable"); tone: app.channel === "beta" ? "proof" : "muted" }
             SecondaryButton {
-                text: page.busy && status === "checking" ? "Checking…" : "Check for updates"
+                text: status === "checking" ? "Checking…" : (status === "downloading" || status === "applying" ? "Updating…" : "Check for updates")
                 enabled: !page.busy
                 onClicked: bridge.call("check_for_updates", "{}")
             }

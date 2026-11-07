@@ -59,10 +59,7 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     if path is not None:
         try:
             font = ImageFont.truetype(str(path), px)
-            try:
-                font.set_variation_by_name("Bold")
-            except Exception:
-                pass  # static Bold file or FreeType without variation support
+            _set_syne_bold(font)
             return font
         except Exception:
             pass
@@ -70,6 +67,24 @@ def _load_font(px: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         return ImageFont.load_default(size=px)  # Pillow >= 10.1
     except TypeError:  # pragma: no cover - very old Pillow
         return ImageFont.load_default()
+
+
+def _set_syne_bold(font: ImageFont.FreeTypeFont | ImageFont.ImageFont) -> None:
+    """Syne ships as a variable font. The default instance is not Bold, and a
+    Regular "Aa" is short enough that the cursor bar reads as a dash."""
+    set_axes = getattr(font, "set_variation_by_axes", None)
+    if set_axes is not None:
+        try:
+            set_axes([700])
+            return
+        except Exception:
+            pass
+    set_name = getattr(font, "set_variation_by_name", None)
+    if set_name is not None:
+        try:
+            set_name("Bold")
+        except Exception:
+            pass
 
 
 def _squiggle_points(scale: float, ox: float, oy: float, steps: int = 64) -> list[tuple[float, float]]:

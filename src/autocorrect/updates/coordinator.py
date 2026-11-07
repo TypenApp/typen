@@ -27,6 +27,8 @@ from autocorrect.version import APP_VERSION
 log = logging.getLogger(__name__)
 
 Status = str  # idle|checking|available|up_to_date|unsigned|downloading|ready|applying|error
+UPDATE_CHECK_ERROR = "Couldn't check for updates. Try again."
+UPDATE_APPLY_ERROR = "Couldn't install the update. Try again."
 
 
 @dataclass
@@ -135,11 +137,11 @@ class AppUpdateCoordinator:
                     self._pending = _Pending(selection=selected)
                 self._persist()
                 return self._state.to_dict()
-        except Exception as exc:
+        except Exception:
             log.exception("app update check failed")
             with self._lock:
                 self._state.status = "error"
-                self._state.error = str(exc)
+                self._state.error = UPDATE_CHECK_ERROR
                 self._persist()
                 return self._state.to_dict()
 
@@ -209,11 +211,11 @@ class AppUpdateCoordinator:
                 current_pid=os.getpid(),
             )
             self._request_shutdown()
-        except Exception as exc:
+        except Exception:
             log.exception("app update apply failed")
             with self._lock:
                 self._state.status = "error"
-                self._state.error = str(exc)
+                self._state.error = UPDATE_APPLY_ERROR
                 self._persist()
 
     def _persist(self) -> None:
@@ -242,8 +244,10 @@ class AppUpdateCoordinator:
                     ):
                         if key in data:
                             setattr(self._state, key, data[key])
-                    # Don't resume mid-download after a crash.
-                    if self._state.status in ("downloading", "applying", "checking"):
+                    # Don't resume mid-download after a crash, and don't keep a
+                    # previous version's raw HTTP error on the Updates page.
+                    if self._state.status in ("downloading", "applying", "checking", "error"):
                         self._state.status = "idle"
+                        self._state.error = None
         except Exception:
             log.exception("could not load app update state")
