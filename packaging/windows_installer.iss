@@ -38,7 +38,6 @@ SetupIconFile=autocorrect.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
-DisableWelcomePage=auto
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
@@ -100,6 +99,19 @@ begin
   { /UPDATEDBYAPP=1 from the desktop app's silent updater. }
   GUpdatedByApp := ExpandConstant('{param:UPDATEDBYAPP|0}') = '1';
   Result := True;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+var
+  Uninstall: String;
+begin
+  { Older Inno builds reject DisableWelcomePage=auto. Skip the welcome page on upgrade. }
+  Result := (PageID = wpWelcome) and RegQueryStringValue(
+    HKCU,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{8D4F62C1-4B9E-497A-9F3E-71B8C2094E1A}_is1',
+    'UninstallString',
+    Uninstall
+  );
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;

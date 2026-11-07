@@ -101,7 +101,7 @@ def _write_windows_archive_helper(package: Path, root: Path, exe: Path, pid: int
         "robocopy \"%TMP%\" \"%DST%\" /E /IS /IT /NFL /NDL /NJH /NJS /nc /ns /np >nul",
         "rmdir /s /q \"%TMP%\" 2>nul",
         f'start \"\" \"{exe}\"',
-        f'del \"%~f0\"',
+        'del "%~f0"',
     ]
     script.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
     return script
@@ -126,28 +126,28 @@ def _write_posix_helper(
         # Zip contains Typen.app (or a folder with it).
         body = [
             f'while kill -0 {pid} 2>/dev/null; do sleep 0.5; done',
-            f'TMP=$(mktemp -d)',
+            'TMP=$(mktemp -d)',
             f'unzip -qo "{package}" -d "$TMP"',
-            f'APP=$(find "$TMP" -maxdepth 2 -name "*.app" -type d | head -n 1)',
-            f'if [ -z "$APP" ]; then echo "no .app in archive"; exit 1; fi',
+            'APP=$(find "$TMP" -maxdepth 2 -name "*.app" -type d | head -n 1)',
+            'if [ -z "$APP" ]; then echo "no .app in archive"; exit 1; fi',
             f'rm -rf "{root}"',
             f'mv "$APP" "{root}"',
-            f'rm -rf "$TMP"',
+            'rm -rf "$TMP"',
             f'open "{root}"',
         ]
     else:
         # Portable tar.gz / zip extract over root.
         body = [
             f'while kill -0 {pid} 2>/dev/null; do sleep 0.5; done',
-            f'TMP=$(mktemp -d)',
+            'TMP=$(mktemp -d)',
             f'case "{package}" in',
             f'  *.tar.gz|*.tgz) tar -xzf "{package}" -C "$TMP" ;;',
             f'  *) unzip -qo "{package}" -d "$TMP" ;;',
-            f'esac',
-            f'INNER=$(find "$TMP" -mindepth 1 -maxdepth 1 | head -n 1)',
-            f'if [ -d "$INNER" ]; then SRC="$INNER"; else SRC="$TMP"; fi',
+            'esac',
+            'INNER=$(find "$TMP" -mindepth 1 -maxdepth 1 | head -n 1)',
+            'if [ -d "$INNER" ]; then SRC="$INNER"; else SRC="$TMP"; fi',
             f'rsync -a --delete "$SRC"/ "{root}"/ 2>/dev/null || cp -R "$SRC"/. "{root}"/',
-            f'rm -rf "$TMP"',
+            'rm -rf "$TMP"',
             f'nohup "{exe}" >/dev/null 2>&1 &',
         ]
     script.write_text(
@@ -159,19 +159,26 @@ def _write_posix_helper(
 
 
 def _detach(argv: list[str]) -> None:
-    kwargs: dict = {
-        "close_fds": True,
-        "stdin": subprocess.DEVNULL,
-        "stdout": subprocess.DEVNULL,
-        "stderr": subprocess.DEVNULL,
-        "start_new_session": True,
-    }
     if sys.platform.startswith("win"):
-        kwargs.pop("start_new_session", None)
         flags = 0
         if hasattr(subprocess, "DETACHED_PROCESS"):
             flags |= subprocess.DETACHED_PROCESS  # type: ignore[attr-defined]
         if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
             flags |= subprocess.CREATE_NEW_PROCESS_GROUP  # type: ignore[attr-defined]
-        kwargs["creationflags"] = flags
-    subprocess.Popen(argv, **kwargs)  # noqa: S603
+        subprocess.Popen(  # noqa: S603
+            argv,
+            close_fds=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=flags,
+        )
+        return
+    subprocess.Popen(  # noqa: S603
+        argv,
+        close_fds=True,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
