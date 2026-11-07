@@ -1,10 +1,10 @@
 {
   "product": "Typen",
   "version": "1.3.0",
-  "channel": "beta.1",
-  "full_version": "1.3.0-beta.1",
-  "release_tag": "v1.3.0-beta.1",
-  "built_at": "2026-11-06T01:15:16Z",
+  "channel": "beta.2",
+  "full_version": "1.3.0-beta.2",
+  "release_tag": "v1.3.0-beta.2",
+  "built_at": "2026-11-07T17:20:27Z",
   "resources": {
     "bundle_version": "1.1.0",
     "schema_version": 1,
@@ -26,8 +26,8 @@
       "id": "academic",
       "version": "1.0.1",
       "file": "academic.pack.json",
-      "size_bytes": 716,
-      "sha256": "00aa723e93092ce8cd6489234ee9fb5484e32dce8395bc24b22089029e0ff9e3",
+      "size_bytes": 751,
+      "sha256": "5663105689c38b5f211d32efc6738fd9d8f531a72faab71fc5d645579f23adaa",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -35,8 +35,8 @@
       "id": "business",
       "version": "1.0.1",
       "file": "business.pack.json",
-      "size_bytes": 820,
-      "sha256": "7f73728ebb32b47648a6fc1454d1db51ae140abd65e3802a5f2d22623c87da7f",
+      "size_bytes": 860,
+      "sha256": "d8d9a4dc54279a2f27b9536cef0bfdea2ff4993e7d29902d02202fbbafc12f59",
       "word_count": 6,
       "direct_typo_count": 2
     },
@@ -44,8 +44,8 @@
       "id": "finance",
       "version": "1.0.2",
       "file": "finance.pack.json",
-      "size_bytes": 829,
-      "sha256": "8274c2c6a23a37be1cccb942a31ae5e67c61cb50c109171c10dbf241fcb1483c",
+      "size_bytes": 869,
+      "sha256": "98f2a2f4cbdd6f86c53bbf8db0e97b4093d70d57e883de2276a9a001d17d7eb1",
       "word_count": 6,
       "direct_typo_count": 2
     },
@@ -53,8 +53,8 @@
       "id": "law",
       "version": "1.0.1",
       "file": "law.pack.json",
-      "size_bytes": 708,
-      "sha256": "60ec5292c9d77630a074c262b66e153025a09b1ac95bfe8d6195b317c2d2ba5c",
+      "size_bytes": 743,
+      "sha256": "d2c596ab5b16a6466de8f4411d3ed7867fec1265da7761596bdbdf560d1d6270",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -62,8 +62,8 @@
       "id": "medicine",
       "version": "1.0.2",
       "file": "medicine.pack.json",
-      "size_bytes": 724,
-      "sha256": "31dd3b75540d0e657001b32e98bda00f8721ae68c4d5087ac083ac5b176fd396",
+      "size_bytes": 759,
+      "sha256": "285cf280b537e407df1f5c7afeee9f4d0f4d6d86f8c43618aa6e21c9082bc43a",
       "word_count": 5,
       "direct_typo_count": 2
     },
@@ -71,15 +71,15 @@
       "id": "programming",
       "version": "1.0.3",
       "file": "programming.pack.json",
-      "size_bytes": 1380,
-      "sha256": "e248d157dde613be77909394eb769565bc1bf44efaeabec468a00f804eeaac75",
+      "size_bytes": 1446,
+      "sha256": "32459a91b97a34c8a2407daadced6a9ed261c9fdb7dbec4ff3a1993f477c08ca",
       "word_count": 11,
       "direct_typo_count": 3
     }
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-06T01:12:13Z",
+      "built_at": "2026-11-07T17:20:27Z",
       "full_version": "1.3.0",
       "channel": "stable",
       "code_signed": false,
@@ -87,61 +87,61 @@
         {
           "kind": "portable",
           "file": "Typen-1.3.0-win64-portable.zip",
-          "size_bytes": 88302581,
-          "sha256": "e0a2e0b6b20445723df74c0b69abe8660b9f9ba63c065000eaf8c63a06c5f540"
+          "size_bytes": 88302878,
+          "sha256": "536aec3b116c94ccb6215818e39406e87967c682ffd5573e788d285ebcb62aca"
         },
         {
           "kind": "installer",
           "file": "Typen-1.3.0-win64-setup.exe",
-          "size_bytes": 57004529,
-          "sha256": "78d41bcde20ccb1658e0803cc4f4891103c64fb61dbc23db941f73b70dd4cb66"
+          "size_bytes": 57002270,
+          "sha256": "f1ad63faa4b2d0f9c968a59c1ca71c951cc7b3f370968c2660159e003d0eb66c"
         }
       ]
     },
     "macos-arm64": {
-      "built_at": "2026-11-06T01:10:42Z",
-      "full_version": "1.3.0-beta.1",
-      "channel": "beta.1",
+      "built_at": "2026-11-07T17:18:22Z",
+      "full_version": "1.3.0-beta.2",
+      "channel": "beta.2",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "installer",
-          "file": "Typen-1.3.0-beta.1-macos-arm64.dmg",
-          "size_bytes": 81227384,
-          "sha256": "f3e4c448b8540dca00321fd3853cd339a4cd885a26138974c55cc837ced0ca5f"
+          "file": "Typen-1.3.0-beta.2-macos-arm64.dmg",
+          "size_bytes": 82375169,
+          "sha256": "460e2d519c5d021de35eb5bddf39399a7fe0dffef0415235140e68bff9a472cd"
         },
         {
           "kind": "portable",
-          "file": "Typen-1.3.0-beta.1-macos-arm64.zip",
-          "size_bytes": 68709666,
-          "sha256": "7f2ecf9abe263ec71bef73b0ef4daaed5f39533dab79a76717ee5ba89352a16a"
+          "file": "Typen-1.3.0-beta.2-macos-arm64.zip",
+          "size_bytes": 68711381,
+          "sha256": "e5791f75e33b8c8f13008d1ce4b997a36fc462e96c17c79255219ac3f258d7d5"
         }
       ],
       "notarized": false
     },
     "linux-x86_64": {
-      "built_at": "2026-11-06T01:15:16Z",
-      "full_version": "1.3.0-beta.1",
-      "channel": "beta.1",
+      "built_at": "2026-11-07T17:18:40Z",
+      "full_version": "1.3.0-beta.2",
+      "channel": "beta.2",
       "code_signed": false,
       "artifacts": [
         {
           "kind": "portable",
-          "file": "Typen-1.3.0-beta.1-linux-x86_64-portable.tar.gz",
-          "size_bytes": 126537805,
-          "sha256": "a02b58122ef36640574118a2e2bccf2d3eb69daee5bf20b47536f98bde8fb5b6"
+          "file": "Typen-1.3.0-beta.2-linux-x86_64-portable.tar.gz",
+          "size_bytes": 126543156,
+          "sha256": "6f2527830c59393bbc2f99b00602b4481286dfe4f960e21abd6bac0770f446de"
         },
         {
           "kind": "appimage",
-          "file": "Typen-1.3.0-beta.1-linux-x86_64.AppImage",
-          "size_bytes": 115403256,
-          "sha256": "0eaf7ae4aeb96d9a789352d91331664428d82ecc0607c530783f55a9db24628d"
+          "file": "Typen-1.3.0-beta.2-linux-x86_64.AppImage",
+          "size_bytes": 115407352,
+          "sha256": "af7c96e2aec2da5c34db7ecd4de11e9b579a97243227a0407822deb1bf4f86b4"
         },
         {
           "kind": "deb",
-          "file": "autocorrect-desktop_1.3.0-beta.1_amd64.deb",
-          "size_bytes": 97783562,
-          "sha256": "ab6e03aa24b520c4638717acd2d792c824296ae190248af31cce043a4f8f8058"
+          "file": "autocorrect-desktop_1.3.0-beta.2_amd64.deb",
+          "size_bytes": 97781452,
+          "sha256": "cf5e387489dddbda3bb53e89dad86f298a659ec7184ca8207a2c9a55f1e01fea"
         }
       ]
     }
@@ -153,14 +153,14 @@
     {
       "kind": "portable",
       "file": "Typen-1.3.0-win64-portable.zip",
-      "size_bytes": 88302581,
-      "sha256": "e0a2e0b6b20445723df74c0b69abe8660b9f9ba63c065000eaf8c63a06c5f540"
+      "size_bytes": 88302878,
+      "sha256": "536aec3b116c94ccb6215818e39406e87967c682ffd5573e788d285ebcb62aca"
     },
     {
       "kind": "installer",
       "file": "Typen-1.3.0-win64-setup.exe",
-      "size_bytes": 57004529,
-      "sha256": "78d41bcde20ccb1658e0803cc4f4891103c64fb61dbc23db941f73b70dd4cb66"
+      "size_bytes": 57002270,
+      "sha256": "f1ad63faa4b2d0f9c968a59c1ca71c951cc7b3f370968c2660159e003d0eb66c"
     }
   ]
 }
