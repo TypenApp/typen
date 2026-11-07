@@ -64,7 +64,7 @@ def test_organisation_constants_and_about_urls(tmp_path: Path, monkeypatch: obje
 def test_tray_menu_and_funding_yml_point_to_github_sponsors() -> None:
     funding = (ROOT / ".github" / "FUNDING.yml").read_text(encoding="utf-8")
     assert "github: [TypenApp, litlEMPEROR]" in funding
-    assert "https://autocorrect-desktop.vercel.app/donate" in funding
+    assert "https://typen.org/donate" in funding
 
     tray = SystemTrayController(
         on_toggle_pause=lambda: True,

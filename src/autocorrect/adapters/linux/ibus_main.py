@@ -136,7 +136,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
             version="0",
             license="Proprietary",
             author="Omnii",
-            homepage="https://autocorrect-desktop.vercel.app",
+            homepage="https://typen.org",
             command_line=f"{sys.executable} --ibus",
             textdomain="autocorrect",
         )

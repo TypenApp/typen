@@ -10,7 +10,7 @@ Page {
     readonly property var res: up.language_resources || {}
     readonly property var models: up.local_models || {}
     readonly property string releasesUrl: String(bridge.about.source_url || "https://github.com/TypenApp/typen") + "/releases"
-    readonly property string downloadUrl: "https://autocorrect-desktop.vercel.app/download"
+    readonly property string downloadUrl: "https://typen.org/download"
 
     function dateOnly(v) { return v ? String(v).slice(0, 10) : "—" }
 

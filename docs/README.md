@@ -2,8 +2,8 @@
 
 Official documentation, architecture specifications, security guarantees, and CLI reference for **Typen** — the free, open-source, offline-first system-wide autocorrect and writing assistant for Windows, macOS, and Linux.
 
-- **Website & Live Demo**: <https://autocorrect-desktop.vercel.app>
-- **Web Docs**: <https://autocorrect-desktop.vercel.app/docs>
+- **Website & Live Demo**: <https://typen.org>
+- **Web Docs**: <https://typen.org/docs>
 - **GitHub Organisation**: <https://github.com/TypenApp>
 
 ## Guides & Reference

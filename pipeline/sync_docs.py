@@ -103,7 +103,7 @@ def render_article_markdown(article: dict[str, Any]) -> str:
             "---",
             "",
             "*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · "
-            "[Read on the web](https://autocorrect-desktop.vercel.app/docs/"
+            "[Read on the web](https://typen.org/docs/"
             f"{article['slug']}) · "
             "[TypenApp on GitHub](https://github.com/TypenApp)*",
             "",
@@ -119,8 +119,8 @@ def render_index_markdown(articles: list[dict[str, Any]]) -> str:
         "",
         "Official documentation, architecture specifications, security guarantees, and CLI reference for **Typen** — the free, open-source, offline-first system-wide autocorrect and writing assistant for Windows, macOS, and Linux.",
         "",
-        "- **Website & Live Demo**: <https://autocorrect-desktop.vercel.app>",
-        "- **Web Docs**: <https://autocorrect-desktop.vercel.app/docs>",
+        "- **Website & Live Demo**: <https://typen.org>",
+        "- **Web Docs**: <https://typen.org/docs>",
         "- **GitHub Organisation**: <https://github.com/TypenApp>",
         "",
         "## Guides & Reference",

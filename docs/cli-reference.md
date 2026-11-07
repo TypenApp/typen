@@ -60,4 +60,4 @@ The offline build pipeline (pipeline/ingest.py, pipeline/validate.py, pipeline/c
 
 ---
 
-*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://autocorrect-desktop.vercel.app/docs/cli-reference) · [TypenApp on GitHub](https://github.com/TypenApp)*
+*Part of the [Typen Documentation](https://github.com/TypenApp/docs) · [Read on the web](https://typen.org/docs/cli-reference) · [TypenApp on GitHub](https://github.com/TypenApp)*
