@@ -73,12 +73,35 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AutoCorrectDesktop"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} in the background (tray icon)"; Flags: nowait postinstall skipifsilent
+; Interactive installs: optional post-install launch (skipped when /SILENT).
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} in the background (tray icon)"; Flags: nowait postinstall skipifsilent; Check: NotUpdatedByApp
+; In-app Update & restart passes /UPDATEDBYAPP=1 with /VERYSILENT — always relaunch.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait postinstall skipifdoesntexist; Check: IsUpdatedByApp
 
 [UninstallRun]
 Filename: "taskkill"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillAutoCorrect"
 
 [Code]
+var
+  GUpdatedByApp: Boolean;
+
+function IsUpdatedByApp: Boolean;
+begin
+  Result := GUpdatedByApp;
+end;
+
+function NotUpdatedByApp: Boolean;
+begin
+  Result := not GUpdatedByApp;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  { /UPDATEDBYAPP=1 from the desktop app's silent updater. }
+  GUpdatedByApp := ExpandConstant('{param:UPDATEDBYAPP|0}') = '1';
+  Result := True;
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ExePath: String;

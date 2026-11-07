@@ -103,8 +103,24 @@ class UpdatePolicyEngine:
 
     @staticmethod
     def _is_newer_semver(current: str, candidate: str) -> bool:
-        def _parse(v: str) -> tuple[int, ...]:
-            parts = v.strip().lstrip("v").split("-")[0].split(".")
-            return tuple(int(p) for p in parts if p.isdigit())
+        """
+        Semver-ish compare: 1.3.0 > 1.3.0-beta.3 > 1.3.0-beta.2.
+        A release without a pre-release tag is newer than the same numbers with one.
+        """
+        return UpdatePolicyEngine._semver_key(candidate) > UpdatePolicyEngine._semver_key(current)
 
-        return _parse(candidate) > _parse(current)
+    @staticmethod
+    def _semver_key(v: str) -> tuple[object, ...]:
+        raw = v.strip().lstrip("v")
+        core, _, pre = raw.partition("-")
+        nums = tuple(int(p) for p in core.split(".") if p.isdigit())
+        if not pre:
+            # Final releases sort after any pre-release of the same core.
+            return (*nums, 1, ())
+        pre_parts: list[object] = []
+        for part in pre.replace(".", "-").split("-"):
+            if part.isdigit():
+                pre_parts.append(int(part))
+            elif part:
+                pre_parts.append(part)
+        return (*nums, 0, tuple(pre_parts))

@@ -879,6 +879,18 @@ class SettingsController:
             return ipc_res
         return self.get_updates_state()
 
+    def check_for_updates(self) -> dict[str, Any]:
+        ipc_res = self._call_ipc_if_online("updates.check")
+        if ipc_res is not None:
+            return ipc_res
+        return self.get_updates_state()
+
+    def apply_app_update(self) -> dict[str, Any]:
+        ipc_res = self._call_ipc_if_online("updates.apply_app")
+        if ipc_res is not None:
+            return ipc_res
+        return self.get_updates_state()
+
     # =========================================================================
     # SCREEN 10: ABOUT & SUPPORT
     # =========================================================================
