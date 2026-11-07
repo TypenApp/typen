@@ -13,7 +13,7 @@ from pipeline.sign_release import sign_manifest_payload
 
 from autocorrect.updates.application_updater import ApplicationReleaseDescriptor, ApplicationUpdater
 from autocorrect.updates.apply_update import windows_installer_command
-from autocorrect.updates.coordinator import UPDATE_CHECK_ERROR, AppUpdateCoordinator
+from autocorrect.updates.coordinator import UPDATE_CHECK_ERROR, AppUpdateCoordinator, describe_update_check
 from autocorrect.updates.install_layout import InstallLayout, preferred_artifact_kind
 from autocorrect.updates.release_client import fetch_manifest, select_app_update
 from autocorrect.updates.update_policy import UpdatePolicyEngine
@@ -345,6 +345,18 @@ def test_check_failure_stores_a_short_message(tmp_path: Path, monkeypatch: pytes
     assert state["status"] == "error"
     assert state["error"] == UPDATE_CHECK_ERROR
     assert "github.com" not in state["error"]
+
+
+def test_describe_update_check_toasts_the_outcome() -> None:
+    assert describe_update_check({"status": "up_to_date"}) == ("You're up to date.", False)
+    assert describe_update_check({"status": "downloading", "available_version": "1.3.2"}) == (
+        "Downloading v1.3.2…",
+        False,
+    )
+    assert describe_update_check({"status": "error", "error": UPDATE_CHECK_ERROR}) == (UPDATE_CHECK_ERROR, True)
+    long_http = "Redirect response '302 Found' https://github.com/TypenApp/typen " + ("x" * 120)
+    assert describe_update_check({"status": "error", "error": long_http}) == (UPDATE_CHECK_ERROR, True)
+    assert describe_update_check({"status": "idle"}) == (UPDATE_CHECK_ERROR, True)
 
 
 def test_attach_app_updates_requires_key(monkeypatch: pytest.MonkeyPatch) -> None:

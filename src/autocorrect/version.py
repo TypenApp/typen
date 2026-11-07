@@ -5,12 +5,12 @@ and perpetual usage vs. 12-month update entitlement verification.
 
 from datetime import UTC, datetime
 
-APP_VERSION: str = "1.3.1"
+APP_VERSION: str = "1.3.2"
 BINARY_SCHEMA_VERSION: int = 1
 
 # Baked in at build time; used offline by update_entitlement.py to verify that
 # this binary was released within the customer's entitled update window.
-APP_RELEASE_TIMESTAMP: str = "2026-11-07T22:30:00Z"
+APP_RELEASE_TIMESTAMP: str = "2026-11-07T23:20:00Z"
 
 
 def get_app_release_datetime() -> datetime:

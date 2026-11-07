@@ -14,7 +14,8 @@ Page {
     readonly property string status: String(app.status || "idle")
     readonly property bool updateAvailable: status === "available" || status === "ready"
     readonly property bool unsignedUpdate: status === "unsigned"
-    readonly property bool busy: status === "checking" || status === "downloading" || status === "applying"
+    readonly property bool checking: bridge.updateBusy || status === "checking"
+    readonly property bool busy: page.checking || status === "downloading" || status === "applying"
 
     Timer {
         interval: 500
@@ -67,9 +68,9 @@ Page {
             Item { Layout.fillWidth: true }
             Pill { label: String(app.channel || "stable"); tone: app.channel === "beta" ? "proof" : "muted" }
             SecondaryButton {
-                text: status === "checking" ? "Checking…" : (status === "downloading" || status === "applying" ? "Updating…" : "Check for updates")
+                text: page.checking ? "Checking…" : (status === "downloading" || status === "applying" ? "Updating…" : "Check for updates")
                 enabled: !page.busy
-                onClicked: bridge.call("check_for_updates", "{}")
+                onClicked: bridge.checkForUpdates()
             }
             PrimaryButton {
                 visible: page.updateAvailable

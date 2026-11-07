@@ -31,6 +31,25 @@ UPDATE_CHECK_ERROR = "Couldn't check for updates. Try again."
 UPDATE_APPLY_ERROR = "Couldn't install the update. Try again."
 
 
+def describe_update_check(app: dict[str, Any]) -> tuple[str, bool]:
+    """Toast copy for a button-triggered check: (message, is_error)."""
+    status = str(app.get("status") or "")
+    version = str(app.get("available_version") or "").lstrip("v")
+    if status == "up_to_date":
+        return "You're up to date.", False
+    if status in {"available", "downloading", "applying", "ready"}:
+        return (f"Downloading v{version}…" if version else "Downloading the update…"), False
+    if status == "unsigned":
+        label = f"v{version} " if version else "A newer build "
+        return f"{label}is on the download page.", False
+    if status == "error":
+        text = str(app.get("error") or UPDATE_CHECK_ERROR).strip()
+        if not text or len(text) > 140 or "http" in text.lower():
+            return UPDATE_CHECK_ERROR, True
+        return text, True
+    return UPDATE_CHECK_ERROR, True
+
+
 @dataclass
 class AppUpdateState:
     status: Status = "idle"
