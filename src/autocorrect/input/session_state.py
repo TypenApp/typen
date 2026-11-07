@@ -32,6 +32,47 @@ from autocorrect.intelligence.schema import RegionFlag
 WORD_BOUNDARY_PUNCTUATION: Final[frozenset[str]] = frozenset(
     {".", ",", "!", "?", ";", ":", ")", "]", "}", '"', "\n"}
 )
+# Tokens that, after an auto-space following '.', are a file extension or a
+# hostname TLD rather than a new sentence. Kept tight so English words that
+# happen to be TLDs ('net', 'us', 'it', 'info') still capitalise normally.
+HOST_OR_FILE_SUFFIXES: Final[frozenset[str]] = frozenset(
+    {
+        "com",
+        "org",
+        "edu",
+        "gov",
+        "pdf",
+        "doc",
+        "docx",
+        "txt",
+        "png",
+        "jpg",
+        "jpeg",
+        "gif",
+        "zip",
+        "html",
+        "htm",
+        "css",
+        "json",
+        "xml",
+        "js",
+        "ts",
+        "py",
+        "exe",
+        "dll",
+        "svg",
+        "webp",
+        "mp3",
+        "mp4",
+        "csv",
+        "xlsx",
+        "pptx",
+        "yaml",
+        "yml",
+        "toml",
+        "md",
+    }
+)
 # Delimiters after which the n-gram / grammar context is reset: the next word
 # starts a new clause, so the word before the mark is not its grammatical neighbour.
 CLAUSE_BOUNDARY_DELIMITERS: Final[frozenset[str]] = frozenset({".", ",", "!", "?", ";", ":", "\n"})
@@ -114,6 +155,7 @@ class InputSessionManager:
         self._features: CorrectionFeatures = CorrectionFeatures()
 
         self._last_completed_word: str = ""
+        self._last_boundary_delimiter: str = ""
         self._last_space_timestamp_ms: float = 0.0
         self._preceded_by_space: bool = False
         # True only when the immediately preceding boundary was a word completed
@@ -207,6 +249,7 @@ class InputSessionManager:
         self._double_space_eligible = False
         self._just_deleted_trailing_space = False
         self._last_completed_word = ""
+        self._last_boundary_delimiter = ""
         self._current_sentence_tokens.clear()
         self._auto_space_pending = False
         if caret_text_before is None:
@@ -254,6 +297,7 @@ class InputSessionManager:
         self._tx_ledger.clear_suppression()
         self._capitaliser.reset_to_sentence_start()
         self._last_completed_word = ""
+        self._last_boundary_delimiter = ""
         self._last_space_timestamp_ms = 0.0
         self._preceded_by_space = False
         self._double_space_eligible = False
@@ -717,6 +761,46 @@ class InputSessionManager:
             return False
         return True
 
+    def _maybe_glue_host_or_file_suffix(
+        self,
+        token: str,
+        delimiter: str,
+        leading_prefix: str,
+        suppress_delimiter: bool,
+    ) -> SessionEventOutcome | None:
+        """
+        After 'example. ' the next token 'com' is a TLD, not a sentence.
+        Collapse the auto-inserted space: 'example. Com' / 'example. com' → 'example.com'.
+        """
+        if leading_prefix or self._priming:
+            return None
+        if self._last_boundary_delimiter != ".":
+            return None
+        if not self._last_completed_word or not self._capitaliser.is_sentence_start:
+            return None
+        if token.lower() not in HOST_OR_FILE_SUFFIXES:
+            return None
+        glued = f"{self._last_completed_word}.{token.lower()}"
+        orig_full = f" {token}{delimiter}"
+        target_full = f"{token.lower()}{delimiter}"
+        plan = SuffixDiffPlanner.plan(
+            original_full=orig_full,
+            target_full=target_full,
+            delimiter_was_suppressed=suppress_delimiter,
+        )
+        self._capitaliser.mark_mid_sentence()
+        self._last_completed_word = glued
+        self._last_boundary_delimiter = delimiter
+        self._preceded_by_space = delimiter == " "
+        self._word_buffer.clear_clean()
+        if self._injector is not None and not plan.is_noop:
+            self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+        return SessionEventOutcome(
+            action=KeyAction.SUPPRESS_AND_INJECT if suppress_delimiter else KeyAction.PASS_THROUGH,
+            replacement_plan=plan,
+            reason_tag="AUTO_SPACE_REATTACH",
+        )
+
     def _arm_auto_space(self, timestamp_ms: float) -> None:
         """The field now ends with '<terminator> ' that we inserted."""
         self._auto_space_pending = True
@@ -786,10 +870,12 @@ class InputSessionManager:
                 reason_tag="AUTO_SPACE_REATTACH",
             )
 
-        # A lowercase letter or digit straight after the terminator: the user is
-        # typing a URL, file name or version ('example.com', 'report.docx',
-        # 'v1.beta'); take the space back and never touch that token.
-        if ch and (ch.islower() or ch.isdigit()):
+        # A digit straight after the terminator is a version / decimal
+        # ('v1.2', 'wait.2'); take the space back. A *letter* is the next
+        # sentence ('Hello. the' → 'Hello. The'): undoing the space and
+        # tainting the buffer is what made capitalisation after a period
+        # look random whenever the user relied on the inserted space.
+        if ch and ch.isdigit():
             plan = ReplacementPlan(
                 backspaces_to_send=1 if suppress else 2,
                 text_to_inject=ch,
@@ -808,7 +894,8 @@ class InputSessionManager:
                 reason_tag="AUTO_SPACE_UNDONE",
             )
 
-        # Anything else (capital letter, Return, symbol): the space stays.
+        # Anything else (letter, Return, symbol): the space stays; a
+        # lowercase letter is evaluated as the start of the next sentence.
         return None
 
     def _evaluate_boundary(
@@ -827,6 +914,7 @@ class InputSessionManager:
             )
             self._just_deleted_trailing_space = False
             self._capitaliser.on_word_completed("", delimiter)
+            self._last_boundary_delimiter = delimiter
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # Only a word completed by a Space arms the double-space-period shortcut.
@@ -844,6 +932,7 @@ class InputSessionManager:
                 self._context_ring.clear()
             self._capitaliser.on_word_completed(token, delimiter)
             self._last_completed_word = token
+            self._last_boundary_delimiter = delimiter
             self._current_sentence_tokens.append(token + delimiter if delimiter in (",", ";", ":") else token)
             if delimiter in (".", "!", "?", "\n"):
                 self._current_sentence_tokens.clear()
@@ -882,6 +971,15 @@ class InputSessionManager:
                     replacement_plan=plan,
                     reason_tag=CorrectionReason.SNIPPET_EXPANSION.value,
                 )
+
+        # A hostname TLD or file extension typed after an auto-space following
+        # '.' ('example.com', 'report.docx') is not a new sentence: pull it
+        # back against the terminator and leave it lowercase.
+        suffix_plan = self._maybe_glue_host_or_file_suffix(
+            token, delimiter, leading_prefix, suppress_delimiter
+        )
+        if suffix_plan is not None:
+            return suffix_plan
 
         # Build evaluation context from the 5-token ID ring buffer
         p1 = self._context_ring.prev1()
@@ -973,6 +1071,7 @@ class InputSessionManager:
             self._context_ring.clear()
         self._capitaliser.on_word_completed(final_word, delimiter)
         self._last_completed_word = final_word
+        self._last_boundary_delimiter = delimiter
         # Keep the clause mark on the token so grammar can see the boundary.
         self._current_sentence_tokens.append(
             final_word + delimiter if delimiter in (",", ";", ":") else final_word

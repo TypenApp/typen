@@ -183,6 +183,11 @@ def test_automatic_sentence_capitalisation_and_abbreviation_guards() -> None:
         session.reset_all_state()
         out_eg = _type_string(session, "Use tools e.g. python for scripts.")
         assert out_eg == "Use tools e.g. python for scripts. "
+
+        session.reset_all_state()
+        # A comma is a clause break, not a sentence: the next word stays lowercase.
+        out_comma = _type_string(session, "hello, world. yes, that is fine. ")
+        assert out_comma == "Hello, world. Yes, that is fine. "
     finally:
         rm.close()
 

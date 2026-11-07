@@ -12,6 +12,7 @@ Page {
     readonly property var hook: ov.hook_status || {}
     readonly property bool paused: bridge.isPaused
     readonly property bool healthy: bridge.ipcConnected && !paused && ["active", "dry_run"].indexOf(String(hook.state)) >= 0
+    property bool tryApplying: false
 
     // Live counters while this page is visible.
     Timer {
@@ -75,34 +76,41 @@ Page {
     Card {
         SectionTitle {
             title: "Try it"
-            description: "Type a sentence with a few mistakes. The system hook fixes it live when Typen is active; the preview below shows what the engine would do with the same text."
+            description: "Type a sentence with a few mistakes. Corrections land in this box as you finish each word — the same engine that runs everywhere else."
         }
         Field {
             id: tryField
             Layout.fillWidth: true
             placeholderText: "teh quick brown fox jumps over teh lazy dog. i recieved your mesage"
-            onTextChanged: previewTimer.restart()
+            onTextChanged: {
+                if (page.tryApplying)
+                    return
+                var t = text
+                if (t.length === 0)
+                    return
+                var last = t.charAt(t.length - 1)
+                applyTimer.interval = " \n.,!?;:".indexOf(last) >= 0 ? 40 : 220
+                applyTimer.restart()
+            }
         }
         Timer {
-            id: previewTimer
-            interval: 250
-            onTriggered: preview.text = tryField.text.trim() === "" ? "" : bridge.tryText(tryField.text + " ")
-        }
-        Rectangle {
-            Layout.fillWidth: true
-            visible: preview.text !== ""
-            implicitHeight: preview.implicitHeight + 20
-            radius: Theme.radiusSm
-            color: Theme.paper1
-            border.color: Theme.line
-            Text {
-                id: preview
-                anchors.fill: parent
-                anchors.margins: 10
-                color: Theme.ink
-                font.family: Theme.sans
-                font.pixelSize: Theme.fsLead
-                wrapMode: Text.WordWrap
+            id: applyTimer
+            interval: 40
+            onTriggered: {
+                var typed = tryField.text
+                if (typed.trim() === "")
+                    return
+                // Do not append a trailing space: that would correct a word
+                // the user is still typing and look like a ghost hint.
+                var result = bridge.tryText(typed)
+                if (result === typed)
+                    return
+                var atEnd = tryField.cursorPosition >= typed.length
+                var pos = tryField.cursorPosition
+                page.tryApplying = true
+                tryField.text = result
+                tryField.cursorPosition = atEnd ? result.length : Math.min(result.length, Math.max(0, pos + result.length - typed.length))
+                page.tryApplying = false
             }
         }
     }

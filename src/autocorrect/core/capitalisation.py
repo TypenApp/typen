@@ -206,6 +206,13 @@ class SentenceCapitaliser:
                 self._state = SentenceBoundaryState.AWAITING_SPACE_AFTER_TERMINAL
             return
 
+        # Comma / semicolon / colon / a closing bracket never start a sentence.
+        # Without this, "Hello, world" capitalises World because the first word
+        # left the tracker at SENTENCE_START.
+        if delimiter in (",", ";", ":", ")", "]", "}"):
+            self._state = SentenceBoundaryState.MID_SENTENCE
+            return
+
         if delimiter == " ":
             if self._state == SentenceBoundaryState.AWAITING_SPACE_AFTER_TERMINAL:
                 self._state = SentenceBoundaryState.SENTENCE_START

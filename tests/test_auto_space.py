@@ -3,9 +3,11 @@ Auto-space after sentence punctuation.
 
 A word closed by '.', '!' or '?' gets a space appended so the user can keep
 typing; a Space they type anyway is swallowed, a second closing mark is pulled
-back against the terminator, and a lowercase letter typed straight after the
-dot (URLs, file names, versions) takes the space back. Both the blocking
-(IBus / dry-run) and passive (Windows hook) delivery modes are covered.
+back against the terminator, a lowercase letter starts the next sentence, and
+a digit typed straight after the dot (versions) takes the space back. Host
+TLDs and file extensions ('example.com', 'report.docx') are glued back at
+word-complete. Both the blocking (IBus / dry-run) and passive (Windows hook)
+delivery modes are covered.
 """
 
 from __future__ import annotations
@@ -78,6 +80,8 @@ def _type(session: InputSessionManager, text: str, *, passive: bool) -> str:
         ("really?", "Really? "),
         # Typing the space yourself never doubles it, and the next sentence starts capitalised.
         ("hello world. this is a tset. ", "Hello world. This is a test. "),
+        # Relying on the inserted space (no extra Space key) still capitalises.
+        ("hello world.this is a tset. ", "Hello world. This is a test. "),
         # A correction on the final word merges with the added space.
         ("i recieved teh mesage.", "I received the message. "),
         # Ellipsis / combined marks are pulled back against the terminator.
