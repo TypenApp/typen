@@ -10,7 +10,7 @@ BINARY_SCHEMA_VERSION: int = 1
 
 # Baked in at build time; used offline by update_entitlement.py to verify that
 # this binary was released within the customer's entitled update window.
-APP_RELEASE_TIMESTAMP: str = "2026-11-06T00:00:00Z"
+APP_RELEASE_TIMESTAMP: str = "2026-11-07T00:00:00Z"
 
 
 def get_app_release_datetime() -> datetime:
