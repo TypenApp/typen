@@ -20,6 +20,7 @@ Item {
     }
 
     Text {
+        id: letters
         x: 19.75 * mark.s
         y: 36 * mark.s - font.pixelSize * 0.78
         text: "Aa"
@@ -30,10 +31,13 @@ Item {
         font.letterSpacing: -1 * mark.s
     }
 
+    // Cursor bar flush after measured "Aa"; right edge stays at design x=68.
     Rectangle {
-        x: 54.25 * mark.s
+        readonly property real cursorEnd: 68 * mark.s
+        readonly property real cursorStart: Math.min(letters.x + letters.contentWidth, cursorEnd - 2 * mark.s)
+        x: cursorStart
         y: 33 * mark.s
-        width: 13.75 * mark.s
+        width: Math.max(2 * mark.s, cursorEnd - cursorStart)
         height: 3 * mark.s
         radius: 1 * mark.s
         color: mark.paused || mark.accent ? "#ffffff" : Theme.paper

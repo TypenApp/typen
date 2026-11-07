@@ -653,6 +653,18 @@ def test_make_icon_writes_all_formats(tmp_path: Path, monkeypatch: pytest.Monkey
     make_icon.write_ico(tmp_path / "a.ico")
     make_icon.write_icns(tmp_path / "a.icns")
     pngs = make_icon.write_pngs(tmp_path / "icons")
+    avatar = tmp_path / "typen-org-avatar.png"
+    make_icon.write_org_avatar(avatar)
+    svgs = make_icon.write_mark_svgs(tmp_path)
     assert (tmp_path / "a.ico").stat().st_size > 1000
     assert (tmp_path / "a.icns").stat().st_size > 1000
     assert len(pngs) == len(make_icon.PNG_SIZES) and all(p.exists() for p in pngs)
+    assert avatar.stat().st_size > 1000
+    assert {p.name for p in svgs} == {make_icon.MARK_SVG_BLACK, make_icon.MARK_SVG_WHITE}
+    assert all("font-family" not in p.read_text(encoding="utf-8") for p in svgs)
+    from PIL import Image
+
+    with Image.open(avatar) as img:
+        assert img.size == (make_icon.ORG_AVATAR_SIZE, make_icon.ORG_AVATAR_SIZE)
+        # White-tile org default (theme=dark); sample inside the centred 88x64 tile.
+        assert img.getpixel((img.width // 2, img.height // 2))[:3] == (255, 255, 255)

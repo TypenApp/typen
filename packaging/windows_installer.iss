@@ -28,6 +28,7 @@ AppPublisher={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}.1
 VersionInfoProductTextVersion={#MyFullVersion}
 DefaultDirName={autopf}\{#MyAppName}
+UsePreviousAppDir=yes
 DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -37,10 +38,13 @@ SetupIconFile=autocorrect.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
 WizardStyle=modern
+DisableWelcomePage=auto
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
-CloseApplications=yes
+; Stop the tray daemon ourselves in PrepareToInstall so Restart Manager does not
+; prompt "files in use / force close" on upgrades. Post-install [Run] relaunches.
+CloseApplications=no
 RestartApplications=no
 ; Optional Authenticode signing of Setup.exe and the uninstaller from inside Inno.
 ; build_windows_beta.ps1 signs Setup.exe itself after compilation, so this is only
@@ -73,3 +77,28 @@ Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} in the back
 
 [UninstallRun]
 Filename: "taskkill"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillAutoCorrect"
+
+[Code]
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExePath: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  ExePath := ExpandConstant('{app}\{#MyAppExeName}');
+  if not FileExists(ExePath) then
+    Exit;
+
+  { Graceful stop via IPC / lock file; then force-kill any leftover process. }
+  Exec(ExePath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
+  Exec(
+    ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM {#MyAppExeName}',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Sleep(500);
+end;
