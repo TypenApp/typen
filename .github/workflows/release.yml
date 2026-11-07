@@ -213,7 +213,7 @@ jobs:
         run: |
           mkdir -p dist/installer
           find downloads-raw -type f -exec cp {} dist/installer/ \;
-          python -m pip install -q cryptography
+          python -m pip install -q "cryptography>=42" "zstandard>=0.22"
           python -m pipeline.merge_release_manifests --downloads dist/installer \
             --out site/src/data/release-manifest.json --download-repo "$RELEASES_REPO"
           if [[ -z "${AC_ED25519_PRIVATE_KEY_HEX:-}" ]]; then
