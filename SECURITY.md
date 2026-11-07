@@ -18,7 +18,7 @@ Typen processes system-wide keyboard input on your machine. Because of that priv
    - **Linux**: Checks EWMH window classes on X11 and `IBUS_INPUT_PURPOSE_PASSWORD` / `PIN` on Wayland.
 3. **Authenticated Local IPC**: The Settings UI talks to the background daemon over a local Named Pipe (Windows) or `0600` Unix Domain Socket (macOS/Linux) authenticated with a 256-bit random hex token (`ipc.token`, mode `0600`).
 4. **Ed25519 Cryptographic Update Verification**:
-   - All language resource updates (`TypenApp/language-data`), optional local AI models (`TypenApp/model-resources`), and application release descriptors (`TypenApp/typen`) are verified against the embedded Ed25519 root public key (`79f7c2e422116b9597ae50d9c2f9e633d2f210b89a280983b52d6bce16344f78`) and SHA-256 digests before staging.
+   - All language resource updates (`TypenApp/language-data`), optional local AI models (`TypenApp/model-resources`), and application release descriptors (`TypenApp/typen`) are verified against the embedded Ed25519 root public key (`aa15967c30afba85bc5381d6c7a4d35adfd9aab7861de52e98214d68fa89e88d`) and SHA-256 digests before staging.
    - Resource archives are scanned to reject path traversal (`..`) and any executable file extensions (`.exe`, `.dll`, `.so`, `.dylib`, `.py`, `.sh`, `.bat`).
 
 ## Reporting a Vulnerability
