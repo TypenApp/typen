@@ -160,6 +160,34 @@ def test_bridge_exposes_state_and_settings(bridge) -> None:
     assert isinstance(bridge.schema, list) and bridge.schema
 
 
+def test_check_for_updates_toasts_off_the_ui_thread(bridge, monkeypatch: pytest.MonkeyPatch) -> None:
+    import time
+
+    from PySide6.QtCore import QCoreApplication
+
+    def slow() -> dict:
+        time.sleep(0.35)
+        return {"app": {"status": "up_to_date", "current_version": "1.3.2"}}
+
+    monkeypatch.setattr(bridge._ctrl, "check_for_updates", slow)
+    messages: list[tuple[str, bool]] = []
+    bridge.toast.connect(lambda message, is_error: messages.append((message, is_error)))
+
+    started = time.perf_counter()
+    bridge.checkForUpdates()
+    assert time.perf_counter() - started < 0.2
+    assert bridge.updateBusy is True
+    assert messages == [("Checking for updates…", False)]
+
+    deadline = time.perf_counter() + 2
+    while len(messages) < 2 and time.perf_counter() < deadline:
+        QCoreApplication.processEvents()
+        time.sleep(0.02)
+
+    assert messages[-1] == ("You're up to date.", False)
+    assert bridge.updateBusy is False
+
+
 def test_bridge_set_setting_and_call_roundtrip(bridge) -> None:
     bridge.setSetting("enable_spelling", False)
     bridge.setSetting("excluded_processes", ["KeePass.exe"])

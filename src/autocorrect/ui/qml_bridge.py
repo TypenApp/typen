@@ -18,6 +18,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -118,11 +119,12 @@ def bridge_class() -> type:
     if _BRIDGE_CLASS is not None:
         return _BRIDGE_CLASS
 
-    from PySide6.QtCore import Property, QObject, QUrl, Signal, Slot
+    from PySide6.QtCore import Property, QMetaObject, QObject, Qt, QUrl, Signal, Slot
 
     class SettingsBridge(QObject):  # type: ignore[misc]
         stateChanged = Signal()
         overviewChanged = Signal()
+        updateBusyChanged = Signal()
         toast = Signal(str, bool)  # message, is_error
 
         def __init__(self, ctrl: SettingsController, font_family: str, initial_screen: str = "") -> None:
@@ -133,6 +135,8 @@ def bridge_class() -> type:
             self._cache: dict[str, dict[str, Any]] = {}
             self._settings: dict[str, Any] | None = None
             self._schema: list[dict[str, Any]] | None = None
+            self._update_busy = False
+            self._update_toast: tuple[str, bool] = ("", False)
 
         # ------------------------------------------------------------ cache
         def _state(self, name: str) -> dict[str, Any]:
@@ -254,6 +258,10 @@ def bridge_class() -> type:
             proc = listening.get("process_name") if isinstance(listening, dict) else ""
             return f"Listening in {proc}" if proc else "Listening for typing in every app."
 
+        @Property(bool, notify=updateBusyChanged)  # type: ignore[misc,arg-type]
+        def updateBusy(self) -> bool:
+            return self._update_busy
+
         @Property(bool, notify=stateChanged)  # type: ignore[misc,arg-type]
         def themeIsDark(self) -> bool:
             choice = str(self._settings_map().get("ui_theme", "system"))
@@ -319,6 +327,48 @@ def bridge_class() -> type:
                 self.toast.emit(f"{method.replace('_', ' ')} failed: {exc}", True)
             self._invalidate()
             return out
+
+        @Slot()  # type: ignore[misc,arg-type]
+        def checkForUpdates(self) -> None:
+            """Check off the window thread and toast the result.
+
+            `call("check_for_updates")` blocks the Qt UI thread for the whole
+            network round-trip, so the window freezes and the outcome never
+            appears as a toast.
+            """
+            if self._update_busy:
+                return
+            self._update_busy = True
+            self.updateBusyChanged.emit()
+            self.toast.emit("Checking for updates…", False)
+
+            def work() -> None:
+                from autocorrect.updates.coordinator import UPDATE_CHECK_ERROR, describe_update_check
+
+                message, is_error = UPDATE_CHECK_ERROR, True
+                try:
+                    result = self._ctrl.check_for_updates()
+                    app = result.get("app") if isinstance(result, dict) else None
+                    message, is_error = describe_update_check(app if isinstance(app, dict) else {})
+                except Exception:
+                    log.exception("check for updates")
+                self._update_toast = (message, is_error)
+                QMetaObject.invokeMethod(
+                    self,
+                    "finishUpdateCheck",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+
+            threading.Thread(target=work, name="typen-update-check", daemon=True).start()
+
+        @Slot()  # type: ignore[misc,arg-type]
+        def finishUpdateCheck(self) -> None:
+            message, is_error = self._update_toast
+            self._update_busy = False
+            self.updateBusyChanged.emit()
+            self._invalidate()
+            if message:
+                self.toast.emit(message, is_error)
 
         @Slot(str, result=str)  # type: ignore[misc,arg-type]
         def tryText(self, text: str) -> str:
