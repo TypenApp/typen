@@ -620,6 +620,25 @@ def test_brand_mark_renders_square_variants(size: int) -> None:
             assert img.getpixel((0, 0))[3] < 8
 
 
+def test_brand_mark_cursor_sits_after_the_letters() -> None:
+    """The cursor is the short bar flush after Bold "Aa", ending at design x=68.
+    A Regular-weight measurement starts the bar in the middle of the tile."""
+    size = 440  # multiple of the 88-wide tile, so one design px is 5 image px
+    img = draw_mark(size, theme="light")
+    scale = size / 88
+    oy = (size - 64 * scale) / 2
+    y = int(oy + 34.5 * scale)
+    xs = [x for x in range(size) if img.getpixel((x, y))[:3] == (255, 255, 255)]
+    bar = [x for x in xs if x / scale >= 53.8]
+    assert bar, "cursor bar missing"
+    start = min(bar) / scale
+    end = (max(bar) + 1) / scale
+    assert 53.8 <= start < 56
+    assert 66 < end <= 70
+    # A gap before the bar: it is flush after "Aa", not a dash through the tile.
+    assert img.getpixel((min(bar) - 3, y))[:3] != (255, 255, 255)
+
+
 def test_brand_mark_colours_follow_theme() -> None:
     light = draw_mark(128, theme="light")
     dark = draw_mark(128, theme="dark")

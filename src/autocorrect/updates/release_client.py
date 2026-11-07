@@ -37,12 +37,21 @@ def fetch_manifest(
     client: httpx.Client | None = None,
     timeout: float = 20.0,
 ) -> dict[str, Any]:
-    http = client or httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
+    http = client or httpx.Client(
+        timeout=timeout,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+        follow_redirects=True,
+    )
     owns = client is None
     try:
         resp = http.get(url)
+        if resp.is_redirect:
+            raise ValueError(f"release manifest redirect was not followed: {resp.status_code}")
         resp.raise_for_status()
-        data = resp.json()
+        try:
+            data = resp.json()
+        except ValueError as exc:
+            raise ValueError("release manifest was not JSON") from exc
         if not isinstance(data, dict):
             raise ValueError("release manifest is not a JSON object")
         return data
@@ -74,7 +83,11 @@ def _resolve_github_release_tag(
     channel: str,
     client: httpx.Client | None = None,
 ) -> str:
-    http = client or httpx.Client(timeout=20.0, headers={"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"})
+    http = client or httpx.Client(
+        timeout=20.0,
+        headers={"User-Agent": USER_AGENT, "Accept": "application/vnd.github+json"},
+        follow_redirects=True,
+    )
     owns = client is None
     try:
         resp = http.get(GITHUB_API_RELEASES.format(repo=repo), params={"per_page": 20})
