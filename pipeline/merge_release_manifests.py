@@ -201,6 +201,9 @@ def main(argv: list[str] | None = None) -> int:
 
     manifests = collect_platform_manifests(args.downloads)
     merged = merge(manifests, download_repo=args.download_repo)
+    from pipeline.sign_app_update import attach_app_updates
+
+    attach_app_updates(merged)
     text = json.dumps(merged, indent=2) + "\n"
     if args.check:
         current = args.out.read_text(encoding="utf-8-sig") if args.out.exists() else ""

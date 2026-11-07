@@ -10,9 +10,33 @@ Page {
     readonly property var res: up.language_resources || {}
     readonly property var models: up.local_models || {}
     readonly property string releasesUrl: String(bridge.about.source_url || "https://github.com/TypenApp/typen") + "/releases"
-    readonly property string downloadUrl: "https://typen.org/download"
+    readonly property string downloadUrl: String(app.download_page_url || "https://typen.org/download")
+    readonly property string status: String(app.status || "idle")
+    readonly property bool updateAvailable: status === "available" || status === "ready"
+    readonly property bool unsignedUpdate: status === "unsigned"
+    readonly property bool busy: status === "checking" || status === "downloading" || status === "applying"
+
+    Timer {
+        interval: 500
+        running: page.busy
+        repeat: true
+        onTriggered: bridge.refresh()
+    }
 
     function dateOnly(v) { return v ? String(v).slice(0, 10) : "—" }
+    function statusLine() {
+        if (status === "checking") return "Checking…"
+        if (status === "downloading")
+            return "Downloading " + Math.round(Number(app.download_progress || 0) * 100) + "%"
+        if (status === "applying") return "Installing and restarting…"
+        if (status === "available" || status === "ready")
+            return "Update available: v" + (app.available_version || "—")
+        if (status === "unsigned")
+            return "v" + (app.available_version || "—") + " is available but not signed for in-app install"
+        if (status === "up_to_date") return "You are up to date"
+        if (status === "error") return String(app.error || "Update check failed")
+        return app.reason ? String(app.reason) : ""
+    }
 
     PageHeader {
         number: "09"
@@ -29,10 +53,31 @@ Page {
                 Eyebrow { label: "Typen" }
                 Text { text: "v" + (app.current_version || bridge.appVersion); color: Theme.ink; font.family: Theme.display; font.pixelSize: Theme.fsTitle; font.weight: Font.Bold; font.letterSpacing: -0.5 }
                 Body { text: "Released " + page.dateOnly(app.released_at); font.pixelSize: Theme.fsSmall }
+                Body {
+                    visible: page.statusLine().length > 0
+                    text: page.statusLine()
+                    font.pixelSize: Theme.fsSmall
+                    color: page.status === "error" ? Theme.proof : Theme.inkMuted
+                }
             }
             Item { Layout.fillWidth: true }
             Pill { label: String(app.channel || "stable"); tone: app.channel === "beta" ? "proof" : "muted" }
-            SecondaryButton { text: "Check for updates"; onClicked: bridge.openUrl(page.downloadUrl) }
+            SecondaryButton {
+                text: page.busy && status === "checking" ? "Checking…" : "Check for updates"
+                enabled: !page.busy
+                onClicked: bridge.call("check_for_updates", "{}")
+            }
+            PrimaryButton {
+                visible: page.updateAvailable
+                text: "Update & restart"
+                enabled: !page.busy
+                onClicked: bridge.call("apply_app_update", "{}")
+            }
+            GhostButton {
+                visible: page.unsignedUpdate
+                text: "Download page"
+                onClicked: bridge.openUrl(page.downloadUrl)
+            }
             GhostButton { text: "Release notes"; onClicked: bridge.openUrl(page.releasesUrl) }
         }
         Divider {}

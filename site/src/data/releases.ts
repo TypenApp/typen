@@ -152,7 +152,7 @@ export const LEXICON_WORD_COUNT = RELEASE.resources.word_count;
  * The private half lives only on the signing machine.
  */
 export const ED25519_PUBLIC_KEY_HEX =
-  "79f7c2e422116b9597ae50d9c2f9e633d2f210b89a280983b52d6bce16344f78";
+  "aa15967c30afba85bc5381d6c7a4d35adfd9aab7861de52e98214d68fa89e88d";
 export const ED25519_KEY_IS_DEV_KEY = false;
 
 export function formatBytes(bytes: number): string {

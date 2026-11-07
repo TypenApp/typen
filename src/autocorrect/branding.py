@@ -173,8 +173,12 @@ def draw_mark(
                 x += font.getlength(ch) + tracking
             except AttributeError:  # pragma: no cover - bitmap fallback font
                 x += font.getbbox(ch)[2] + tracking
+        # Cursor bar flush after measured "Aa"; right edge stays at design x=68
+        # so the squiggle (x=20..68) still spans the full "Aa_" group.
+        cursor_end = ox + 68.0 * s
+        cursor_start = min(x, cursor_end - 2.0 * s)
         d.rounded_rectangle(
-            (ox + 54.25 * s, oy + 33.0 * s, ox + 68.0 * s, oy + 36.0 * s),
+            (cursor_start, oy + 33.0 * s, cursor_end, oy + 36.0 * s),
             radius=1.0 * s,
             fill=glyph,
         )

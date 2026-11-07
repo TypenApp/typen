@@ -28,6 +28,7 @@ AppPublisher={#MyAppPublisher}
 VersionInfoVersion={#MyAppVersion}.1
 VersionInfoProductTextVersion={#MyFullVersion}
 DefaultDirName={autopf}\{#MyAppName}
+UsePreviousAppDir=yes
 DefaultGroupName={#MyAppName}
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
@@ -40,7 +41,9 @@ WizardStyle=modern
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
-CloseApplications=yes
+; Stop the tray daemon ourselves in PrepareToInstall so Restart Manager does not
+; prompt "files in use / force close" on upgrades. Post-install [Run] relaunches.
+CloseApplications=no
 RestartApplications=no
 ; Optional Authenticode signing of Setup.exe and the uninstaller from inside Inno.
 ; build_windows_beta.ps1 signs Setup.exe itself after compilation, so this is only
@@ -69,7 +72,68 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "AutoCorrectDesktop"; ValueData: """{app}\{#MyAppExeName}"""; Flags: uninsdeletevalue; Tasks: startup
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} in the background (tray icon)"; Flags: nowait postinstall skipifsilent
+; Interactive installs: optional post-install launch (skipped when /SILENT).
+Filename: "{app}\{#MyAppExeName}"; Description: "Launch {#MyAppName} in the background (tray icon)"; Flags: nowait postinstall skipifsilent; Check: NotUpdatedByApp
+; In-app Update & restart passes /UPDATEDBYAPP=1 with /VERYSILENT — always relaunch.
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait postinstall skipifdoesntexist; Check: IsUpdatedByApp
 
 [UninstallRun]
 Filename: "taskkill"; Parameters: "/F /IM {#MyAppExeName}"; Flags: runhidden; RunOnceId: "KillAutoCorrect"
+
+[Code]
+var
+  GUpdatedByApp: Boolean;
+
+function IsUpdatedByApp: Boolean;
+begin
+  Result := GUpdatedByApp;
+end;
+
+function NotUpdatedByApp: Boolean;
+begin
+  Result := not GUpdatedByApp;
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  { /UPDATEDBYAPP=1 from the desktop app's silent updater. }
+  GUpdatedByApp := ExpandConstant('{param:UPDATEDBYAPP|0}') = '1';
+  Result := True;
+end;
+
+function ShouldSkipPage(PageID: Integer): Boolean;
+var
+  Uninstall: String;
+begin
+  { Older Inno builds reject DisableWelcomePage=auto. Skip the welcome page on upgrade. }
+  Result := (PageID = wpWelcome) and RegQueryStringValue(
+    HKCU,
+    'Software\Microsoft\Windows\CurrentVersion\Uninstall\{{8D4F62C1-4B9E-497A-9F3E-71B8C2094E1A}_is1',
+    'UninstallString',
+    Uninstall
+  );
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  ExePath: String;
+  ResultCode: Integer;
+begin
+  Result := '';
+  ExePath := ExpandConstant('{app}\{#MyAppExeName}');
+  if not FileExists(ExePath) then
+    Exit;
+
+  { Graceful stop via IPC / lock file; then force-kill any leftover process. }
+  Exec(ExePath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(1500);
+  Exec(
+    ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM {#MyAppExeName}',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Sleep(500);
+end;

@@ -15,6 +15,11 @@ name: Release builds
 #   macOS   : AC_MAC_CERT_P12_BASE64, AC_MAC_CERT_PASSWORD, AC_SIGN_IDENTITY,
 #             AC_NOTARY_APPLE_ID, AC_NOTARY_TEAM_ID, AC_NOTARY_PASSWORD
 #   Linux   : AC_MINISIGN_KEY_BASE64, AC_MINISIGN_PASSWORD
+#   In-app  : AC_ED25519_PRIVATE_KEY_HEX (64-hex private key pairing the public
+#             key in src/autocorrect/licensing/root_key.py). When set, the
+#             publish job embeds signed ApplicationReleaseDescriptor blocks in
+#             release-manifest.json so the desktop app can Update & restart
+#             without opening a browser.
 #   Site    : SITE_DEPLOY_KEY (write deploy key on SITE_REPO; needed when SITE_REPO
 #             is another repository or this one's default branch has a ruleset)
 
@@ -203,11 +208,17 @@ jobs:
         with:
           path: downloads-raw
       - name: Assemble release assets and merged manifest
+        env:
+          AC_ED25519_PRIVATE_KEY_HEX: ${{ secrets.AC_ED25519_PRIVATE_KEY_HEX }}
         run: |
           mkdir -p dist/installer
           find downloads-raw -type f -exec cp {} dist/installer/ \;
+          python -m pip install -q "cryptography>=42" "zstandard>=0.22"
           python -m pipeline.merge_release_manifests --downloads dist/installer \
             --out site/src/data/release-manifest.json --download-repo "$RELEASES_REPO"
+          if [[ -z "${AC_ED25519_PRIVATE_KEY_HEX:-}" ]]; then
+            echo "AC_ED25519_PRIVATE_KEY_HEX unset: release-manifest has no signed app_update blocks (in-app Update & restart will fall back to the download page)"
+          fi
           ls -la dist/installer
       - uses: actions/upload-artifact@v4
         with:

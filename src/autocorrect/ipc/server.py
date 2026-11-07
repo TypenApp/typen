@@ -784,6 +784,7 @@ class LocalIPCServer:
             bundle = d.resource_manager.active_bundle
             snap = d.entitlement_manager.evaluate()
             hw = d.local_ai.detect_hardware_profile()
+            app_update = d.app_update_coordinator.snapshot()
             return {
                 "app": {
                     "current_version": APP_VERSION,
@@ -791,6 +792,16 @@ class LocalIPCServer:
                     "channel": prefs.get_typed("update_channel"),
                     "check_on_launch": prefs.get_typed("updates_check_on_launch"),
                     "auto_language_data": prefs.get_typed("updates_auto_language_data"),
+                    "status": app_update.get("status", "idle"),
+                    "available_version": app_update.get("available_version"),
+                    "release_tag": app_update.get("release_tag"),
+                    "signed": bool(app_update.get("signed")),
+                    "download_progress": float(app_update.get("download_progress") or 0),
+                    "error": app_update.get("error"),
+                    "reason": app_update.get("reason"),
+                    "checked_at": app_update.get("checked_at"),
+                    "download_page_url": app_update.get("download_page_url")
+                    or "https://typen.org/download",
                 },
                 "language_resources": {
                     "active_version": bundle.version,
@@ -811,6 +822,14 @@ class LocalIPCServer:
                     ),
                 },
             }
+
+        if method == "updates.check":
+            d.app_update_coordinator.check()
+            return self._dispatch("updates.get_state", {})
+
+        if method == "updates.apply_app":
+            d.app_update_coordinator.apply()
+            return self._dispatch("updates.get_state", {})
 
         if method == "updates.update_settings":
             d.apply_settings({k: v for k, v in params.items() if k in settings_schema.SCHEMA_BY_KEY})

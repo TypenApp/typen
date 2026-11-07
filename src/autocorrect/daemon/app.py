@@ -60,6 +60,7 @@ from autocorrect.productivity.app_profiles import ApplicationProfileManager
 from autocorrect.productivity.local_insights import LocalInsightsStore
 from autocorrect.productivity.snippet_engine import SnippetEngine
 from autocorrect.updates.application_updater import ApplicationUpdater
+from autocorrect.updates.coordinator import AppUpdateCoordinator
 from autocorrect.updates.language_resource_updater import LanguageResourceUpdater
 from autocorrect.updates.model_updater import ModelUpdater
 from autocorrect.version import APP_VERSION as APP_VERSION_STR
@@ -181,6 +182,13 @@ class AutoCorrectDaemon:
             staging_dir=self._data_dir / "staging_app",
             public_key=self._public_key,
         )
+        self.app_update_coordinator = AppUpdateCoordinator(
+            updater=self.app_updater,
+            state_path=self._data_dir / "staging_app" / "state.json",
+            get_channel=lambda: str(self.preference_store.get_typed("update_channel")),
+            get_updates_expire_at=lambda: self.entitlement_manager.evaluate().updates_expire_at,
+            request_shutdown=self.request_shutdown,
+        )
         self.model_updater = ModelUpdater(
             models_dir=self._data_dir / "models",
             public_key=self._public_key,
@@ -297,7 +305,20 @@ class AutoCorrectDaemon:
         if self.preference_store.get_typed("start_paused"):
             self.session.set_paused(True)
             self._notify_state_changed()
+        if self.preference_store.get_typed("updates_check_on_launch"):
+            threading.Thread(
+                target=self._check_app_updates_on_launch,
+                name="typen-app-update-check",
+                daemon=True,
+            ).start()
         return snapshot
+
+    def _check_app_updates_on_launch(self) -> None:
+        try:
+            self.app_update_coordinator.check()
+        except Exception:
+            log = logging.getLogger(__name__)
+            log.exception("launch-time app update check failed")
 
     def apply_log_level(self) -> None:
         choice = str(self.preference_store.get_typed("log_level"))

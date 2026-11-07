@@ -43,6 +43,7 @@ dev = [
     "mypy>=1.8.0",
     "ruff>=0.5.0",
     "pyinstaller>=6.6.0",
+    "fonttools>=4.53.0",  # outline Syne into packaging/typen-mark*.svg
 ]
 # Language-resource pipeline only (never a runtime dependency): corpus
 # frequency rankings used to tier the ESDB/SCOWL dictionary at build time.

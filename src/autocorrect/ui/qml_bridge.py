@@ -62,6 +62,8 @@ CALLABLE_METHODS: frozenset[str] = frozenset(
         "upsert_snippet",
         "delete_snippet",
         "rollback_language_resources",
+        "check_for_updates",
+        "apply_app_update",
         "try_text",
         "open_sponsors_page",
         "open_source_repository",
