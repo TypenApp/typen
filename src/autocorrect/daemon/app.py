@@ -417,9 +417,19 @@ class AutoCorrectDaemon:
         region (Overview "Try it" field). Nothing is injected and the live
         session is untouched; returns what the field would contain.
         """
+        return str(self.try_text_with_prediction(text)["result"])
+
+    def try_text_with_prediction(self, text: str) -> dict[str, str]:
+        """
+        Run `text` through a throw-away session with `self.adaptive_lm` and return
+        `{"result": corrected_text, "prediction": ghost_display_text}`.
+        """
         text = text[:400]
         scratch = InputSessionManager(
-            engine=self.engine, injector=None, active_region=self.session._active_region
+            engine=self.engine,
+            injector=None,
+            active_region=self.session._active_region,
+            adaptive_lm=self.adaptive_lm,
         )
         scratch.configure_features(self.session.features)
         field_chars: list[str] = []
@@ -438,7 +448,11 @@ class AutoCorrectDaemon:
                     if field_chars:
                         field_chars.pop()
                 field_chars.extend(plan.text_to_inject)
-        return "".join(field_chars)
+        pred = scratch.active_prediction if scratch.has_active_prediction else None
+        return {
+            "result": "".join(field_chars),
+            "prediction": pred.display_text if pred is not None else "",
+        }
 
     def list_running_apps(self, limit: int = 60) -> list[dict[str, str]]:
         """Visible top-level windows → [{process, title}] for the Apps screen picker (Windows only)."""
@@ -1019,18 +1033,11 @@ class AutoCorrectDaemon:
     def _dispatch_os_key(self, event: KeyEvent) -> KeyAction:
         """
         Called on the OS hook thread. Never evaluates anything heavy there:
-        when an inline predictive placeholder is active and the user presses a plain Tab,
-        consume the physical Tab key (`SUPPRESS_AND_INJECT`) and queue the completion
-        acceptance on the worker so Tab never jumps focus to another field.
+        when an inline predictive placeholder is active and the user presses the
+        configured acceptance key (`Tab` or `Right` arrow), consume the physical key
+        (`SUPPRESS_AND_INJECT`) and queue the completion acceptance on the worker.
         """
-        if (
-            event.key_name == "Tab"
-            and not event.shift_pressed
-            and not event.ctrl_pressed
-            and not event.alt_pressed
-            and not event.meta_pressed
-            and self.session.has_active_prediction
-        ):
+        if self.session.is_prediction_accept_key(event):
             ts = event.timestamp_ms
             self.dispatcher.post_call(
                 lambda: self._accept_prediction_on_worker(ts, tab_was_suppressed=True)
@@ -1060,7 +1067,7 @@ class AutoCorrectDaemon:
         if self.ghost_overlay is None or self.caret_probe is None:
             return
         pred = self.session.active_prediction if self.session.has_active_prediction else None
-        if pred is None:
+        if pred is None or self.dispatcher.queue_depth > 0:
             self.ghost_overlay.hide()
             return
         rect, dpi = self.caret_probe.read_geometry_fast()

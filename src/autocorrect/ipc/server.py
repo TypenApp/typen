@@ -586,7 +586,7 @@ class LocalIPCServer:
 
         if method == "corrections.try_text":
             # Overview "Try it" field: evaluate a sentence offline, never touching the real session.
-            return {"result": d.try_text(str(params.get("text", "")))}
+            return d.try_text_with_prediction(str(params.get("text", "")))
 
         if method == "corrections.add_rejected":
             orig = str(params.get("original", "")).strip()

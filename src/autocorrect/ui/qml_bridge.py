@@ -400,6 +400,14 @@ def bridge_class() -> type:
                 log.exception("try_text")
                 return text
 
+        @Slot(str, result=str)  # type: ignore[misc,arg-type]
+        def tryTextPredict(self, text: str) -> str:
+            try:
+                return json.dumps(self._ctrl.try_text_with_prediction(text))
+            except Exception:
+                log.exception("try_text_predict")
+                return json.dumps({"result": text, "prediction": ""})
+
         @Slot()  # type: ignore[misc,arg-type]
         def togglePause(self) -> None:
             self._ctrl.set_paused(not self.isPaused)

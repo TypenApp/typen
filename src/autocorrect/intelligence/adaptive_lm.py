@@ -306,11 +306,12 @@ class AdaptivePersonalLM:
                         (u_low, u_disp, -4.2 + min(2.2, 0.40 * math.log1p(u_cnt)))
                     )
 
-        # Query the mmap lexicon via O(log N) binary search for words starting with low_pref
-        for _wid, w_str, w_freq, w_exact in bundle.lexicon.find_word_ids_by_prefix(
-            low_pref, min_log_freq=-7.4, min_len=max(5, len(low_pref) + 2), limit=16
-        ):
-            raw_candidates.append((w_str, w_exact or w_str, w_freq))
+        # Query the mmap lexicon via O(log N) binary search for words starting with low_pref >= 3 chars
+        if len(low_pref) >= 3:
+            for _wid, w_str, w_freq, w_exact in bundle.lexicon.find_word_ids_by_prefix(
+                low_pref, min_log_freq=-7.4, min_len=max(5, len(low_pref) + 2), limit=16
+            ):
+                raw_candidates.append((w_str, w_exact or w_str, w_freq))
 
         best_word_low = ""
         best_disp = ""

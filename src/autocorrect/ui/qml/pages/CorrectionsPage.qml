@@ -18,7 +18,17 @@ Page {
 
     Card {
         SectionTitle { title: "Predictive typing" }
-        ToggleRow { key: "enable_predictive_tab"; label: "Inline placeholder suggestions on Tab"; description: "Show muted inline completions and next-word predictions at the caret; press Tab to accept." }
+        ToggleRow { key: "enable_predictive_tab"; label: "Inline placeholder suggestions"; description: "Show muted inline completions and next-word predictions at the caret." }
+        ChoiceRow {
+            key: "predictive_accept_key"; label: "Accept suggestion with"; indent: true
+            enabled: s.enable_predictive_tab === true
+            description: "Which key inserts the inline suggestion when one is visible."
+            options: [
+                { value: "both", label: "Tab or Right →" },
+                { value: "tab", label: "Tab only" },
+                { value: "right", label: "Right → only" }
+            ]
+        }
     }
 
     Card {

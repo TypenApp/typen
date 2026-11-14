@@ -33,6 +33,7 @@ from autocorrect import __version__
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.input.ports import KeyEvent
 from autocorrect.input.session_state import EntitlementCheckPort, InputSessionManager
+from autocorrect.intelligence.adaptive_lm import AdaptivePersonalLM
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 from autocorrect.preferences.sqlite_store import SQLitePreferenceStore
 from autocorrect.productivity.snippet_engine import SnippetEngine
@@ -133,6 +134,8 @@ class SessionPool:
             self._evict_locked()
             db_path = self._dir / f"{session_id}.sqlite3"
             store = SQLitePreferenceStore(db_path)
+            adaptive_lm = AdaptivePersonalLM()
+            store.overlay.set_personal_lm_scorer(adaptive_lm.score_boost)
             engine = AutocorrectEngine(resource_manager=self._resources, preferences=store.overlay)
             session = InputSessionManager(
                 engine=engine,
@@ -140,6 +143,7 @@ class SessionPool:
                 snippet_matcher=self._snippets,
                 entitlement_gate=self._gate,
                 active_region=store.overlay.active_region,
+                adaptive_lm=adaptive_lm,
             )
             created = DemoSession(
                 session_id=session_id,
@@ -255,6 +259,12 @@ class EngineHost:
     ) -> dict[str, Any]:
         tx = session.transaction_ledger.active_transaction
         undo = f'"{tx.corrected_token}" -> "{tx.original_token}"' if tx is not None else None
+        pred = session.active_prediction if session.has_active_prediction else None
+        pred_dict = (
+            {"mode": pred.mode, "display_text": pred.display_text, "full_word": pred.full_word}
+            if pred is not None
+            else None
+        )
         return {
             "action": action,
             "plan": plan,
@@ -265,6 +275,7 @@ class EngineHost:
             "buffer_state": session.word_buffer.state.value,
             "sentence_state": session.capitaliser.state.value,
             "active_undo": undo,
+            "prediction": pred_dict,
             "word_count": self.word_count,
             "session_new": session_new,
         }

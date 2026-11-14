@@ -13,6 +13,7 @@ Page {
     readonly property bool paused: bridge.isPaused
     readonly property bool healthy: bridge.ipcConnected && !paused && ["active", "dry_run"].indexOf(String(hook.state)) >= 0
     property bool tryApplying: false
+    property string tryGhostText: ""
 
     // Live counters while this page is visible.
     Timer {
@@ -76,21 +77,73 @@ Page {
     Card {
         SectionTitle {
             title: "Try it"
-            description: "Type a sentence with a few mistakes. Corrections land in this box as you finish each word — the same engine that runs everywhere else."
+            description: "Type a sentence with a few mistakes. Corrections land as you finish each word, and inline suggestions can be accepted with Tab or Right Arrow (→)."
         }
-        Field {
-            id: tryField
+        Item {
             Layout.fillWidth: true
-            placeholderText: "teh quick brown fox jumps over teh lazy dog. i recieved your mesage"
-            onTextChanged: {
-                if (page.tryApplying)
-                    return
-                var t = text
-                if (t.length === 0)
-                    return
-                var last = t.charAt(t.length - 1)
-                applyTimer.interval = " \n.,!?;:".indexOf(last) >= 0 ? 40 : 220
-                applyTimer.restart()
+            implicitHeight: tryField.implicitHeight
+            Field {
+                id: tryField
+                anchors.fill: parent
+                placeholderText: "teh quick brown fox jumps over teh lazy dog. i recieved your mesage"
+                Keys.onTabPressed: function(event) {
+                    var choice = String(bridge.settings.predictive_accept_key || "both")
+                    if (page.tryGhostText !== "" && (choice === "both" || choice === "tab")) {
+                        event.accepted = true
+                        page.tryApplying = true
+                        tryField.text = tryField.text + page.tryGhostText + " "
+                        tryField.cursorPosition = tryField.text.length
+                        page.tryGhostText = ""
+                        page.tryApplying = false
+                        applyTimer.interval = 30
+                        applyTimer.restart()
+                    } else {
+                        event.accepted = false
+                    }
+                }
+                Keys.onRightPressed: function(event) {
+                    var choice = String(bridge.settings.predictive_accept_key || "both")
+                    if (
+                        page.tryGhostText !== ""
+                        && tryField.cursorPosition >= tryField.text.length
+                        && (choice === "both" || choice === "right")
+                    ) {
+                        event.accepted = true
+                        page.tryApplying = true
+                        tryField.text = tryField.text + page.tryGhostText + " "
+                        tryField.cursorPosition = tryField.text.length
+                        page.tryGhostText = ""
+                        page.tryApplying = false
+                        applyTimer.interval = 30
+                        applyTimer.restart()
+                    } else {
+                        event.accepted = false
+                    }
+                }
+                onTextChanged: {
+                    if (page.tryApplying)
+                        return
+                    var t = text
+                    if (t.length === 0) {
+                        page.tryGhostText = ""
+                        return
+                    }
+                    var last = t.charAt(t.length - 1)
+                    applyTimer.interval = " \n.,!?;:".indexOf(last) >= 0 ? 35 : 90
+                    applyTimer.restart()
+                }
+            }
+            Text {
+                id: ghostHint
+                visible: page.tryGhostText !== "" && tryField.activeFocus && tryField.cursorPosition >= tryField.text.length
+                x: tryField.cursorRectangle.x + 2
+                y: tryField.cursorRectangle.y
+                height: tryField.cursorRectangle.height
+                verticalAlignment: Text.AlignVCenter
+                text: page.tryGhostText
+                color: Theme.inkFaint
+                font.family: tryField.font.family
+                font.pixelSize: tryField.font.pixelSize
             }
         }
         Timer {
@@ -98,11 +151,13 @@ Page {
             interval: 40
             onTriggered: {
                 var typed = tryField.text
-                if (typed.trim() === "")
+                if (typed.trim() === "") {
+                    page.tryGhostText = ""
                     return
-                // Do not append a trailing space: that would correct a word
-                // the user is still typing and look like a ghost hint.
-                var result = bridge.tryText(typed)
+                }
+                var payload = JSON.parse(bridge.tryTextPredict(typed))
+                var result = String(payload.result !== undefined ? payload.result : typed)
+                page.tryGhostText = String(payload.prediction || "")
                 if (result === typed)
                     return
                 var atEnd = tryField.cursorPosition >= typed.length

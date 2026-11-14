@@ -58,6 +58,7 @@ class CorrectionFeatures:
 
     # Predictive typing
     enable_predictive_tab: bool = True
+    predictive_accept_key: str = "both"  # both | tab | right
     # Spelling
     enable_spelling: bool = True
     aggressiveness: float = 1.0  # 1.0 = standard conservative; <1.0 stricter; >1.0 more assertive

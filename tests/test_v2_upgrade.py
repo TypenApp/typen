@@ -45,7 +45,7 @@ def resource_manager() -> ResourceManager:
 
 def test_v2_version_and_full_lexicon_scale(resource_manager: ResourceManager) -> None:
     """Verify Typen V2 version numbers and >400,000 word lexicon scale."""
-    assert APP_VERSION == "2.0.0"
+    assert APP_VERSION.startswith("2.0.")
     assert BINARY_SCHEMA_VERSION == 2
     bundle = resource_manager.active_bundle
     assert bundle.version == "2.0.0"
@@ -337,4 +337,31 @@ def test_first_word_after_click_or_focus_is_never_ignored(
     _, space_res = host.handle("POST", "key", {"key_name": "Space", "char": " ", "text": "recieved"}, sid)
     assert space_res["action"] == "SUPPRESS_AND_INJECT"
     assert space_res["plan"]["target_full"] == "Received "
+
+    # 3. Right Arrow (as well as Tab) accepts active inline predictions, and
+    # `predictive_accept_key` setting controls which key is accepted.
+    adaptive = AdaptivePersonalLM()
+    sess_pred = InputSessionManager(engine=engine, adaptive_lm=adaptive)
+    _type_string(sess_pred, "Thank ")
+    assert sess_pred.has_active_prediction
+    right_out = sess_pred.handle_key_event(
+        KeyEvent(key_name="Right", char="", timestamp_ms=500.0),
+        suppress_delimiter_on_replace=True,
+    )
+    assert right_out.action == KeyAction.SUPPRESS_AND_INJECT
+    assert right_out.reason_tag == "PREDICTIVE_TAB"
+    assert right_out.replacement_plan is not None
+    assert right_out.replacement_plan.text_to_inject == "you "
+
+    # When `predictive_accept_key == 'tab'`, Right Arrow passes through normally
+    sess_pred.reset_all_state()
+    sess_pred.configure_features(predictive_accept_key="tab")
+    _type_string(sess_pred, "Thank ")
+    assert sess_pred.has_active_prediction
+    right_pass = sess_pred.handle_key_event(
+        KeyEvent(key_name="Right", char="", timestamp_ms=600.0),
+        suppress_delimiter_on_replace=True,
+    )
+    assert right_pass.action == KeyAction.PASS_THROUGH
+
 

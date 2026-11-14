@@ -33,6 +33,8 @@ interface PendingKey {
   char: string;
   /** performance.now() when the key was pressed: lets the engine time the double-Backspace gesture. */
   t: number;
+  /** True when the character was already inserted into the textarea synchronously on keydown. */
+  optimistic?: boolean;
 }
 
 class CheckpointError extends Error {
@@ -56,6 +58,12 @@ interface EnginePlan {
   target_full: string;
 }
 
+interface EnginePrediction {
+  mode: string;
+  display_text: string;
+  full_word: string;
+}
+
 interface EngineResponse {
   action: string;
   plan: EnginePlan | null;
@@ -63,6 +71,7 @@ interface EngineResponse {
   reverted_word: string | null;
   latency_ms: number;
   active_undo: string | null;
+  prediction?: EnginePrediction | null;
   word_count: number;
   session_new?: boolean;
 }
@@ -110,6 +119,8 @@ export function InteractiveSandbox() {
   const [newWord, setNewWord] = useState("");
   const [busy, setBusy] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [editorText, setEditorText] = useState("");
+  const [ghostText, setGhostText] = useState("");
 
   const editorRef = useRef<HTMLTextAreaElement>(null);
   const sessionRef = useRef<string>("");
@@ -118,6 +129,8 @@ export function InteractiveSandbox() {
   const pendingRef = useRef<PendingKey[]>([]);
   const flushQueuedRef = useRef(false);
   const draftRef = useRef("");
+  const ghostRef = useRef("");
+  const committedTextRef = useRef("");
   /** `t` of the last key sent to the engine: a fresh instance needs it to time a double Space across batches. */
   const lastKeyTRef = useRef<number | null>(null);
 
@@ -148,8 +161,7 @@ export function InteractiveSandbox() {
 
   /** Context a fresh serverless instance needs to rebuild this session. */
   const primingContext = () => {
-    const ed = editorRef.current;
-    const before = ed ? ed.value.slice(0, ed.selectionStart) : "";
+    const before = committedTextRef.current;
     let text = before.length > PRIME_TAIL ? before.slice(-PRIME_TAIL) : before;
     if (text.length === PRIME_TAIL) {
       const cut = text.indexOf(" ");
@@ -211,6 +223,7 @@ export function InteractiveSandbox() {
         }
         if (draft && editorRef.current) {
           editorRef.current.value = draft;
+          committedTextRef.current = draft;
           editorRef.current.setSelectionRange(draft.length, draft.length);
           await call("caret", { text: draft.slice(-PRIME_TAIL), words: [] });
         }
@@ -229,17 +242,46 @@ export function InteractiveSandbox() {
   }, [attempt, call, loadDictionary, pushLog]);
 
   // --- editor mutations (mirror of the OS injector) ------------------------------
-  const applyPlan = (plan: EnginePlan) => {
+  const syncOverlayState = (pred?: EnginePrediction | null) => {
+    const ed = editorRef.current;
+    const val = ed ? ed.value : "";
+    setEditorText(val);
+    const atEnd = ed ? ed.selectionStart >= val.length : true;
+    const g = pred && pred.display_text && atEnd ? pred.display_text : "";
+    ghostRef.current = g;
+    setGhostText(g);
+  };
+
+  const applyPlan = (plan: EnginePlan, optimistic?: boolean) => {
     const ed = editorRef.current;
     if (!ed) return;
-    const caret = ed.selectionStart;
-    const keep = Math.max(0, caret - plan.backspaces_to_send);
-    ed.value = ed.value.slice(0, keep) + plan.text_to_inject + ed.value.slice(ed.selectionEnd);
-    const pos = keep + plan.text_to_inject.length;
+    // Update authoritative server-committed text buffer
+    const cKeep = Math.max(0, committedTextRef.current.length - plan.backspaces_to_send);
+    committedTextRef.current = committedTextRef.current.slice(0, cKeep) + plan.text_to_inject;
+
+    // In the visible DOM textarea, any pending optimistic keys sit AFTER our commit point;
+    // preserve that tail so fast typing during a network round-trip never drops or scrambles text.
+    const pendingOptimisticLen = pendingRef.current.reduce(
+      (acc, k) => acc + (k.optimistic ? (k.key_name === "Backspace" ? -1 : k.char.length) : 0),
+      0,
+    );
+    const domCommitPos = Math.max(0, Math.min(ed.value.length, ed.value.length - Math.max(0, pendingOptimisticLen)));
+    const extraDelete = optimistic ? 1 : 0;
+    const domKeep = Math.max(0, domCommitPos - (plan.backspaces_to_send + extraDelete));
+    const tail = ed.value.slice(domCommitPos);
+    ed.value = ed.value.slice(0, domKeep) + plan.text_to_inject + tail;
+    const pos = ed.value.length;
     ed.setSelectionRange(pos, pos);
   };
 
-  const applyPassThrough = (keyName: string, ch: string) => {
+  const applyPassThrough = (keyName: string, ch: string, optimistic?: boolean) => {
+    // Update authoritative server-committed text buffer
+    if (keyName === "Backspace") {
+      committedTextRef.current = committedTextRef.current.slice(0, -1);
+    } else if (ch) {
+      committedTextRef.current += ch;
+    }
+    if (optimistic) return;
     const ed = editorRef.current;
     if (!ed) return;
     const start = ed.selectionStart;
@@ -262,7 +304,7 @@ export function InteractiveSandbox() {
   /** Mirror one engine result on the field, exactly as the OS injector would. */
   const applyResult = (key: PendingKey, data: EngineResponse): boolean => {
     if (data.action === "SUPPRESS_AND_INJECT" && data.plan) {
-      applyPlan(data.plan);
+      applyPlan(data.plan, key.optimistic);
       if (data.reverted_word) {
         pushLog("UNDO", `Kept "${data.reverted_word}" — added to suggestions.`);
         return true;
@@ -276,7 +318,7 @@ export function InteractiveSandbox() {
       );
       return false;
     }
-    applyPassThrough(key.key_name, key.char);
+    applyPassThrough(key.key_name, key.char, key.optimistic);
     return false;
   };
 
@@ -292,10 +334,11 @@ export function InteractiveSandbox() {
     if (keys.length === 0) return;
     let data: BatchResponse;
     try {
-      data = await call<BatchResponse>("key", { keys, ...primingContext() });
+      const wireKeys = keys.map(({ key_name, char, t }) => ({ key_name, char, t }));
+      data = await call<BatchResponse>("key", { keys: wireKeys, ...primingContext() });
     } catch (err) {
       // Whatever went wrong, the visitor's keystrokes must not vanish.
-      for (const k of keys) applyPassThrough(k.key_name, k.char);
+      for (const k of keys) applyPassThrough(k.key_name, k.char, k.optimistic);
       throw err;
     } finally {
       lastKeyTRef.current = keys[keys.length - 1].t;
@@ -318,6 +361,7 @@ export function InteractiveSandbox() {
           if (applyResult(keys[i], r)) reverted = true;
           setLatency(r.latency_ms);
         }
+        syncOverlayState(r?.prediction ?? null);
         caret = ed ? ed.selectionStart : caret;
         const jitter = ((i * 17) % 13) - 6; // -6..+6 ms, a human cadence rather than a metronome
         await sleep(Math.max(18, (correcting ? 55 : ch === "." || ch === "," ? 70 : ch === " " ? 45 : 34) + jitter));
@@ -326,6 +370,8 @@ export function InteractiveSandbox() {
       results.forEach((r, i) => {
         if (i < keys.length && applyResult(keys[i], r)) reverted = true;
       });
+      const lastRes = results[results.length - 1];
+      syncOverlayState(lastRes?.prediction ?? null);
       setLatency(results.reduce((max, r) => Math.max(max, r.latency_ms), 0));
     }
     if (reverted) await loadDictionary();
@@ -340,7 +386,20 @@ export function InteractiveSandbox() {
   };
 
   const queueKey = (keyName: string, ch: string) => {
-    pendingRef.current.push({ key_name: keyName, char: ch, t: performance.now() });
+    const ed = editorRef.current;
+    let optimistic = false;
+    // Insert printable characters synchronously so typing has 0ms perceived latency
+    // while the server evaluates corrections and predictions in the background.
+    if (ed && ch && keyName !== "Tab" && keyName !== "Right" && ed.selectionStart === ed.selectionEnd) {
+      const start = ed.selectionStart;
+      ed.value = ed.value.slice(0, start) + ch + ed.value.slice(start);
+      ed.setSelectionRange(start + ch.length, start + ch.length);
+      setEditorText(ed.value);
+      setGhostText("");
+      ghostRef.current = "";
+      optimistic = true;
+    }
+    pendingRef.current.push({ key_name: keyName, char: ch, t: performance.now(), optimistic });
     if (!flushQueuedRef.current) {
       flushQueuedRef.current = true;
       enqueue(flushKeys);
@@ -349,7 +408,9 @@ export function InteractiveSandbox() {
 
   const invalidateCaret = () =>
     enqueue(async () => {
+      syncOverlayState(null);
       const ed = editorRef.current;
+      committedTextRef.current = ed ? ed.value.slice(0, ed.selectionStart) : "";
       if (ed && ed.value === "") await call("reset", {});
       else await call("caret", primingContext());
     });
@@ -361,6 +422,14 @@ export function InteractiveSandbox() {
     }
     if (e.ctrlKey || e.altKey || e.metaKey) {
       invalidateCaret();
+      return;
+    }
+    // Accept inline prediction on Tab or Right Arrow when at the end of the text
+    const ed = editorRef.current;
+    const atEnd = ed ? ed.selectionStart >= ed.value.length : true;
+    if (!e.shiftKey && ghostRef.current && atEnd && (e.key === "Tab" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      queueKey(e.key === "Tab" ? "Tab" : "Right", e.key === "Tab" ? "\t" : "");
       return;
     }
     let keyName = e.key;
@@ -416,6 +485,8 @@ export function InteractiveSandbox() {
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
+      committedTextRef.current = "";
+      syncOverlayState(null);
       lastKeyTRef.current = null;
       await call("reset", {});
       await typeThroughEngine(sample);
@@ -427,6 +498,8 @@ export function InteractiveSandbox() {
     enqueue(async () => {
       const ed = editorRef.current;
       if (ed) ed.value = "";
+      committedTextRef.current = "";
+      syncOverlayState(null);
       lastKeyTRef.current = null;
       await call("reset", {});
       ed?.focus();
@@ -472,9 +545,9 @@ export function InteractiveSandbox() {
     <div className="card overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-3">
         <p className="text-sm text-ink-muted">
-          Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; a second{" "}
-          <kbd className="kbd">Space</kbd> ends the sentence with a full stop; press{" "}
-          <kbd className="kbd">Backspace</kbd> twice right after a correction to keep what you typed.
+          Type below. Corrections land on <kbd className="kbd">Space</kbd> or punctuation; press{" "}
+          <kbd className="kbd">Tab</kbd> or <kbd className="kbd">→</kbd> to accept an inline suggestion; press{" "}
+          <kbd className="kbd">Backspace</kbd> twice right after a correction to undo.
         </p>
         <span className="inline-flex items-center gap-2 font-mono text-[11px] text-ink-faint">
           <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
@@ -509,22 +582,36 @@ export function InteractiveSandbox() {
       ) : (
         <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-12 lg:gap-8">
           <div className="lg:col-span-8">
-            <textarea
-              ref={editorRef}
-              defaultValue=""
-              onKeyDown={onKeyDown}
-              onPaste={onPaste}
-              onMouseDown={() => mode === "live" && invalidateCaret()}
-              rows={7}
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-              autoCapitalize="off"
-              disabled={mode !== "live"}
-              placeholder={mode === "live" ? "dont forget teh milk" : "Connecting…"}
-              aria-label="Live demo editor"
-              className="field min-h-[11rem] resize-none p-4 font-mono text-base leading-relaxed sm:text-lg"
-            />
+            <div className="relative">
+              {ghostText && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded border border-transparent p-4 font-mono text-base leading-relaxed sm:text-lg"
+                >
+                  <span className="text-transparent">{editorText}</span>
+                  <span className="text-ink-faint">{ghostText}</span>
+                  <span className="ml-1.5 inline-flex translate-y-[-1px] items-center rounded border border-line bg-paper-2 px-1 py-0 text-[10px] text-ink-faint">
+                    Tab / →
+                  </span>
+                </div>
+              )}
+              <textarea
+                ref={editorRef}
+                defaultValue=""
+                onKeyDown={onKeyDown}
+                onPaste={onPaste}
+                onMouseDown={() => mode === "live" && invalidateCaret()}
+                rows={7}
+                spellCheck={false}
+                autoComplete="off"
+                autoCorrect="off"
+                autoCapitalize="off"
+                disabled={mode !== "live"}
+                placeholder={mode === "live" ? "dont forget teh milk" : "Connecting…"}
+                aria-label="Live demo editor"
+                className="field relative z-10 min-h-[11rem] resize-none bg-transparent p-4 font-mono text-base leading-relaxed sm:text-lg"
+              />
+            </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="eyebrow mr-1">Try</span>
               {SAMPLES.map((s) => (

@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 
-// .field, multi-line.
+// .field, multi-line with a visible, theme-aware blinking caret.
 Rectangle {
     id: box
     property alias text: area.text
@@ -34,6 +34,17 @@ Rectangle {
             font.family: Theme.sans
             font.pixelSize: Theme.fsBody
             background: null
+            cursorDelegate: Rectangle {
+                width: 1.5
+                color: Theme.ink
+                visible: area.activeFocus && !area.readOnly && area.selectionStart === area.selectionEnd
+                SequentialAnimation on opacity {
+                    running: area.activeFocus && !area.readOnly
+                    loops: Animation.Infinite
+                    NumberAnimation { from: 1.0; to: 1.0; duration: 520 }
+                    NumberAnimation { from: 0.0; to: 0.0; duration: 480 }
+                }
+            }
         }
     }
 }

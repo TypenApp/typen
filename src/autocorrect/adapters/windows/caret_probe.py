@@ -157,20 +157,51 @@ class WindowsCaretProbe:
     def read_geometry_fast(self) -> tuple[tuple[int, int, int, int] | None, int]:
         """
         Sub-millisecond Win32 GUIThreadInfo caret screen rectangle + DPI lookup.
-        Falls back to UIA bounding rectangles if Win32 rcCaret is not populated.
+        Falls back to UIA bounding rectangles with a strict 12ms budget so the
+        input dispatcher worker never stalls during fast typing.
         """
         if sys.platform != "win32":
             return None, 96
         rect, dpi = self._read_win32_caret_rect()
         if rect is not None:
             return rect, dpi
+        t0 = time.perf_counter()
         try:
-            ctx = self._read_uia()
-            if ctx is not None and ctx.caret_rect is not None:
-                return ctx.caret_rect, ctx.dpi
+            ctx = self._read_uia_geometry_only(dpi)
+            if ctx is not None and (time.perf_counter() - t0) <= 0.015:
+                return ctx, dpi
         except Exception:
             pass
         return None, dpi
+
+    def _read_uia_geometry_only(self, dpi: int = 96) -> tuple[int, int, int, int] | None:
+        uia = self._ensure_uia()
+        if uia is None:
+            return None
+        import comtypes  # type: ignore[import-not-found]
+
+        self._init_com(comtypes)
+        element = uia.GetFocusedElement()
+        if element is None:
+            return None
+        mod = self._uia_mod
+        pattern = element.GetCurrentPattern(UIA_TextPattern2Id)
+        if pattern is not None:
+            try:
+                text2 = pattern.QueryInterface(mod.IUIAutomationTextPattern2)
+                is_active = ctypes.c_int(0)
+                caret = text2.GetCaretRange(ctypes.byref(is_active))
+                if caret is not None:
+                    r = self._extract_uia_range_rect(caret)
+                    if r is not None:
+                        return r
+                    caret.MoveEndpointByUnit(
+                        TextPatternRangeEndpoint_Start, TextUnit_Character, -1
+                    )
+                    return self._extract_uia_range_rect(caret)
+            except Exception:
+                pass
+        return None
 
     @staticmethod
     def _read_win32_caret_rect() -> tuple[tuple[int, int, int, int] | None, int]:
@@ -274,11 +305,12 @@ class WindowsCaretProbe:
                 if doc is not None:
                     whole = str(doc.GetText(self._n) or "").replace("\r\n", "\n")
                     is_empty = whole.strip() == ""
+                    rect = win_rect or self._estimate_element_caret_rect(element, whole, dpi)
                     return CaretContext(
                         "" if is_empty else whole,
                         is_empty_field=is_empty,
                         source="uia-text1",
-                        caret_rect=win_rect,
+                        caret_rect=rect,
                         dpi=dpi,
                     )
         except Exception:
@@ -292,17 +324,47 @@ class WindowsCaretProbe:
                 val_str = str(vp.CurrentValue or "").replace("\r\n", "\n")
                 is_empty = val_str.strip() == ""
                 tail = val_str[-self._n :] if not is_empty else ""
+                rect = win_rect or self._estimate_element_caret_rect(element, tail, dpi)
                 return CaretContext(
                     tail,
                     is_empty_field=is_empty,
                     source="uia-value",
-                    caret_rect=win_rect,
+                    caret_rect=rect,
                     dpi=dpi,
                 )
         except Exception:
             pass
 
         return None
+
+    @staticmethod
+    def _estimate_element_caret_rect(
+        element: Any, text_before: str, dpi: int = 96
+    ) -> tuple[int, int, int, int] | None:
+        """
+        Estimate caret coordinates from `element.CurrentBoundingRectangle` and the
+        current line's character length when a control only exposes `ValuePattern`.
+        """
+        try:
+            rc = element.CurrentBoundingRectangle
+            left = int(rc.left)
+            top = int(rc.top)
+            right = int(rc.right)
+            bottom = int(rc.bottom)
+            width = right - left
+            height = bottom - top
+            if width <= 8 or height <= 8 or width > 4000 or height > 1200:
+                return None
+            scale = max(1.0, dpi / 96.0)
+            line_h = min(max(16, int(20 * scale)), height - 4)
+            last_line = text_before.rsplit("\n", 1)[-1] if text_before else ""
+            char_w = max(6.0, 7.6 * scale)
+            x_offset = int(10 * scale + len(last_line) * char_w)
+            cx = min(right - 24, left + x_offset)
+            cy = top + max(2, (height - line_h) // 2 if height < int(48 * scale) else int(8 * scale))
+            return (cx, cy, 1, line_h)
+        except Exception:
+            return None
 
     @staticmethod
     def _extract_uia_range_rect(text_range: Any) -> tuple[int, int, int, int] | None:

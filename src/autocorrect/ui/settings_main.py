@@ -151,23 +151,36 @@ class SettingsController:
 
     def try_text(self, text: str) -> str:
         """Overview 'Try it': what the engine would make of `text` (daemon first, offline engine otherwise)."""
+        return str(self.try_text_with_prediction(text)["result"])
+
+    def try_text_with_prediction(self, text: str) -> dict[str, str]:
         ipc_res = self._call_ipc_if_online("corrections.try_text", {"text": text})
         if ipc_res is not None and "result" in ipc_res:
-            return str(ipc_res["result"])
+            return {
+                "result": str(ipc_res["result"]),
+                "prediction": str(ipc_res.get("prediction") or ""),
+            }
         return self._offline_try_text(text)
 
-    def _offline_try_text(self, text: str) -> str:
+    def _offline_try_text(self, text: str) -> dict[str, str]:
         from autocorrect.core.engine import AutocorrectEngine
         from autocorrect.core.models import CorrectionFeatures
         from autocorrect.input.ports import KeyAction, KeyEvent
         from autocorrect.input.session_state import InputSessionManager
+        from autocorrect.intelligence.adaptive_lm import AdaptivePersonalLM
         from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 
         self._prefs.reload_into_overlay()
         rm = ResourceManager(bundled_dir=DEFAULT_BUNDLED_DIR)
         try:
+            adaptive = AdaptivePersonalLM()
+            self._prefs.overlay.set_personal_lm_scorer(adaptive.score_boost)
             engine = AutocorrectEngine(rm, preferences=self._prefs.overlay)
-            session = InputSessionManager(engine=engine, active_region=self._prefs.overlay.active_region)
+            session = InputSessionManager(
+                engine=engine,
+                active_region=self._prefs.overlay.active_region,
+                adaptive_lm=adaptive,
+            )
             session.configure_features(CorrectionFeatures.from_mapping(self._prefs.get_all_typed()))
             out: list[str] = []
             ts = 0.0
@@ -184,7 +197,11 @@ class SettingsController:
                         if out:
                             out.pop()
                     out.extend(res.replacement_plan.text_to_inject)
-            return "".join(out)
+            pred = session.active_prediction if session.has_active_prediction else None
+            return {
+                "result": "".join(out),
+                "prediction": pred.display_text if pred is not None else "",
+            }
         finally:
             rm.close()
 

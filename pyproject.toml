@@ -3,8 +3,8 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "autocorrect"
-version = "2.0.0"
+name = "typen"
+version = "2.0.1"
 description = "Typen: offline-first, system-wide desktop autocorrect and writing assistant"
 readme = "README.md"
 requires-python = ">=3.11"

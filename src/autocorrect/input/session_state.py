@@ -225,6 +225,27 @@ class InputSessionManager:
             and not self._focus_context.is_terminal_or_code
         )
 
+    def is_prediction_accept_key(self, event: KeyEvent) -> bool:
+        """
+        Return True if `event` is the user's configured prediction-acceptance key
+        (`Tab`, `Right` arrow, or either when `predictive_accept_key == 'both'`)
+        with no modifier keys held and an active inline prediction ready.
+        """
+        if (
+            event.shift_pressed
+            or event.ctrl_pressed
+            or event.alt_pressed
+            or event.meta_pressed
+            or not self.has_active_prediction
+        ):
+            return False
+        choice = self._features.predictive_accept_key
+        if choice == "tab":
+            return event.key_name == "Tab"
+        if choice == "right":
+            return event.key_name == "Right"
+        return event.key_name in ("Tab", "Right")
+
     def set_adaptive_lm(self, adaptive_lm: AdaptivePersonalLM | None) -> None:
         self._adaptive_lm = adaptive_lm
 
@@ -637,16 +658,9 @@ class InputSessionManager:
             self.on_mouse_click_or_caret_move()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
-        # 5. Cursor navigation keys invalidate the active buffer (except Tab when accepting an active prediction).
+        # 5. Cursor navigation keys invalidate the active buffer (except Tab/Right when accepting an active prediction).
         if event.key_name in NAVIGATION_KEYS:
-            if (
-                event.key_name == "Tab"
-                and not event.shift_pressed
-                and not event.ctrl_pressed
-                and not event.alt_pressed
-                and not event.meta_pressed
-                and self.has_active_prediction
-            ):
+            if self.is_prediction_accept_key(event):
                 return self.accept_active_prediction(
                     event.timestamp_ms,
                     tab_was_suppressed=suppress_delimiter_on_replace,

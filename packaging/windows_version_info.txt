@@ -4,8 +4,8 @@
 # resource carries no pre-release flag or channel tag.
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(2, 0, 0, 1),
-    prodvers=(2, 0, 0, 1),
+    filevers=(2, 0, 1, 1),
+    prodvers=(2, 0, 1, 1),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -21,12 +21,12 @@ VSVersionInfo(
           [
             StringStruct('CompanyName', 'Omnii'),
             StringStruct('FileDescription', 'Typen — system-wide offline autocorrect'),
-            StringStruct('FileVersion', '2.0.0'),
-            StringStruct('InternalName', 'Typen'),
+            StringStruct('FileVersion', '2.0.1'),
+            StringStruct('InternalName', 'typen'),
             StringStruct('LegalCopyright', '© Omnii. MIT licence. Qt components (if present) under LGPLv3.'),
-            StringStruct('OriginalFilename', 'Typen.exe'),
+            StringStruct('OriginalFilename', 'typen.exe'),
             StringStruct('ProductName', 'Typen'),
-            StringStruct('ProductVersion', '2.0.0'),
+            StringStruct('ProductVersion', '2.0.1'),
             StringStruct('Comments', 'Free and open source. Nothing you type leaves your computer.')
           ]
         )
