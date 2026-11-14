@@ -119,6 +119,11 @@ Page {
             enabled: s.learn_repeated_oov === true
             formatter: function (v) { return v + " times" }
         }
+        ToggleRow {
+            key: "auto_add_repeated_oov"; label: "Add repeated words to dictionary automatically"; indent: true
+            enabled: s.learn_repeated_oov === true
+            description: "Promote words to your dictionary as soon as they reach the threshold above."
+        }
     }
 
     Card {

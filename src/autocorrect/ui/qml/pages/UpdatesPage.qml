@@ -102,7 +102,7 @@ Page {
                 spacing: 2
                 Eyebrow { label: "Language data" }
                 Text { text: "v" + (res.active_version || "—"); color: Theme.ink; font.family: Theme.display; font.pixelSize: Theme.fsTitle; font.weight: Font.Bold; font.letterSpacing: -0.5 }
-                Body { text: Number(res.word_count || 0).toLocaleString(Qt.locale(), "f", 0) + " words  ·  schema " + (res.schema_version || "—") + "  ·  " + page.dateOnly(res.released_at); font.pixelSize: Theme.fsSmall }
+                Body { text: Number(res.word_count || 0).toLocaleString(Qt.locale(), "f", 0) + " words  ·  lexicon v" + (res.schema_version || "—") + "  ·  " + page.dateOnly(res.released_at); font.pixelSize: Theme.fsSmall }
             }
             Item { Layout.fillWidth: true }
             GhostButton { text: "Roll back"; onClicked: bridge.call("rollback_language_resources", "{}") }

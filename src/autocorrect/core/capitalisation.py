@@ -144,6 +144,10 @@ class SentenceCapitaliser:
         """Mark the start of a new field or paragraph as a sentence start."""
         self._state = SentenceBoundaryState.SENTENCE_START
 
+    def set_state(self, state: SentenceBoundaryState) -> None:
+        """Restore a previously saved SentenceBoundaryState (e.g., on Backspace or Undo)."""
+        self._state = state
+
     def suppress(self) -> None:
         """Suppress sentence capitalisation when caret is moved or buffer is tainted."""
         self._state = SentenceBoundaryState.SUPPRESSED

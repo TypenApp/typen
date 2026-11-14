@@ -17,6 +17,11 @@ Page {
     }
 
     Card {
+        SectionTitle { title: "Predictive typing" }
+        ToggleRow { key: "enable_predictive_tab"; label: "Inline placeholder suggestions on Tab"; description: "Show muted inline completions and next-word predictions at the caret; press Tab to accept." }
+    }
+
+    Card {
         SectionTitle { title: "Spelling" }
         ToggleRow { key: "enable_spelling"; label: "Fix misspelled words"; description: "Typos, transpositions and common misspellings from the lexicon." }
         SliderRow {

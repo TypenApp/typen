@@ -90,7 +90,7 @@ $Version = (python -c "import sys; sys.path.insert(0,'src'); from autocorrect.ve
 $FullVersion = $Version
 $ReleaseTag = "v$Version-$Channel"
 $DistDir = Join-Path $Root "dist"
-$AppDir = Join-Path $DistDir "AutoCorrectDesktop"
+$AppDir = Join-Path $DistDir "Typen"
 $OutDir = Join-Path $DistDir "installer"
 
 Write-Host "==> Typen $FullVersion (win64, release $ReleaseTag)" -ForegroundColor Cyan
@@ -117,7 +117,7 @@ Remove-Item Env:PYTHONPATH
 if (-not $gplOk) { throw "GPLv3-only Qt binaries found in the frozen build" }
 
 # 2b. Authenticode-sign the frozen executable (no-op unless AC_WIN_SIGN_* is set)
-$Exe = Join-Path $AppDir "AutoCorrectDesktop.exe"
+$Exe = Join-Path $AppDir "typen.exe"
 $CodeSigned = Invoke-Sign $Exe
 if (-not $CodeSigned) { Write-Host "    AC_WIN_SIGN_* not set: building UNSIGNED (SmartScreen will warn)" -ForegroundColor Yellow }
 
@@ -164,7 +164,7 @@ if (-not $SkipInstaller) {
         if ($LASTEXITCODE -ne 0) { throw "Inno Setup compile failed" }
         if ($CodeSigned) { [void](Invoke-Sign $SetupPath) }
     } else {
-        Write-Warning "ISCC.exe not found — skipping Setup.exe (portable ZIP still produced)."
+        Write-Warning "ISCC.exe not found - skipping Setup.exe (portable ZIP still produced)."
     }
 }
 

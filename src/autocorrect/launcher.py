@@ -1,14 +1,14 @@
 """
 Typen — Unified Executable Entry Point.
 
-This is the single `main()` compiled into the frozen `AutoCorrectDesktop.exe`
+This is the single `main()` compiled into the frozen `typen.exe`
 (PyInstaller one-folder / Nuitka standalone). One executable, two modes:
 
-    AutoCorrectDesktop.exe                 -> background daemon + system tray
-    AutoCorrectDesktop.exe --settings      -> out-of-process Settings UI (10 screens)
-    AutoCorrectDesktop.exe --stop          -> ask the running daemon to quit
-    AutoCorrectDesktop.exe --safe-mode     -> start with typing assistance switched off
-    AutoCorrectDesktop.exe --resume        -> clear safe mode and start normally
+    typen.exe                 -> background daemon + system tray
+    typen.exe --settings      -> out-of-process Settings UI (10 screens)
+    typen.exe --stop          -> ask the running daemon to quit
+    typen.exe --safe-mode     -> start with typing assistance switched off
+    typen.exe --resume        -> clear safe mode and start normally
 
 The daemon mode:
   1. Configures file logging (`<data_dir>/logs/typen.log`).
@@ -55,7 +55,7 @@ DEFAULT_DATA_DIR: Final[Path] = default_data_dir()
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="AutoCorrectDesktop",
+        prog="typen",
         description=f"{APP_DISPLAY_NAME} {VERSION_LABEL}",
     )
     parser.add_argument(
@@ -131,7 +131,7 @@ def _run_headless_check(data_dir: Path) -> int:
         bundle = daemon.resource_manager.active_bundle
         print(
             f"{APP_DISPLAY_NAME} {VERSION_LABEL} OK | "
-            f"resources={bundle.bundle_dir} (v{bundle.version}, schema {bundle.schema_version}) | "
+            f"resources={bundle.bundle_dir} (v{bundle.version}, lexicon v{bundle.schema_version}, schema {bundle.schema_version}) | "
             f"entitlement={snapshot.status_message}"
         )
     finally:
@@ -231,10 +231,11 @@ def _run_daemon(data_dir: Path, with_tray: bool, *, safe_mode: bool = False, res
         daemon.on_correction = lambda _o, _r, _reason: tray.pulse()
         daemon.on_hold_progress = tray.show_hold_countdown
 
-        def open_settings() -> None:
-            tray.launch_settings_subprocess()
+        def open_settings(screen: str | None = None) -> None:
+            tray.launch_settings_subprocess(screen=screen)
 
-        daemon.on_open_settings_requested = open_settings
+        daemon.on_open_settings_requested = lambda: open_settings(None)
+        daemon.on_update_available = lambda _state: open_settings("updates")
         daemon.on_quit_requested = tray.stop
 
         def on_tray_ready() -> None:

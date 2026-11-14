@@ -109,10 +109,15 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     # Recognition-only words (DO_NOT_SUGGEST: rare/obscure externally attested
     # forms) are valid in the lexicon but must never generate suggestions,
     # so they are excluded from the SymSpell candidate index entirely.
+    # Sort by descending log_freq so high-frequency words are always retained first
+    # when a delete-hash bucket reaches its capacity cap (128).
     from autocorrect.intelligence.schema import MorphFlag
 
+    freq_sorted_entries = sorted(
+        sorted_entries, key=lambda e: (-e.log_freq, e.word)
+    )
     delete_buckets: dict[int, list[int]] = {}
-    for entry in sorted_entries:
+    for entry in freq_sorted_entries:
         wid = word_to_id[entry.word]
         if entry.morph_mask & MorphFlag.DO_NOT_SUGGEST:
             continue
@@ -120,7 +125,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
             continue
         for del_hash in generate_delete_hashes(entry.word):
             bucket = delete_buckets.setdefault(del_hash, [])
-            if len(bucket) < 64:
+            if len(bucket) < 128:
                 bucket.append(wid)
 
     sorted_del_hashes = sorted(delete_buckets.keys())

@@ -56,6 +56,8 @@ class CorrectionFeatures:
     at each stage. Field names are the setting keys.
     """
 
+    # Predictive typing
+    enable_predictive_tab: bool = True
     # Spelling
     enable_spelling: bool = True
     aggressiveness: float = 1.0  # 1.0 = standard conservative; <1.0 stricter; >1.0 more assertive

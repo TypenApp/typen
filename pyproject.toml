@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autocorrect"
-version = "1.3.0"
+version = "2.0.0"
 description = "Typen: offline-first, system-wide desktop autocorrect and writing assistant"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -76,6 +76,7 @@ ui = [
 ]
 
 [project.scripts]
+typen = "autocorrect.launcher:main"
 autocorrect-desktop = "autocorrect.launcher:main"
 autocorrect-daemon = "autocorrect.daemon.app:main"
 autocorrect-settings = "autocorrect.ui.settings_main:main"

@@ -1,36 +1,147 @@
 {
   "pack_id": "academic",
-  "version": "1.0.1",
-  "released_at": "2026-11-02T00:00:00Z",
+  "version": "2.0.0",
+  "released_at": "2026-11-14T00:00:00Z",
   "words": {
     "epistemological": {
-      "log_freq": -6.4,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "historiography": {
-      "log_freq": -6.4,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "methodology": {
-      "log_freq": -5.9,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "empirical": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "peer-reviewed": {
-      "log_freq": -6.1,
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ontological": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "phenomenological": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hermeneutics": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ethnography": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ethnographic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "qualitative": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "quantitative": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "longitudinal": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "cross-sectional": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "meta-analysis": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "econometrics": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "psychometric": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "stochastic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "heteroskedasticity": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "multicollinearity": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "autocorrelation": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "endogeneity": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "counterfactual": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "falsifiability": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "paradigm": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "heuristic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pedagogy": {
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     }
   },
   "direct_typos": {
     "methodolgy": "methodology",
-    "emperical": "empirical"
+    "emperical": "empirical",
+    "epistemologcal": "epistemological"
   }
 }

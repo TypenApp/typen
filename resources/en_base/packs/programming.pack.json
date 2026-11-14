@@ -1,67 +1,559 @@
 {
   "pack_id": "programming",
-  "version": "1.0.3",
-  "released_at": "2026-11-02T00:00:00Z",
+  "version": "2.0.0",
+  "released_at": "2026-11-14T00:00:00Z",
   "words": {
-    "kubernetes": {
-      "log_freq": -6.0,
-      "casing_flag": 1,
-      "exact_casing": "Kubernetes"
-    },
-    "pytorch": {
-      "log_freq": -6.0,
-      "casing_flag": 4,
-      "exact_casing": "PyTorch"
-    },
-    "fastapi": {
-      "log_freq": -6.0,
-      "casing_flag": 4,
-      "exact_casing": "FastAPI"
-    },
-    "numpy": {
-      "log_freq": -6.0,
-      "casing_flag": 4,
-      "exact_casing": "NumPy"
-    },
-    "graphql": {
-      "log_freq": -6.0,
-      "casing_flag": 4,
-      "exact_casing": "GraphQL"
-    },
     "idempotency": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "idempotent": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "microservice": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "microservices": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "serialization": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "deserialization": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
+    },
+    "containerization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "orchestration": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "observability": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "telemetry": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "multithreading": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "multiprocessing": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "concurrency": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "parallelism": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "memoization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "virtualization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hypervisor": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "serverless": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "monorepo": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "polyrepo": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "middleware": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "backpressure": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "refactoring": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "transpiler": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "bundler": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "linter": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "formatter": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "tree-shaking": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hydration": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ssr": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "csr": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "isr": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "webhook": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "webhooks": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "websocket": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "websockets": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "protobuf": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "grpc": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "graphql": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "GraphQL"
+    },
+    "restful": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "oauth": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "oidc": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pkce": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "jwt": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "saml": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "rbac": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "abac": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "zero-trust": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "sandboxing": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "vectorization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "quantization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "embeddings": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "tokenizer": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "fine-tuning": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "inference": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "latency": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "throughput": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "sharding": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "replication": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "failover": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "quorum": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "consensus": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "raft": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "paxos": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "kubernetes": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Kubernetes"
+    },
+    "pytorch": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "PyTorch"
+    },
+    "tensorflow": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "TensorFlow"
+    },
+    "fastapi": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "FastAPI"
+    },
+    "numpy": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "NumPy"
+    },
+    "scipy": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "SciPy"
+    },
+    "pandas": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Pandas"
+    },
+    "typescript": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "TypeScript"
+    },
+    "javascript": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "JavaScript"
+    },
+    "postgresql": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "PostgreSQL"
+    },
+    "mysql": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "MySQL"
+    },
+    "mongodb": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "MongoDB"
+    },
+    "sqlite": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "SQLite"
+    },
+    "redis": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Redis"
+    },
+    "supabase": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Supabase"
+    },
+    "vercel": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Vercel"
+    },
+    "netlify": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Netlify"
+    },
+    "cloudflare": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Cloudflare"
+    },
+    "openai": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "OpenAI"
+    },
+    "anthropic": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Anthropic"
+    },
+    "chatgpt": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "ChatGPT"
+    },
+    "claude": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Claude"
+    },
+    "gemini": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Gemini"
+    },
+    "deepmind": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "DeepMind"
+    },
+    "nvidia": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Nvidia"
+    },
+    "github": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "GitHub"
+    },
+    "gitlab": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "GitLab"
+    },
+    "bitbucket": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Bitbucket"
+    },
+    "docker": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Docker"
+    },
+    "terraform": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Terraform"
+    },
+    "ansible": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Ansible"
+    },
+    "nextjs": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "NextJS"
+    },
+    "nodejs": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "NodeJS"
+    },
+    "reactjs": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "ReactJS"
+    },
+    "svelte": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Svelte"
+    },
+    "tailwind": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Tailwind"
+    },
+    "vscode": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "VSCode"
+    },
+    "intellij": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "IntelliJ"
+    },
+    "pycharm": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "PyCharm"
+    },
+    "neovim": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Neovim"
+    },
+    "raycast": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Raycast"
+    },
+    "cursor": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Cursor"
+    },
+    "pyside": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "PySide"
+    },
+    "nuitka": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Nuitka"
     }
   },
   "direct_typos": {
     "kubernets": "Kubernetes",
     "idempotant": "idempotent",
-    "asyncronous": "asynchronous"
+    "asyncronous": "asynchronous",
+    "suapbase": "Supabase",
+    "supabse": "Supabase",
+    "anthrpic": "Anthropic",
+    "postgressql": "PostgreSQL",
+    "typescipt": "TypeScript",
+    "javascipt": "JavaScript",
+    "cloudflair": "Cloudflare"
   }
 }

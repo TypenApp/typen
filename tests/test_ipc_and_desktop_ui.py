@@ -26,7 +26,7 @@ from autocorrect.ui import (
     scan_distribution_dir_for_gpl_binaries,
 )
 from autocorrect.ui.qml_bridge import QML_FILE_PATH
-from autocorrect.version import APP_VERSION
+from autocorrect.version import APP_VERSION, BINARY_SCHEMA_VERSION
 
 
 def test_ipc_authentication_and_protocol_guards(tmp_path: Path) -> None:
@@ -245,7 +245,7 @@ def test_all_10_desktop_ui_screens_end_to_end_over_live_ipc(tmp_path: Path) -> N
         # --- Screen 9: Independent Updates ---
         upd = controller.get_updates_state()
         assert upd["app"]["current_version"] == APP_VERSION
-        assert upd["language_resources"]["schema_version"] == 1
+        assert upd["language_resources"]["schema_version"] == BINARY_SCHEMA_VERSION
         assert controller.update_updates_settings(update_channel="beta")["app"]["channel"] == "beta"
         controller.rollback_language_resources()
 

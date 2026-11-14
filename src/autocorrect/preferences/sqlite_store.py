@@ -115,6 +115,20 @@ class SQLitePreferenceStore:
                     day TEXT PRIMARY KEY,
                     payload_json TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS user_adaptive_unigrams (
+                    word_lower TEXT PRIMARY KEY,
+                    display_word TEXT NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 1,
+                    updated_at REAL NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS user_adaptive_ngrams (
+                    prev2_lower TEXT NOT NULL DEFAULT '',
+                    prev1_lower TEXT NOT NULL,
+                    word_lower TEXT NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 1,
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (prev2_lower, prev1_lower, word_lower)
+                );
                 """
             )
             # Older databases: columns added after 1.2.
@@ -154,7 +168,9 @@ class SQLitePreferenceStore:
             if row and row[0] in REGION_NAME_TO_FLAG:
                 self._overlay.set_active_region(REGION_NAME_TO_FLAG[row[0]])
 
-    def add_custom_word(self, word: str, category: str = "user") -> None:
+    def add_custom_word(
+        self, word: str, category: str = "user", *, keep_suggestion: bool = False
+    ) -> None:
         cleaned = word.strip()
         if not cleaned:
             return
@@ -169,10 +185,11 @@ class SQLitePreferenceStore:
                 """,
                 (cleaned.lower(), cleaned, category, time.time()),
             )
-            conn.execute(
-                "DELETE FROM suggested_dictionary_words WHERE word_lower = ?",
-                (cleaned.lower(),),
-            )
+            if not keep_suggestion:
+                conn.execute(
+                    "DELETE FROM suggested_dictionary_words WHERE word_lower = ?",
+                    (cleaned.lower(),),
+                )
         self._overlay.add_custom_word(cleaned)
 
     def _persist_reverted_word(self, display_word: str, corrected_to: str) -> None:
@@ -397,6 +414,8 @@ class SQLitePreferenceStore:
                 DELETE FROM app_profiles;
                 DELETE FROM snippets;
                 DELETE FROM insights_daily;
+                DELETE FROM user_adaptive_unigrams;
+                DELETE FROM user_adaptive_ngrams;
                 """
             )
         self._overlay.clear_all()
@@ -534,14 +553,19 @@ class SQLitePreferenceStore:
                     (low, cleaned, now),
                 )
             else:
-                seen, updated_at, _source = int(row[0]), float(row[1]), str(row[2])
+                seen, updated_at, prev_source = int(row[0]), float(row[1]), str(row[2])
                 seen = 1 if now - updated_at > 7 * 86400 else seen + 1
+                new_source = "repeated" if seen >= threshold else prev_source
                 conn.execute(
-                    "UPDATE suggested_dictionary_words SET seen_count = ?, updated_at = ? WHERE word_lower = ?",
-                    (seen, now, low),
+                    """
+                    UPDATE suggested_dictionary_words
+                    SET display_word = ?, seen_count = ?, updated_at = ?, source = ?
+                    WHERE word_lower = ?
+                    """,
+                    (cleaned, seen, now, new_source, low),
                 )
+        self._overlay.load_suggested_word(cleaned, "", max(1, seen))
         if seen >= threshold:
-            self._overlay.load_suggested_word(cleaned, "", 0)
             return seen == threshold
         return False
 
@@ -594,3 +618,55 @@ class SQLitePreferenceStore:
             self.add_custom_word(row[0].strip())
             count += 1
         return count
+
+    # Adaptive personal language model persistence -----------------------
+
+    def load_adaptive_lm(
+        self,
+    ) -> tuple[
+        list[tuple[str, str, int, float]],
+        list[tuple[str, str, str, int, float]],
+    ]:
+        with self._connect() as conn:
+            u_rows = conn.execute(
+                "SELECT word_lower, display_word, count, updated_at FROM user_adaptive_unigrams"
+            ).fetchall()
+            n_rows = conn.execute(
+                "SELECT prev2_lower, prev1_lower, word_lower, count, updated_at FROM user_adaptive_ngrams"
+            ).fetchall()
+        return (
+            [(str(r[0]), str(r[1]), int(r[2]), float(r[3])) for r in u_rows],
+            [(str(r[0]), str(r[1]), str(r[2]), int(r[3]), float(r[4])) for r in n_rows],
+        )
+
+    def flush_adaptive_lm(
+        self,
+        unigrams: dict[str, tuple[int, str, float]],
+        ngrams: dict[tuple[str, str, str], tuple[int, float]],
+    ) -> None:
+        if not unigrams and not ngrams:
+            return
+        with self._connect() as conn:
+            if unigrams:
+                conn.executemany(
+                    """
+                    INSERT INTO user_adaptive_unigrams (word_lower, display_word, count, updated_at)
+                    VALUES (?, ?, ?, ?)
+                    ON CONFLICT(word_lower) DO UPDATE SET
+                        display_word = excluded.display_word,
+                        count = excluded.count,
+                        updated_at = excluded.updated_at
+                    """,
+                    [(w_low, disp, cnt, ts) for w_low, (cnt, disp, ts) in unigrams.items()],
+                )
+            if ngrams:
+                conn.executemany(
+                    """
+                    INSERT INTO user_adaptive_ngrams (prev2_lower, prev1_lower, word_lower, count, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    ON CONFLICT(prev2_lower, prev1_lower, word_lower) DO UPDATE SET
+                        count = excluded.count,
+                        updated_at = excluded.updated_at
+                    """,
+                    [(p2, p1, w_low, cnt, ts) for (p2, p1, w_low), (cnt, ts) in ngrams.items()],
+                )

@@ -51,6 +51,7 @@ hidden = [
     "autocorrect.daemon.input_dispatcher",
     "autocorrect.preferences.settings_schema",
     "autocorrect.preferences.system_locale",
+    "autocorrect.intelligence.adaptive_lm",
     "autocorrect.logging_setup",
     "autocorrect.platform_paths",
     "tkinter",
@@ -73,6 +74,7 @@ if IS_WIN:
         "autocorrect.adapters.windows.win32_injector",
         "autocorrect.adapters.windows.uia_inspector",
         "autocorrect.adapters.windows.caret_probe",
+        "autocorrect.adapters.windows.inline_ghost_overlay",
         "autocorrect.adapters.windows.window_list",
         "autocorrect.adapters.windows.win_keymap",
         "pystray._win32",
@@ -223,7 +225,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="AutoCorrectDesktop",
+    name="typen",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -240,7 +242,7 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="AutoCorrectDesktop",
+    name="Typen",
 )
 
 if IS_MAC:

@@ -362,6 +362,28 @@ def bridge_class() -> type:
             threading.Thread(target=work, name="typen-update-check", daemon=True).start()
 
         @Slot()  # type: ignore[misc,arg-type]
+        def checkForUpdatesSilently(self) -> None:
+            """Run an automatic background update check on window launch without toasting 'up to date'."""
+            if self._update_busy:
+                return
+            self._update_busy = True
+            self.updateBusyChanged.emit()
+
+            def work() -> None:
+                try:
+                    self._ctrl.check_for_updates()
+                except Exception:
+                    log.debug("silent update check failed", exc_info=True)
+                self._update_toast = ("", False)
+                QMetaObject.invokeMethod(
+                    self,
+                    "finishUpdateCheck",
+                    Qt.ConnectionType.QueuedConnection,
+                )
+
+            threading.Thread(target=work, name="typen-silent-update-check", daemon=True).start()
+
+        @Slot()  # type: ignore[misc,arg-type]
         def finishUpdateCheck(self) -> None:
             message, is_error = self._update_toast
             self._update_busy = False

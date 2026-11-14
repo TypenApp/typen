@@ -241,9 +241,11 @@ def test_independent_signed_resource_updates_delta_and_rollback(
     patch_sha, patch_size = create_zstd_delta_patch(v1_bytes, v2_bytes, patch_path)
     patch_bytes = patch_path.read_bytes()
 
+    from autocorrect.version import BINARY_SCHEMA_VERSION
+
     descriptor = ResourceUpdateDescriptor(
         version="1.0.9",
-        schema_version=1,
+        schema_version=BINARY_SCHEMA_VERSION,
         released_at="2026-12-01T00:00:00Z",
         full_archive_sha256=v2_sha,
         full_archive_size=v2_size,

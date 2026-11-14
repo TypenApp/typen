@@ -17,7 +17,11 @@ from typing import Final
 
 from autocorrect.intelligence.mmap_lexicon import MmapAbbreviationSet, MmapLexicon
 from autocorrect.intelligence.mmap_ngram import MmapNGramModel
-from autocorrect.intelligence.mmap_symspell import MmapDirectTypoTable, MmapSymSpellIndex
+from autocorrect.intelligence.mmap_symspell import (
+    MmapDirectTypoTable,
+    MmapSymSpellIndex,
+    generate_delete_strings,
+)
 from autocorrect.intelligence.schema import BINARY_SCHEMA_VERSION, CasingFlag
 
 
@@ -57,6 +61,26 @@ class DomainPackOverlay:
     released_at: str
     words: dict[str, tuple[float, CasingFlag, str | None]]  # word_lower -> (log_freq, casing, exact)
     direct_typos: dict[str, str]  # typo_lower -> target_word
+    delete_index: dict[str, set[str]] = field(default_factory=dict)
+
+    def query_candidates(self, word_lower: str, max_distance: int = 2) -> list[tuple[str, float]]:
+        """
+        Return `[(cand_lower, log_freq), ...]` for domain pack words sharing a SymSpell
+        delete variant with `word_lower` within `max_distance`.
+        """
+        low = word_lower.lower()
+        if not low or not self.delete_index:
+            return []
+        matched: set[str] = set()
+        for del_str in generate_delete_strings(low, max_distance=max_distance):
+            bucket = self.delete_index.get(del_str)
+            if bucket:
+                matched.update(bucket)
+        out: list[tuple[str, float]] = []
+        for cand_low in matched:
+            if abs(len(cand_low) - len(low)) <= max_distance and cand_low in self.words:
+                out.append((cand_low, self.words[cand_low][0]))
+        return out
 
 
 @dataclass(slots=True)
@@ -187,18 +211,23 @@ class ResourceManager:
             if pack_file.exists():
                 raw = json.loads(pack_file.read_text(encoding="utf-8"))
                 words: dict[str, tuple[float, CasingFlag, str | None]] = {}
+                delete_index: dict[str, set[str]] = {}
                 for w_lower, w_info in raw.get("words", {}).items():
-                    words[w_lower] = (
-                        float(w_info.get("log_freq", -8.0)),
+                    low_clean = w_lower.strip().lower()
+                    words[low_clean] = (
+                        float(w_info.get("log_freq", -6.0)),
                         CasingFlag(int(w_info.get("casing_flag", 0))),
                         w_info.get("exact_casing"),
                     )
+                    for del_str in generate_delete_strings(low_clean, max_distance=2):
+                        delete_index.setdefault(del_str, set()).add(low_clean)
                 bundle.domain_packs[pack_id] = DomainPackOverlay(
                     pack_id=pack_id,
                     version=str(raw.get("version", "1.0.0")),
                     released_at=str(raw.get("released_at", bundle.released_at)),
                     words=words,
                     direct_typos=dict(raw.get("direct_typos", {})),
+                    delete_index=delete_index,
                 )
 
     def set_enabled_domain_packs(self, pack_ids: set[str]) -> None:

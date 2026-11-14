@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final, Protocol
 
-from autocorrect.core.capitalisation import SentenceCapitaliser
+from autocorrect.core.capitalisation import SentenceBoundaryState, SentenceCapitaliser
 from autocorrect.core.confusion_sets import evaluate_retroactive_two_word_confusion
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.core.models import (
@@ -27,6 +27,7 @@ from autocorrect.input.diff_planner import ReplacementPlan, SuffixDiffPlanner
 from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent, TextInjectorPort
 from autocorrect.input.transaction_ledger import TransactionLedger
 from autocorrect.input.word_buffer import ActiveWordBuffer, ContextRingBuffer
+from autocorrect.intelligence.adaptive_lm import AdaptivePersonalLM, PredictionCandidate
 from autocorrect.intelligence.schema import RegionFlag
 
 WORD_BOUNDARY_PUNCTUATION: Final[frozenset[str]] = frozenset(
@@ -110,6 +111,17 @@ class EntitlementCheckPort(Protocol):
 
 
 @dataclass(slots=True)
+class BoundaryHistoryEntry:
+    """Snapshot of a completed word boundary for accurate Backspace/Undo unwinding."""
+
+    word: str
+    leading_prefix: str
+    delimiter: str
+    pre_cap_state: SentenceBoundaryState
+    post_cap_state: SentenceBoundaryState
+
+
+@dataclass(slots=True)
 class SessionEventOutcome:
     """Result of processing a single KeyEvent through InputSessionManager."""
 
@@ -136,12 +148,14 @@ class InputSessionManager:
         snippet_matcher: SnippetMatcherPort | None = None,
         entitlement_gate: EntitlementCheckPort | None = None,
         active_region: RegionFlag = RegionFlag.EN_GB,
+        adaptive_lm: AdaptivePersonalLM | None = None,
     ) -> None:
         self._engine = engine
         self._injector = injector
         self._snippet_matcher = snippet_matcher
         self._entitlement_gate = entitlement_gate
         self._active_region = active_region
+        self._adaptive_lm = adaptive_lm
 
         self._word_buffer = ActiveWordBuffer()
         self._context_ring = ContextRingBuffer()
@@ -173,6 +187,8 @@ class InputSessionManager:
         # sentence terminator ('word.' -> 'word. '); the user's own following
         # Space is then swallowed, and a second closing mark re-attaches.
         self._auto_space_pending: bool = False
+        self._history_stack: list[BoundaryHistoryEntry] = []
+        self._active_prediction: PredictionCandidate | None = None
 
     @property
     def word_buffer(self) -> ActiveWordBuffer:
@@ -193,6 +209,24 @@ class InputSessionManager:
     @property
     def is_paused(self) -> bool:
         return self._paused
+
+    @property
+    def active_prediction(self) -> PredictionCandidate | None:
+        return self._active_prediction
+
+    @property
+    def has_active_prediction(self) -> bool:
+        return (
+            self._active_prediction is not None
+            and self._features.enable_predictive_tab
+            and not self._paused
+            and not self._focus_context.is_password_or_secure
+            and not self._focus_context.is_excluded_app
+            and not self._focus_context.is_terminal_or_code
+        )
+
+    def set_adaptive_lm(self, adaptive_lm: AdaptivePersonalLM | None) -> None:
+        self._adaptive_lm = adaptive_lm
 
     def set_paused(self, paused: bool) -> None:
         self._paused = paused
@@ -252,6 +286,8 @@ class InputSessionManager:
         self._last_boundary_delimiter = ""
         self._current_sentence_tokens.clear()
         self._auto_space_pending = False
+        self._history_stack.clear()
+        self._active_prediction = None
         if caret_text_before is None:
             self._capitaliser.suppress()
         else:
@@ -276,19 +312,33 @@ class InputSessionManager:
             # the delimiter, so `is_sentence_start` is correct as is.
             self._word_buffer.clear_clean()
             return
-        # Caret directly after a non-space character ('Hello wor|ld'): the user
-        # may be inside a word we cannot see the end of. Never correct that
-        # word and never capitalise what they type next; the delimiter they
-        # eventually type still advances the sentence state machine.
+        # Caret directly after a non-space character ('Hello wor|ld'): if it's a
+        # sentence terminator ('.', '!', '?'), the next space will start a sentence;
+        # otherwise the user may be inside a word we cannot see the end of.
+        if tail.endswith((".", "!", "?")):
+            self._word_buffer.clear_clean()
+            self._capitaliser.mark_after_terminal()
+            return
         self._word_buffer.mark_tainted()
         self._capitaliser.suppress()
 
-    def on_focus_changed(self, focus: FocusContext, caret_text_before: str | None = None) -> None:
+    def on_focus_changed(
+        self,
+        focus: FocusContext,
+        caret_text_before: str | None = None,
+        *,
+        caret_probe_attempted: bool = False,
+    ) -> None:
         """Flush all ephemeral buffers on window switch and update security/app profile flags."""
         self._focus_context = focus
         self.reset_all_state()
         if caret_text_before is not None:
             self.resync_from_caret(caret_text_before)
+        elif caret_probe_attempted:
+            # When the OS caret probe could not inspect the control, suppress
+            # auto-capitalisation so switching windows mid-sentence never forces
+            # a false sentence-start capital.
+            self._capitaliser.suppress()
 
     def reset_all_state(self) -> None:
         self._word_buffer.clear_clean()
@@ -304,6 +354,135 @@ class InputSessionManager:
         self._just_deleted_trailing_space = False
         self._current_sentence_tokens.clear()
         self._auto_space_pending = False
+        self._history_stack.clear()
+        self._active_prediction = None
+
+    def accept_active_prediction(
+        self,
+        timestamp_ms: float = 0.0,
+        *,
+        tab_was_suppressed: bool = True,
+    ) -> SessionEventOutcome:
+        """
+        Accept the currently displayed inline placeholder suggestion on Tab press.
+        Injects the remaining suffix or next word + trailing space and updates session state.
+        """
+        pred = self._active_prediction
+        self._active_prediction = None
+        if pred is None or not self._features.enable_predictive_tab:
+            self.on_mouse_click_or_caret_move()
+            return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
+        inject_text = f"{pred.display_text} "
+        backspaces = 0 if tab_was_suppressed else 1
+        plan = ReplacementPlan(
+            backspaces_to_send=backspaces,
+            text_to_inject=inject_text,
+            common_prefix_len=0,
+            original_full=self._word_buffer.current_word if pred.mode == "SUFFIX" else "",
+            target_full=f"{pred.full_word} ",
+        )
+        completed_word = pred.full_word
+        leading_prefix = self._word_buffer.leading_prefix if pred.mode == "SUFFIX" else ""
+        self._word_buffer.clear_clean()
+
+        p1 = self._context_ring.prev1()
+        p2 = self._context_ring.prev2()
+        if self._adaptive_lm is not None and not self._priming:
+            self._adaptive_lm.record_word_sequence(
+                completed_word,
+                prev1_lower=p1.normalized_in_vocab_word if p1 else None,
+                prev2_lower=p2.normalized_in_vocab_word if p2 else None,
+            )
+
+        pre_cap = self._capitaliser.state
+        prefs = self._engine.preferences
+        wid = self._engine.resolve_word_id(completed_word)
+        is_cust = bool(prefs is not None and prefs.is_custom_word(completed_word.lower()))
+        self._context_ring.push(wid, completed_word.lower(), is_trusted_custom=is_cust)
+        self._capitaliser.on_word_completed(completed_word, " ")
+        post_cap = self._capitaliser.state
+        self._history_stack.append(
+            BoundaryHistoryEntry(
+                word=completed_word,
+                leading_prefix=leading_prefix,
+                delimiter=" ",
+                pre_cap_state=pre_cap,
+                post_cap_state=post_cap,
+            )
+        )
+        if len(self._history_stack) > 8:
+            self._history_stack.pop(0)
+
+        self._last_completed_word = completed_word
+        self._last_boundary_delimiter = " "
+        self._last_space_timestamp_ms = timestamp_ms
+        self._preceded_by_space = True
+        self._double_space_eligible = True
+        self._just_deleted_trailing_space = False
+        self._current_sentence_tokens.append(completed_word)
+
+        self._tx_ledger.record_correction(
+            original_token=plan.original_full or completed_word,
+            corrected_token=completed_word,
+            delimiter=" ",
+            reason=CorrectionReason.SPELLING_OOV,
+            timestamp_ms=timestamp_ms,
+        )
+        if self._injector is not None and not plan.is_noop:
+            self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+
+        # Immediately compute next-word prediction following the accepted word
+        self._update_prediction_state()
+        return SessionEventOutcome(
+            action=KeyAction.SUPPRESS_AND_INJECT if tab_was_suppressed else KeyAction.PASS_THROUGH,
+            replacement_plan=plan,
+            reason_tag="PREDICTIVE_TAB",
+        )
+
+    def _update_prediction_state(self) -> None:
+        """Recompute `_active_prediction` based on the current word buffer or preceding word."""
+        if (
+            self._priming
+            or self._paused
+            or not self._features.enable_predictive_tab
+            or self._focus_context.is_password_or_secure
+            or self._focus_context.is_excluded_app
+            or self._focus_context.is_terminal_or_code
+            or self._adaptive_lm is None
+        ):
+            self._active_prediction = None
+            return
+
+        p1 = self._context_ring.prev1()
+        p2 = self._context_ring.prev2()
+        p1_str = p1.normalized_in_vocab_word if p1 else None
+        p2_str = p2.normalized_in_vocab_word if p2 else None
+
+        if self._word_buffer.is_clean_and_nonempty and not self._word_buffer.leading_prefix:
+            curr = self._word_buffer.current_word
+            prefs = self._engine.preferences
+            custom_map = (
+                prefs.list_custom_words_map()
+                if prefs is not None and hasattr(prefs, "list_custom_words_map")
+                else None
+            )
+            self._active_prediction = self._adaptive_lm.predict_suffix(
+                partial_token=curr,
+                bundle=self._engine.resource_manager.active_bundle,
+                custom_words=custom_map,
+                prev1_lower=p1_str,
+                prev2_lower=p2_str,
+                is_sentence_start=self._capitaliser.is_sentence_start,
+            )
+        elif self._preceded_by_space and not self._word_buffer.current_word:
+            self._active_prediction = self._adaptive_lm.predict_next_word(
+                prev1_word=p1_str or self._last_completed_word,
+                prev2_word=p2_str,
+                is_sentence_start=self._capitaliser.is_sentence_start,
+            )
+        else:
+            self._active_prediction = None
 
     def prime_from_text(self, text: str, typed_at_ms: float | None = None) -> None:
         """
@@ -361,6 +540,7 @@ class InputSessionManager:
         # swap the straight mark on screen if nothing else touched the text.
         smart = self._smart_quote_for(event) if self._features.smart_quotes else None
         outcome = self._handle_key_event_inner(event, suppress_delimiter_on_replace)
+        self._update_prediction_state()
         if (
             smart is not None
             and outcome.action == KeyAction.PASS_THROUGH
@@ -436,12 +616,25 @@ class InputSessionManager:
             self.on_mouse_click_or_caret_move()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
-        # 5. Cursor navigation keys invalidate the active buffer. Tab almost
-        # always moves to another field, whose first word starts a sentence.
+        # 5. Cursor navigation keys invalidate the active buffer (except Tab when accepting an active prediction).
         if event.key_name in NAVIGATION_KEYS:
+            if (
+                event.key_name == "Tab"
+                and not event.shift_pressed
+                and not event.ctrl_pressed
+                and not event.alt_pressed
+                and not event.meta_pressed
+                and self.has_active_prediction
+            ):
+                return self.accept_active_prediction(
+                    event.timestamp_ms,
+                    tab_was_suppressed=suppress_delimiter_on_replace,
+                )
             self.on_mouse_click_or_caret_move()
             if event.key_name == "Tab":
-                self._capitaliser.reset_to_sentence_start()
+                # Passing Tab through leaves the word buffer CLEAN (ready for the next word)
+                # while keeping sentence capitalisation suppressed unless caret resync overrides it.
+                self._word_buffer.clear_clean()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # 5b. A space the session inserted after a sentence terminator is pending.
@@ -472,6 +665,9 @@ class InputSessionManager:
                     restored_word = tx.original_token.rsplit(" ", 1)[-1]
                     if self._current_sentence_tokens:
                         self._current_sentence_tokens.pop()
+                    if self._history_stack:
+                        popped = self._history_stack.pop()
+                        self._capitaliser.set_state(popped.pre_cap_state)
                     self._word_buffer.clear_clean()
                     for ch in restored_word:
                         self._word_buffer.append_char(ch, event.timestamp_ms)
@@ -494,6 +690,30 @@ class InputSessionManager:
                 # buffer yet so a subsequent Space + Space can still insert a period.
                 self._preceded_by_space = False
                 self._just_deleted_trailing_space = True
+                if self._history_stack and self._history_stack[-1].delimiter == " ":
+                    self._capitaliser.set_state(self._history_stack[-1].pre_cap_state)
+            elif not self._word_buffer.current_word and self._history_stack:
+                # Deleting a non-space delimiter or stepping back into the just-completed word
+                entry = self._history_stack.pop()
+                self._capitaliser.set_state(entry.pre_cap_state)
+                self._context_ring.pop_last()
+                if self._current_sentence_tokens:
+                    self._current_sentence_tokens.pop()
+                self._word_buffer.clear_clean()
+                for s_ch in entry.leading_prefix:
+                    self._word_buffer.append_prefix_symbol(s_ch, event.timestamp_ms)
+                for w_ch in entry.word:
+                    self._word_buffer.append_char(w_ch, event.timestamp_ms)
+                if self._just_deleted_trailing_space:
+                    # The space was already deleted on the previous Backspace; this Backspace
+                    # removes the last character of the restored word!
+                    self._word_buffer.handle_backspace(event.timestamp_ms)
+                self._preceded_by_space = False
+                self._just_deleted_trailing_space = False
+                self._last_completed_word = self._history_stack[-1].word if self._history_stack else ""
+                self._last_boundary_delimiter = (
+                    self._history_stack[-1].delimiter if self._history_stack else ""
+                )
             else:
                 self._word_buffer.handle_backspace(event.timestamp_ms)
                 self._preceded_by_space = False
@@ -913,7 +1133,7 @@ class InputSessionManager:
                 and self._last_completed_word[-1].isalnum()
             )
             self._just_deleted_trailing_space = False
-            self._capitaliser.on_word_completed("", delimiter)
+            self._capitaliser.on_word_completed(self._last_completed_word, delimiter)
             self._last_boundary_delimiter = delimiter
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
@@ -1062,14 +1282,39 @@ class InputSessionManager:
                     if self._current_sentence_tokens:
                         self._current_sentence_tokens[-1] = formatted_prev
 
-        # Advance context ring buffer and sentence boundary tracker
-        final_wid = self._engine.resolve_word_id(final_word)
-        self._context_ring.push(final_wid, final_word.lower())
+        # Advance context ring buffer, adaptive LM, and sentence boundary tracker
+        pre_cap = self._capitaliser.state
+        prefs = self._engine.preferences
+        for sub_word in final_word.split():
+            sub_low = sub_word.lower()
+            sub_wid = self._engine.resolve_word_id(sub_word)
+            is_cust = bool(prefs is not None and prefs.is_custom_word(sub_low))
+            if self._adaptive_lm is not None and not self._priming and (sub_wid > 0 or is_cust):
+                cur_p1 = self._context_ring.prev1()
+                cur_p2 = self._context_ring.prev2()
+                self._adaptive_lm.record_word_sequence(
+                    sub_word,
+                    prev1_lower=cur_p1.normalized_in_vocab_word if cur_p1 else None,
+                    prev2_lower=cur_p2.normalized_in_vocab_word if cur_p2 else None,
+                )
+            self._context_ring.push(sub_wid, sub_low, is_trusted_custom=is_cust)
         if delimiter in CLAUSE_BOUNDARY_DELIMITERS:
             # Grammar / confusion context never crosses a clause boundary:
             # 'Hi everyone, dont worry' must not see 'everyone' as the subject of 'dont'.
             self._context_ring.clear()
         self._capitaliser.on_word_completed(final_word, delimiter)
+        post_cap = self._capitaliser.state
+        self._history_stack.append(
+            BoundaryHistoryEntry(
+                word=final_word.rsplit(" ", 1)[-1],
+                leading_prefix=leading_prefix,
+                delimiter=delimiter,
+                pre_cap_state=pre_cap,
+                post_cap_state=post_cap,
+            )
+        )
+        if len(self._history_stack) > 8:
+            self._history_stack.pop(0)
         self._last_completed_word = final_word
         self._last_boundary_delimiter = delimiter
         # Keep the clause mark on the token so grammar can see the boundary.

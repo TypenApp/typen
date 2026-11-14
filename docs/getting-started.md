@@ -18,7 +18,7 @@
 <a id="architecture-overview"></a>
 ## How Typen Works
 
-Typen is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (AutoCorrectDesktop.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the current builds ship the lightweight native fallback window.
+Typen is engineered around a strict two-process separation: a lightweight, always-on background service that hooks system-wide keyboard input with sub-millisecond word evaluation latency, and an on-demand 10-screen Settings window. Both run from the same executable (typen.exe); the Settings window is started with the --settings flag. The Qt Quick/QML front end (PySide6-Essentials) is used when installed; the current builds ship the lightweight native fallback window.
 
 When you close the Settings window, the UI process terminates completely (0% UI CPU and 0 MB GUI RAM), while the background daemon continues correcting typos across every native and web application on your machine.
 
@@ -31,7 +31,7 @@ When you close the Settings window, the UI process terminates completely (0% UI 
 
 Windows is the stable platform: the build has been verified end to end on real machines. Download the installer (.exe) or portable (.zip) build from the Download page — every file is attached to the matching GitHub release — and compare its SHA-256 with the value shown there. The Windows build is not code-signed yet, so SmartScreen will show a warning on first run: choose More info, then Run anyway.
 
-The installer offers launch-at-login and creates Start menu shortcuts for the service and for Settings. After launch the Typen mark (a black tile with "Aa_" and a red squiggle; white on dark taskbars, grey while paused) appears in the system tray, and on the very first run the Settings window opens so you can see the service is live. The keyboard hook is only attached once the tray icon is on screen, so Pause and Quit are always reachable. Right-click the icon to pause, open Settings, or quit; launching the Start-menu entry again while the service is running opens Settings instead of a second copy. The portable build is a one-folder PyInstaller bundle: unzip it anywhere and run AutoCorrectDesktop.exe.
+The installer offers launch-at-login and creates Start menu shortcuts for the service and for Settings. After launch the Typen mark (a black tile with "Aa_" and a red squiggle; white on dark taskbars, grey while paused) appears in the system tray, and on the very first run the Settings window opens so you can see the service is live. The keyboard hook is only attached once the tray icon is on screen, so Pause and Quit are always reachable. Right-click the icon to pause, open Settings, or quit; launching the Start-menu entry again while the service is running opens Settings instead of a second copy. The portable build is a one-folder PyInstaller bundle: unzip it anywhere and run typen.exe.
 
 On Windows, Typen uses SetWindowsHookExW (WH_KEYBOARD_LL) to observe keys and Raw Input (WM_INPUT) to notice mouse clicks, paired with atomic SendInput (KEYEVENTF_UNICODE) packets tagged with AUTOCORRECT_EXTRA_INFO_TAG so synthetic keystrokes are never re-evaluated. The hook callback does nothing but queue the event and return, so Typen can never hold up the system input chain; all correction work runs on a separate worker thread, and if that worker ever falls behind, the hook releases itself and the tray reports 'Not correcting' rather than slowing your machine down.
 
@@ -43,13 +43,13 @@ Get-FileHash .\Typen-<version>-win64-setup.exe -Algorithm SHA256
 # ...and compare with SHA256SUMS.txt on the GitHub release
 
 # 2. Start the background service (tray icon)
-& "$env:LOCALAPPDATA\Programs\Typen\AutoCorrectDesktop.exe"
+& "$env:LOCALAPPDATA\Programs\Typen\typen.exe"
 
 # 3. Open the Settings window (connects to the service over a Named Pipe)
-& "$env:LOCALAPPDATA\Programs\Typen\AutoCorrectDesktop.exe" --settings
+& "$env:LOCALAPPDATA\Programs\Typen\typen.exe" --settings
 
 # Optional: print a one-line health check and exit
-& "...\AutoCorrectDesktop.exe" --headless-check
+& "...\typen.exe" --headless-check
 ```
 
 <a id="macos-setup"></a>
@@ -95,19 +95,19 @@ The same flags work with python -m autocorrect.launcher when running from source
 
 ```powershell
 # Open Settings (starts the service first if it is not running)
-& "...\AutoCorrectDesktop.exe" --settings
+& "...\typen.exe" --settings
 
 # Ask a running service to shut down cleanly (falls back to terminating it)
-& "...\AutoCorrectDesktop.exe" --stop
+& "...\typen.exe" --stop
 
 # Start without attaching the keyboard hook (tray + Settings only)
-& "...\AutoCorrectDesktop.exe" --safe-mode
+& "...\typen.exe" --safe-mode
 
 # Clear safe mode and start correcting again
-& "...\AutoCorrectDesktop.exe" --resume
+& "...\typen.exe" --resume
 
 # One-line health check (hook state, data dir), then exit
-& "...\AutoCorrectDesktop.exe" --headless-check
+& "...\typen.exe" --headless-check
 ```
 
 ---

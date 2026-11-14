@@ -28,8 +28,8 @@ class RawWordEntry:
 class RawCorpusDataset:
     """Complete structured language intelligence dataset ready for validation & compilation."""
 
-    version: str = "1.1.0"
-    released_at: str = "2026-11-02T00:00:00Z"
+    version: str = "2.0.0"
+    released_at: str = "2026-11-14T00:00:00Z"
     words: dict[str, RawWordEntry] = field(default_factory=dict)
     direct_typos: dict[str, tuple[str, float]] = field(default_factory=dict)
     bigrams: list[tuple[str, str, float]] = field(default_factory=list)
@@ -39,7 +39,7 @@ class RawCorpusDataset:
     domain_packs: dict[str, dict[str, object]] = field(default_factory=dict)
 
 
-def build_master_english_dataset(version: str = "1.1.0") -> RawCorpusDataset:
+def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
     """
     Construct the curated master English language dataset including:
     - Core high/medium/low frequency English vocabulary
@@ -2780,156 +2780,289 @@ def build_master_english_dataset(version: str = "1.1.0") -> RawCorpusDataset:
         6: ["were", "where", "we're"],
     }
 
-    # 10. Pro Domain-Specific Vocabulary Packs
+    # 10. Pro Domain-Specific Vocabulary Packs (V2 Expanded Specialist & Brand Registries)
+    def _build_pack_words(
+        lower_terms: list[str],
+        branded_terms: dict[str, tuple[CasingFlag, str]],
+        freq: float = -5.8,
+    ) -> dict[str, dict[str, object]]:
+        out: dict[str, dict[str, object]] = {}
+        for t in lower_terms:
+            out[t.lower()] = {"log_freq": freq, "casing_flag": 0, "exact_casing": None}
+        for low_k, (c_flag, exact_str) in branded_terms.items():
+            out[low_k.lower()] = {
+                "log_freq": freq + 0.2,
+                "casing_flag": int(c_flag),
+                "exact_casing": exact_str,
+            }
+        return out
+
+    prog_lower = (
+        "idempotency idempotent microservice microservices serialization deserialization "
+        "containerization orchestration observability telemetry multithreading multiprocessing "
+        "concurrency parallelism memoization virtualization hypervisor serverless monorepo "
+        "polyrepo middleware backpressure refactoring transpiler bundler linter formatter "
+        "tree-shaking hydration SSR CSR ISR webhook webhooks websocket websockets protobuf "
+        "gRPC GraphQL RESTful OAuth OIDC PKCE JWT SAML RBAC ABAC zero-trust sandboxing "
+        "vectorization quantization embeddings tokenizer fine-tuning inference latency "
+        "throughput sharding replication failover quorum consensus raft paxos"
+    ).split()
+    prog_brands: dict[str, tuple[CasingFlag, str]] = {
+        "kubernetes": (CasingFlag.TITLE_ONLY, "Kubernetes"),
+        "pytorch": (CasingFlag.EXACT_MIXED, "PyTorch"),
+        "tensorflow": (CasingFlag.EXACT_MIXED, "TensorFlow"),
+        "fastapi": (CasingFlag.EXACT_MIXED, "FastAPI"),
+        "numpy": (CasingFlag.EXACT_MIXED, "NumPy"),
+        "scipy": (CasingFlag.EXACT_MIXED, "SciPy"),
+        "pandas": (CasingFlag.TITLE_ONLY, "Pandas"),
+        "graphql": (CasingFlag.EXACT_MIXED, "GraphQL"),
+        "typescript": (CasingFlag.EXACT_MIXED, "TypeScript"),
+        "javascript": (CasingFlag.EXACT_MIXED, "JavaScript"),
+        "postgresql": (CasingFlag.EXACT_MIXED, "PostgreSQL"),
+        "mysql": (CasingFlag.EXACT_MIXED, "MySQL"),
+        "mongodb": (CasingFlag.EXACT_MIXED, "MongoDB"),
+        "sqlite": (CasingFlag.EXACT_MIXED, "SQLite"),
+        "redis": (CasingFlag.TITLE_ONLY, "Redis"),
+        "supabase": (CasingFlag.TITLE_ONLY, "Supabase"),
+        "vercel": (CasingFlag.TITLE_ONLY, "Vercel"),
+        "netlify": (CasingFlag.TITLE_ONLY, "Netlify"),
+        "cloudflare": (CasingFlag.TITLE_ONLY, "Cloudflare"),
+        "openai": (CasingFlag.EXACT_MIXED, "OpenAI"),
+        "anthropic": (CasingFlag.TITLE_ONLY, "Anthropic"),
+        "chatgpt": (CasingFlag.EXACT_MIXED, "ChatGPT"),
+        "claude": (CasingFlag.TITLE_ONLY, "Claude"),
+        "gemini": (CasingFlag.TITLE_ONLY, "Gemini"),
+        "deepmind": (CasingFlag.EXACT_MIXED, "DeepMind"),
+        "nvidia": (CasingFlag.TITLE_ONLY, "Nvidia"),
+        "github": (CasingFlag.EXACT_MIXED, "GitHub"),
+        "gitlab": (CasingFlag.EXACT_MIXED, "GitLab"),
+        "bitbucket": (CasingFlag.TITLE_ONLY, "Bitbucket"),
+        "docker": (CasingFlag.TITLE_ONLY, "Docker"),
+        "terraform": (CasingFlag.TITLE_ONLY, "Terraform"),
+        "ansible": (CasingFlag.TITLE_ONLY, "Ansible"),
+        "nextjs": (CasingFlag.EXACT_MIXED, "NextJS"),
+        "nodejs": (CasingFlag.EXACT_MIXED, "NodeJS"),
+        "reactjs": (CasingFlag.EXACT_MIXED, "ReactJS"),
+        "svelte": (CasingFlag.TITLE_ONLY, "Svelte"),
+        "tailwind": (CasingFlag.TITLE_ONLY, "Tailwind"),
+        "vscode": (CasingFlag.EXACT_MIXED, "VSCode"),
+        "intellij": (CasingFlag.EXACT_MIXED, "IntelliJ"),
+        "pycharm": (CasingFlag.EXACT_MIXED, "PyCharm"),
+        "neovim": (CasingFlag.TITLE_ONLY, "Neovim"),
+        "raycast": (CasingFlag.TITLE_ONLY, "Raycast"),
+        "cursor": (CasingFlag.TITLE_ONLY, "Cursor"),
+        "pyside": (CasingFlag.EXACT_MIXED, "PySide"),
+        "nuitka": (CasingFlag.TITLE_ONLY, "Nuitka"),
+    }
+
+    bus_lower = (
+        "deliverable deliverables stakeholder stakeholders onboarding offboarding "
+        "monetisation monetization productization go-to-market omnichannel touchpoint "
+        "touchpoints headcountworkstream workstreams deliverable KPIs OKRs SaaS PaaS IaaS "
+        "B2B B2C D2C churn retention upsell cross-sell pipeline enablement alignment "
+        "synergy procurement SLA SLAs RFP RFPs RFQ KPI OKR"
+    ).split()
+    bus_brands: dict[str, tuple[CasingFlag, str]] = {
+        "typen": (CasingFlag.TITLE_ONLY, "Typen"),
+        "figma": (CasingFlag.TITLE_ONLY, "Figma"),
+        "notion": (CasingFlag.TITLE_ONLY, "Notion"),
+        "linear": (CasingFlag.TITLE_ONLY, "Linear"),
+        "stripe": (CasingFlag.TITLE_ONLY, "Stripe"),
+        "shopify": (CasingFlag.TITLE_ONLY, "Shopify"),
+        "slack": (CasingFlag.TITLE_ONLY, "Slack"),
+        "discord": (CasingFlag.TITLE_ONLY, "Discord"),
+        "zoom": (CasingFlag.TITLE_ONLY, "Zoom"),
+        "asana": (CasingFlag.TITLE_ONLY, "Asana"),
+        "jira": (CasingFlag.TITLE_ONLY, "Jira"),
+        "confluence": (CasingFlag.TITLE_ONLY, "Confluence"),
+        "atlassian": (CasingFlag.TITLE_ONLY, "Atlassian"),
+        "hubspot": (CasingFlag.EXACT_MIXED, "HubSpot"),
+        "salesforce": (CasingFlag.TITLE_ONLY, "Salesforce"),
+        "zendesk": (CasingFlag.TITLE_ONLY, "Zendesk"),
+        "airtable": (CasingFlag.TITLE_ONLY, "Airtable"),
+        "miro": (CasingFlag.TITLE_ONLY, "Miro"),
+        "canva": (CasingFlag.TITLE_ONLY, "Canva"),
+        "linkedin": (CasingFlag.EXACT_MIXED, "LinkedIn"),
+        "youtube": (CasingFlag.EXACT_MIXED, "YouTube"),
+        "tiktok": (CasingFlag.EXACT_MIXED, "TikTok"),
+        "whatsapp": (CasingFlag.EXACT_MIXED, "WhatsApp"),
+        "telegram": (CasingFlag.TITLE_ONLY, "Telegram"),
+        "signal": (CasingFlag.TITLE_ONLY, "Signal"),
+        "spotify": (CasingFlag.TITLE_ONLY, "Spotify"),
+        "netflix": (CasingFlag.TITLE_ONLY, "Netflix"),
+        "reddit": (CasingFlag.TITLE_ONLY, "Reddit"),
+        "substack": (CasingFlag.TITLE_ONLY, "Substack"),
+        "intercom": (CasingFlag.TITLE_ONLY, "Intercom"),
+    }
+
+    med_lower = (
+        "cardiovascular hypertension pathophysiology pharmacokinetics pharmacodynamics "
+        "arrhythmia tachycardia bradycardia atherosclerosis cardiomyopathy myocardial "
+        "infarction ischemia thrombosis embolism prophylaxis contraindication "
+        "contraindications comorbidity comorbidities etiology epidemiology oncology "
+        "immunotherapy hematology endocrinology neurology gastroenterology nephrology "
+        "pulmonology rheumatology dermatology ophthalmology otolaryngology anesthesiology "
+        "radiology pathology biopsies biopsy intubation resuscitation defibrillation "
+        "analgesic analgesics antipyretic antibiotic antibiotics corticosteroid "
+        "corticosteroids immunosuppressant anticoagulants bioavailability half-life"
+    ).split()
+    med_brands: dict[str, tuple[CasingFlag, str]] = {
+        "hipaa": (CasingFlag.UPPER_ONLY, "HIPAA"),
+        "nsaid": (CasingFlag.UPPER_ONLY, "NSAID"),
+        "mrna": (CasingFlag.EXACT_MIXED, "mRNA"),
+        "crispr": (CasingFlag.UPPER_ONLY, "CRISPR"),
+        "ekg": (CasingFlag.UPPER_ONLY, "EKG"),
+        "ecg": (CasingFlag.UPPER_ONLY, "ECG"),
+    }
+
+    law_lower = (
+        "jurisprudence indemnification subpoena subpoenas affidavit affidavits fiduciary "
+        "tortfeasor estoppel promissory certiorari mandamus habeas corpus voir dire "
+        "deposition depositions interrogatories discovery adjudicate adjudication "
+        "arbitration mediation severability force majeure liquidated damages injunction "
+        "injunctive declaratoryappellant appellee petitioner respondent plaintiff "
+        "defendant amicus curiae stare decisis mens rea actus reus prima facie "
+        "res judicata collateral Consequential"
+    ).split()
+    law_brands: dict[str, tuple[CasingFlag, str]] = {
+        "gdpr": (CasingFlag.UPPER_ONLY, "GDPR"),
+        "ccpa": (CasingFlag.UPPER_ONLY, "CCPA"),
+        "hipaa": (CasingFlag.UPPER_ONLY, "HIPAA"),
+        "dmca": (CasingFlag.UPPER_ONLY, "DMCA"),
+    }
+
+    fin_lower = (
+        "amortization collateralized reconciliation chargeback chargebacks securitization "
+        "underwriting arbitrage derivatives liquidity solvency deleveraging capitalization "
+        "depreciation accrual accruals ledger actuarial fiduciary dividend dividends "
+        "yield curve basis points mark-to-market tranche tranches subordinated mezzanine "
+        "syndication covenant covenants receivership restructuring"
+    ).split()
+    fin_brands: dict[str, tuple[CasingFlag, str]] = {
+        "ebitda": (CasingFlag.UPPER_ONLY, "EBITDA"),
+        "gaap": (CasingFlag.UPPER_ONLY, "GAAP"),
+        "ifrs": (CasingFlag.UPPER_ONLY, "IFRS"),
+        "cagr": (CasingFlag.UPPER_ONLY, "CAGR"),
+        "capex": (CasingFlag.EXACT_MIXED, "CapEx"),
+        "opex": (CasingFlag.EXACT_MIXED, "OpEx"),
+        "fintech": (CasingFlag.TITLE_ONLY, "FinTech"),
+    }
+
+    acad_lower = (
+        "epistemological historiography methodology empirical peer-reviewed ontological "
+        "phenomenological hermeneutics ethnography ethnographic qualitative quantitative "
+        "longitudinal cross-sectional meta-analysis econometrics psychometric "
+        "stochastic heteroskedasticity multicollinearity autocorrelation endogeneity "
+        "counterfactual falsifiability paradigm heuristic pedagogy"
+    ).split()
+
     ds.domain_packs = {
         "programming": {
             "pack_id": "programming",
-            "version": "1.0.3",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "kubernetes": {
-                    "log_freq": -6.0,
-                    "casing_flag": int(CasingFlag.TITLE_ONLY),
-                    "exact_casing": "Kubernetes",
-                },
-                "pytorch": {
-                    "log_freq": -6.0,
-                    "casing_flag": int(CasingFlag.EXACT_MIXED),
-                    "exact_casing": "PyTorch",
-                },
-                "fastapi": {
-                    "log_freq": -6.0,
-                    "casing_flag": int(CasingFlag.EXACT_MIXED),
-                    "exact_casing": "FastAPI",
-                },
-                "numpy": {
-                    "log_freq": -6.0,
-                    "casing_flag": int(CasingFlag.EXACT_MIXED),
-                    "exact_casing": "NumPy",
-                },
-                "graphql": {
-                    "log_freq": -6.0,
-                    "casing_flag": int(CasingFlag.EXACT_MIXED),
-                    "exact_casing": "GraphQL",
-                },
-                "idempotency": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "idempotent": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "microservice": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "microservices": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "serialization": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "deserialization": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-            },
+            "words": _build_pack_words(prog_lower, prog_brands),
             "direct_typos": {
                 "kubernets": "Kubernetes",
                 "idempotant": "idempotent",
                 "asyncronous": "asynchronous",
+                "suapbase": "Supabase",
+                "supabse": "Supabase",
+                "anthrpic": "Anthropic",
+                "postgressql": "PostgreSQL",
+                "typescipt": "TypeScript",
+                "javascipt": "JavaScript",
+                "cloudflair": "Cloudflare",
             },
         },
         "medicine": {
             "pack_id": "medicine",
-            "version": "1.0.2",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "cardiovascular": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "hypertension": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "pathophysiology": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "pharmacokinetics": {"log_freq": -6.5, "casing_flag": 0, "exact_casing": None},
-                "arrhythmia": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-            },
+            "words": _build_pack_words(med_lower, med_brands),
             "direct_typos": {
                 "arythmia": "arrhythmia",
                 "hypertention": "hypertension",
+                "cardiovasular": "cardiovascular",
+                "pathophisiology": "pathophysiology",
             },
         },
         "law": {
             "pack_id": "law",
-            "version": "1.0.1",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "jurisprudence": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "indemnification": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "subpoena": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "affidavit": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "fiduciary": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-            },
+            "words": _build_pack_words(law_lower, law_brands),
             "direct_typos": {
                 "subpena": "subpoena",
                 "indemnifcation": "indemnification",
+                "afidavit": "affidavit",
+                "fiduaciary": "fiduciary",
             },
         },
         "finance": {
             "pack_id": "finance",
-            "version": "1.0.2",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "amortization": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "collateralized": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "reconciliation": {"log_freq": -5.8, "casing_flag": 0, "exact_casing": None},
-                "chargeback": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "chargebacks": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "ebitda": {
-                    "log_freq": -6.2,
-                    "casing_flag": int(CasingFlag.UPPER_ONLY),
-                    "exact_casing": "EBITDA",
-                },
-            },
+            "words": _build_pack_words(fin_lower, fin_brands),
             "direct_typos": {
                 "reconcilation": "reconciliation",
                 "ammortization": "amortization",
+                "colateralized": "collateralized",
             },
         },
         "business": {
             "pack_id": "business",
-            "version": "1.0.1",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "deliverables": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "stakeholder": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "stakeholders": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "onboarding": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "monetisation": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-                "monetization": {"log_freq": -6.2, "casing_flag": 0, "exact_casing": None},
-            },
+            "words": _build_pack_words(bus_lower, bus_brands),
             "direct_typos": {
                 "stakholder": "stakeholder",
                 "deliverbles": "deliverables",
+                "monetizaton": "monetization",
+                "shpoify": "Shopify",
+                "linkdin": "LinkedIn",
             },
         },
         "academic": {
             "pack_id": "academic",
-            "version": "1.0.1",
+            "version": "2.0.0",
             "released_at": ds.released_at,
-            "words": {
-                "epistemological": {"log_freq": -6.4, "casing_flag": 0, "exact_casing": None},
-                "historiography": {"log_freq": -6.4, "casing_flag": 0, "exact_casing": None},
-                "methodology": {"log_freq": -5.9, "casing_flag": 0, "exact_casing": None},
-                "empirical": {"log_freq": -6.0, "casing_flag": 0, "exact_casing": None},
-                "peer-reviewed": {"log_freq": -6.1, "casing_flag": 0, "exact_casing": None},
-            },
+            "words": _build_pack_words(acad_lower, {}),
             "direct_typos": {
                 "methodolgy": "methodology",
                 "emperical": "empirical",
+                "epistemologcal": "epistemological",
             },
         },
     }
 
-    # 11. Comprehensive External Lexicon (ESDB/SCOWL validity + wordfreq ranks).
-    # This is the real dictionary: ~10^5 attested words and inflected forms
-    # from the same database that backs Aspell/LibreOffice, merged UNDER the
-    # curated overlay above. Curated entries (casing, brands, confusion sets,
-    # regional variants) always win; external data only fills the gaps that
-    # caused false corrections like 'montly' -> 'mostly' and 'code' -> 'core'.
-    # Recognition-only words (rare/obscure) are marked DO_NOT_SUGGEST so they
-    # are accepted as valid but never offered as corrections.
+    # Also register major universal brands in the core lexicon so brand casing works
+    # out-of-the-box even when a specialist pack is toggled off.
+    for low_b, (b_flag, b_exact) in (*prog_brands.items(), *bus_brands.items()):
+        if low_b not in ds.words and low_b not in ds.direct_typos:
+            add_w(low_b, freq=-6.2, casing=b_flag, exact=b_exact)
+
+    # 11. Comprehensive External Lexicon (ESDB/SCOWL max_level=100 + full JSON dictionary + wordfreq).
+    # Load Wikipedia misspellings FIRST so we never admit a known common misspelling
+    # from SCOWL level 80..95 or raw JSON dictionary wordlists as a valid word.
     from pipeline.external_sources import (
         corpus_log_frequency,
         load_common_misspellings,
+        load_comprehensive_json_dictionary,
         load_external_lexicon,
     )
 
+    external_typos = load_common_misspellings()
+    known_misspellings = set(ds.direct_typos.keys()) | set(external_typos.keys()) | {
+        "woking",
+        "arythmia",
+        "langage",
+        "paly",
+    }
+
     external_words = load_external_lexicon()
     for ext in external_words.values():
-        if ext.word in ds.words or ext.word in ds.direct_typos:
+        if ext.word in ds.words or ext.word in known_misspellings:
             continue
         ds.words[ext.word] = RawWordEntry(
             word=ext.word,
@@ -2940,13 +3073,26 @@ def build_master_english_dataset(version: str = "1.1.0") -> RawCorpusDataset:
             source_count=2,
         )
 
+    # 11a-bis. Merge comprehensive English dictionary JSON (~370k words) for niche/uncommon words
+    json_dict_words = load_comprehensive_json_dictionary()
+    for j_ext in json_dict_words.values():
+        if j_ext.word in ds.words or j_ext.word in known_misspellings:
+            continue
+        ds.words[j_ext.word] = RawWordEntry(
+            word=j_ext.word,
+            log_freq=j_ext.log_freq,
+            region_flags=RegionFlag.UNIVERSAL,
+            casing_flags=CasingFlag.LOWER,
+            morph_mask=MorphFlag.NONE if j_ext.can_suggest else MorphFlag.DO_NOT_SUGGEST,
+            source_count=2,
+        )
+
     # 11a. Common-misspelling pairs (Wikipedia machine-readable list), merged
     # UNDER the curated `direct_typos`. Each pair is kept only when the target
     # is an attested lexicon word that may be suggested, and the misspelling is
     # not itself a valid word (so 'form'/'from' style pairs can never sneak in).
     # Curated pairs score 8.x; these get a slightly lower boost so a curated
     # entry for the same intent always wins in the candidate ranker.
-    external_typos = load_common_misspellings()
     for typo, target in external_typos.items():
         if typo in ds.direct_typos or typo in ds.words:
             continue
@@ -2957,57 +3103,56 @@ def build_master_english_dataset(version: str = "1.1.0") -> RawCorpusDataset:
             continue
         ds.direct_typos[typo] = (target, 7.5)
 
-    # 11b. Technical & internet vocabulary (recognition-only).
-    # Everyday developer / online terms that SCOWL (a general-English database)
-    # does not list but that people type constantly in chat, email and docs:
-    # 'config dir' -> 'confirm did', 'mutex' -> 'muted', 'pytest' -> 'protest'
-    # were real false corrections. Corpus rank cannot be used to validate them
-    # (web corpora rank 'alot', 'teh' and 'recieve' inside the top 40k), so this
-    # is a curated gap-filler merged UNDER both the curated core and the external
-    # lexicon: it only adds words that are still missing, and marks them
-    # DO_NOT_SUGGEST so a typo is never corrected *into* jargon.
-    technical_vocabulary = (
-        # tooling / ecosystems
+    # 11b. Technical & internet vocabulary + modern conversational slang.
+    # Low-level CLI flags/identifiers ('config', 'dir', 'mutex', 'pytest', 'npm', 'kubectl', 'varchar')
+    # stay recognition-only (`DO_NOT_SUGGEST`) so ordinary prose typos are never turned into code flags,
+    # while modern conversational words, slang, and everyday digital vocabulary are suggestible (`MorphFlag.NONE`).
+    recognition_only_jargon = (
         "config configs dir dirs env envs dotenv npm npx yarn pnpm pip pipx conda venv "
         "virtualenv pytest unittest mypy ruff flake8 pylint eslint prettier webpack vite "
-        "rollup esbuild babel tsc jest mocha vitest cypress playwright selenium docker "
-        "dockerfile kubernetes kubectl helm terraform ansible nginx tomcat gunicorn uvicorn "
-        "fastapi flask django rails laravel nodejs deno bun golang rustc cargo gradle maven "
+        "rollup esbuild babel tsc jest mocha vitest cypress playwright selenium "
+        "dockerfile kubectl helm ansible nginx tomcat gunicorn uvicorn "
+        "flask django rails laravel deno bun golang rustc cargo gradle maven "
         "cmake makefile gcc clang llvm jvm jdk sdk sdks api apis cli clis gui guis ide ides "
-        "vscode intellij pycharm xcode github gitlab bitbucket repo repos changelog readme "
+        "xcode repo repos "
         "todo todos wip tbd "
-        # formats / extensions
         "json yaml yml toml xml html css scss sass js ts tsx jsx py rb php sql nosql csv tsv "
         "pdf png jpg jpeg svg webp mp3 mp4 wav zip gz gzip exe dll dmg deb rpm apk iso utf "
         "ascii unicode base64 md5 sha256 uuid guid "
-        # programming concepts
-        "mutex mutexes semaphore async await callback callbacks coroutine coroutines "
-        "threadsafe deadlock lambda lambdas tuple tuples enum enums struct structs boolean "
-        "bool int ints varchar nullable middleware backend backends frontend frontends "
-        "fullstack devops sysadmin webhook webhooks endpoint endpoints localhost hostname "
-        "hostnames subdomain subdomains ip ips dns tcp udp ssh ssl tls https http ftp sftp "
-        "smtp imap oauth jwt saml sso auth login logins logout signup signin username "
-        "usernames passwd admin admins superuser sudo chmod chown grep sed awk bash zsh "
+        "mutex mutexes semaphore async await coroutine coroutines "
+        "threadsafe lambda lambdas tuple tuples enum enums struct structs "
+        "bool int ints varchar nullable sysadmin "
+        "hostnames ip ips dns tcp udp ssh ssl tls https http ftp sftp "
+        "smtp imap oauth jwt saml sso "
+        "usernames passwd superuser sudo chmod chown grep sed awk bash zsh "
         "powershell cmd stdin stdout stderr args kwargs argv regex regexp regexes url urls "
-        "uri uris cdn dom ajax websocket websockets graphql grpc restful crud orm orms sqlite "
-        "postgres postgresql mysql mariadb mongodb redis elasticsearch kafka rabbitmq cron "
-        "crontab systemd daemon daemons kernel kernels bootloader firmware bios uefi gpu gpus "
-        "cpu cpus ram ssd ssds hdd nvme usb hdmi bluetooth wifi lan wan vpn vpns nat "
-        # internet / social / modern usage
-        "ok okay lol lmao omg btw fyi asap tbh imo imho brb afk irl smh ftw ngl idk selfie "
-        "selfies hashtag hashtags meme memes emoji emojis gif gifs vlog vlogs vlogger blogger "
-        "bloggers podcast podcasts livestream livestreams streamer streamers influencer "
-        "influencers unfollow unfollowed unsubscribe unsubscribed retweet retweets upvote "
-        "upvotes downvote downvotes subreddit crowdfunding crowdsourcing cryptocurrency "
-        "cryptocurrencies crypto bitcoin ethereum blockchain nft nfts chatbot chatbots "
-        "covid coronavirus lockdown lockdowns wfh webinar webinars onboarding offboarding "
-        "whitepaper roadmap roadmaps backlog backlogs standup standups kanban scrum agile "
-        "mvp kpi kpis okr okrs roi saas paas iaas b2b b2c ecommerce fintech edtech startup "
-        "startups scaleup"
+        "uri uris cdn dom ajax grpc crud orm orms "
+        "postgres mariadb elasticsearch kafka rabbitmq cron "
+        "crontab systemd daemons bootloader uefi gpu gpus "
+        "cpu cpus ssd ssds hdd nvme hdmi lan wan vpn vpns nat "
+        "lol lmao omg btw fyi asap tbh imo imho brb afk irl smh ftw ngl idk "
+        "wfh b2b b2c paas iaas"
     ).split()
-    for tech_word in technical_vocabulary:
+    for tech_word in recognition_only_jargon:
         if tech_word not in ds.words and tech_word not in ds.direct_typos:
             add_w(tech_word, freq=-7.0, morph=MorphFlag.DO_NOT_SUGGEST)
+
+    suggestible_modern_and_slang = (
+        "okay selfie selfies hashtag hashtags meme memes emoji emojis vlog vlogs vlogger "
+        "blogger bloggers podcast podcasts livestream livestreams streamer streamers "
+        "influencer influencers unfollow unfollowed unsubscribe unsubscribed retweet "
+        "retweets upvote upvotes downvote downvotes subreddit crowdfunding crowdsourcing "
+        "cryptocurrency cryptocurrencies crypto bitcoin ethereum blockchain chatbot chatbots "
+        "covid coronavirus lockdown lockdowns webinar webinars onboarding offboarding "
+        "whitepaper roadmap roadmaps backlog backlogs standup standups kanban scrum agile "
+        "saas ecommerce fintech edtech startup startups scaleup Ghosting ghosted gaslight "
+        "gaslighting vibe vibes vibing banger bangers lowkey highkey deadass bestie besties "
+        "fomo jomo goat goated salty cringe cringey sus yeet boujee wholesome doomscrolling "
+        "bingeable adulting ghostedghosting"
+    ).lower().split()
+    for mod_word in suggestible_modern_and_slang:
+        if mod_word not in ds.words and mod_word not in ds.direct_typos:
+            add_w(mod_word, freq=-6.8, morph=MorphFlag.NONE)
 
     # 12. Corpus-frequency re-ranking of EVERY word (curated entries included).
     # The curated overlay above hand-assigns coarse tier frequencies (hundreds of

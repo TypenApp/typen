@@ -88,9 +88,9 @@ jobs:
         shell: bash
         run: |
           case "$RUNNER_OS" in
-            Windows) BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop.exe" ;;
-            macOS)   BIN="dist/Typen.app/Contents/MacOS/AutoCorrectDesktop" ;;
-            Linux)   BIN="dist/AutoCorrectDesktop/AutoCorrectDesktop" ;;
+            Windows) BIN="dist/Typen/typen.exe" ;;
+            macOS)   BIN="dist/Typen.app/Contents/MacOS/typen" ;;
+            Linux)   BIN="dist/Typen/typen" ;;
           esac
           "$BIN" --version
           "$BIN" --headless-check --data-dir "${{ runner.temp }}/ac-frozen" | tee check.txt

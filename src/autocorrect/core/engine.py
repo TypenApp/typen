@@ -25,11 +25,12 @@ from autocorrect.core.punctuation import (
 )
 from autocorrect.intelligence.resource_manager import ResourceManager
 from autocorrect.intelligence.schema import CasingFlag, RegionFlag
+from autocorrect.preferences.memory_overlay import infer_custom_word_casing
 
 # Conservative confidence thresholds (Core Philosophy 3.3: "Intelligent, not aggressive")
 DEFAULT_OOV_SCORE_THRESHOLD: Final[float] = -13.2
 DEFAULT_OOV_MIN_MARGIN: Final[float] = 0.45
-DEFAULT_REALWORD_CONFUSION_MARGIN: Final[float] = 4.2
+DEFAULT_REALWORD_CONFUSION_MARGIN: Final[float] = 2.8
 
 
 class AutocorrectEngine:
@@ -130,7 +131,32 @@ class AutocorrectEngine:
                     margin=9.0,
                 )
 
-        # 1. Lexical Token Guards (URLs, emails, digits, snake_case, camelCase, CLI flags)
+        token_lower = token.lower()
+        force_cap = ctx.is_sentence_start and caps_sentence and not ctx.is_code_or_terminal_app
+
+        # 1. Check User Custom Dictionary FIRST (so PascalCase, camelCase, and short ALL-CAPS
+        # custom words like 'GitHub', 'OpenAI', 'iPhone', 'NASA' are recognized and formatted
+        # before lexical guards skip them).
+        if (
+            self._preferences is not None
+            and not ctx.leading_prefix
+            and self._preferences.is_custom_word(token_lower)
+        ):
+            custom_display = self._preferences.get_custom_word_casing(token_lower)
+            c_flag, c_exact = (
+                infer_custom_word_casing(custom_display)
+                if custom_display
+                else (CasingFlag.LOWER, None)
+            )
+            return self._apply_in_vocab_formatting(
+                token=token,
+                target_lower=token_lower,
+                casing_flag=c_flag,
+                exact_mixed=c_exact,
+                ctx=ctx,
+            )
+
+        # 2. Lexical Token Guards (URLs, emails, digits, snake_case, camelCase, CLI flags)
         if should_skip_token(
             token,
             leading_prefix=ctx.leading_prefix,
@@ -141,19 +167,6 @@ class AutocorrectEngine:
             ignore_longer_than=f.ignore_longer_than,
         ):
             return self._no_change(token, ctx, CorrectionReason.GUARD_EXCLUDED)
-
-        token_lower = token.lower()
-        force_cap = ctx.is_sentence_start and caps_sentence and not ctx.is_code_or_terminal_app
-
-        # 2. Check User Custom Dictionary (never "correct" a user's approved custom word)
-        if self._preferences is not None and self._preferences.is_custom_word(token_lower):
-            return self._apply_in_vocab_formatting(
-                token=token,
-                target_lower=token_lower,
-                casing_flag=CasingFlag.LOWER,
-                exact_mixed=None,
-                ctx=ctx,
-            )
 
         # 3. Check User Preferred Spelling Variant (e.g. 'color' -> 'colour')
         if self._preferences is not None:
@@ -301,9 +314,12 @@ class AutocorrectEngine:
         if is_valid_in_region and direct_typo_hit is None:
             assert meta is not None
             # 6a. Check if this valid word belongs to a Contextual Confusion Set
+            in_confusion_set = token_lower in WORD_TO_CONFUSION_GROUP or (
+                meta.confusion_set_id > 0 and meta.confusion_set_id in bundle.confusion_sets
+            )
             if (
                 f.enable_confusion_sets
-                and token_lower in WORD_TO_CONFUSION_GROUP
+                and in_confusion_set
                 and not ctx.is_code_or_terminal_app
             ):
                 conf_decision = self._evaluate_confusion_set(token, token_lower, bundle, ctx)
@@ -359,41 +375,22 @@ class AutocorrectEngine:
             and best.word != token_lower
         )
 
-        if not best.is_direct_typo and not strict_variant:
-            if best.composite_score < score_threshold or margin < min_margin:
-                return CorrectionDecision(
-                    original_token=token,
-                    replacement_token=token,
-                    original_delimiter=ctx.trailing_delimiter,
-                    replacement_delimiter=ctx.trailing_delimiter,
-                    should_replace=False,
-                    reason=CorrectionReason.INSUFFICIENT_CONFIDENCE,
-                    confidence=best.composite_score,
-                    margin=margin,
-                    candidates=tuple(ranked[:5]),
-                )
-
-        # 7-pre. Very short OOV tokens (by default <= 3 letters: 'src', 'ipc',
-        # 'lic', 'sig') are overwhelmingly acronyms, identifiers or abbreviations
-        # rather than misspellings. A single edit from such a token to a real
-        # word ('src' -> 'sec') is low-confidence noise, so require a curated
-        # direct-typo match (which bypasses this guard) before touching them.
-        if not best.is_direct_typo and not strict_variant and len(token) < f.min_correction_length:
-            return CorrectionDecision(
-                original_token=token,
-                replacement_token=token,
-                original_delimiter=ctx.trailing_delimiter,
-                replacement_delimiter=ctx.trailing_delimiter,
-                should_replace=False,
-                reason=CorrectionReason.INSUFFICIENT_CONFIDENCE,
-                confidence=best.composite_score,
-                margin=margin,
-                candidates=tuple(ranked[:5]),
-            )
-
         best_meta = bundle.lexicon.get_meta(best.word_id) if best.word_id > 0 else None
         best_casing = best_meta.casing_flags if best_meta is not None else CasingFlag.LOWER
         best_exact = bundle.lexicon.get_exact_casing(best.word_id) if best.word_id > 0 else None
+
+        # Overlay custom dictionary or domain pack casing when candidate originates from them
+        if self._preferences is not None and self._preferences.is_custom_word(best.word):
+            custom_disp = self._preferences.get_custom_word_casing(best.word)
+            if custom_disp:
+                best_casing, best_exact = infer_custom_word_casing(custom_disp)
+        else:
+            for pack in bundle.domain_packs.values():
+                if best.word in pack.words:
+                    _, p_casing, p_exact = pack.words[best.word]
+                    best_casing = p_casing
+                    best_exact = p_exact
+                    break
 
         # 7a. Probable proper noun guard. A Title-case token the lexicon does not
         # know ('Priya', 'Okafor', 'Tomas') is usually a name, not a typo.
@@ -426,13 +423,62 @@ class AutocorrectEngine:
                     candidates=tuple(ranked[:5]),
                 )
 
-        formatted_replacement = apply_casing_transfer(
-            original=token,
-            target_lower=best.word,
-            casing_flag=best_casing,
-            exact_mixed=best_exact,
-            force_sentence_start=force_cap,
-        )
+        if not best.is_direct_typo and not strict_variant:
+            if best.composite_score < score_threshold or margin < min_margin:
+                return CorrectionDecision(
+                    original_token=token,
+                    replacement_token=token,
+                    original_delimiter=ctx.trailing_delimiter,
+                    replacement_delimiter=ctx.trailing_delimiter,
+                    should_replace=False,
+                    reason=CorrectionReason.INSUFFICIENT_CONFIDENCE,
+                    confidence=best.composite_score,
+                    margin=margin,
+                    candidates=tuple(ranked[:5]),
+                )
+
+        # 7-pre. Very short OOV tokens (by default <= 3 letters: 'src', 'ipc',
+        # 'lic', 'sig') are overwhelmingly acronyms, identifiers or abbreviations
+        # rather than misspellings. A single edit from such a token to a real
+        # word ('src' -> 'sec') is low-confidence noise, so require a curated
+        # direct-typo match (which bypasses this guard) before touching them.
+        if not best.is_direct_typo and not strict_variant and len(token) < f.min_correction_length:
+            return CorrectionDecision(
+                original_token=token,
+                replacement_token=token,
+                original_delimiter=ctx.trailing_delimiter,
+                replacement_delimiter=ctx.trailing_delimiter,
+                should_replace=False,
+                reason=CorrectionReason.INSUFFICIENT_CONFIDENCE,
+                confidence=best.composite_score,
+                margin=margin,
+                candidates=tuple(ranked[:5]),
+            )
+
+        if " " in best.word:
+            first, _, rest = best.word.partition(" ")
+            formatted_first = apply_casing_transfer(
+                original=token,
+                target_lower=first,
+                force_sentence_start=force_cap,
+            )
+            if token.isupper() and len(token) > 1:
+                formatted_replacement = best.word.upper()
+            else:
+                formatted_rest = (
+                    "I" + rest[1:]
+                    if (rest == "i" or rest.startswith("i'"))
+                    else rest
+                )
+                formatted_replacement = f"{formatted_first} {formatted_rest}" if rest else formatted_first
+        else:
+            formatted_replacement = apply_casing_transfer(
+                original=token,
+                target_lower=best.word,
+                casing_flag=best_casing,
+                exact_mixed=best_exact,
+                force_sentence_start=force_cap,
+            )
 
         reason = CorrectionReason.DIRECT_TYPO if best.is_direct_typo else CorrectionReason.SPELLING_OOV
 
@@ -550,7 +596,7 @@ class AutocorrectEngine:
         if (
             ctx.enable_auto_capitalise
             and f.cap_brands
-            and (casing_flag & CasingFlag.EXACT_MIXED)
+            and ((casing_flag & CasingFlag.EXACT_MIXED) or exact_mixed is not None)
             and exact_mixed
             and token.islower()
         ):

@@ -30,6 +30,7 @@ a commercial release and keep the provenance record below up to date.
 
 from __future__ import annotations
 
+import json
 import math
 import os
 import re
@@ -42,17 +43,22 @@ from pathlib import Path
 ESDB_SCOWL_PRE_URL = "https://raw.githubusercontent.com/en-wl/wordlist/v2/data/scowl-pre.txt"
 ESDB_FILENAME = "scowl-pre.txt"
 
+# Comprehensive English dictionary JSON (~370,100+ English words, dwyl/english-words)
+ENGLISH_WORDS_JSON_URL = (
+    "https://raw.githubusercontent.com/dwyl/english-words/master/words_dictionary.json"
+)
+ENGLISH_WORDS_JSON_FILENAME = "words_dictionary.json"
+
 EXTERNAL_DATA_DIR = Path(__file__).resolve().parent / "data" / "external"
 
 # SCOWL size levels: 35/40 = core, 50/60 = standard spell-checker,
-# 70 = larger/less vetted, 80+ = obscure/specialised. 70 matches SCOWL's
-# own "large spell-checker" recommendation while staying high-precision.
-DEFAULT_MAX_LEVEL = 70
+# 70 = large, 80..95 = full unabridged English vocabulary.
+# Setting DEFAULT_MAX_LEVEL = 100 ingests 100% of SCOWL with zero level truncation.
+DEFAULT_MAX_LEVEL = 100
 
-# Words ranked beyond this in the frequency corpus are recognised as valid
-# but never suggested as corrections (too rare to be a plausible intent,
-# and keeping them out of the SymSpell index keeps candidate sets small).
-SUGGEST_RANK_LIMIT = 50_000
+# Words ranked up to this threshold in the frequency corpus (or SCOWL <= 70)
+# are actively suggestible as corrections; rarer words stay recognition-valid.
+SUGGEST_RANK_LIMIT = 200_000
 
 _WORD_RE = re.compile(r"^[a-z]+(?:'[a-z]+)?$")
 _ENTRY_RE = re.compile(r"^(?P<word>.*?) <(?P<flags>[^>]*)>(?:\s*\{[^}]*\})?(?:: (?P<forms>.*))?$")
@@ -131,9 +137,18 @@ def _freq_from_rank(rank: int | None, level: int) -> float:
     Falls back to the ESDB commonality level when no rank is available.
     """
     if rank is not None:
-        return max(-11.0, -2.5 - 0.9 * math.log10(rank))
-    level_freq = {35: -5.2, 40: -5.8, 50: -6.6, 60: -7.4, 70: -8.2, 80: -9.0}
-    return level_freq.get(level, -8.6)
+        return max(-11.5, -2.5 - 0.9 * math.log10(rank))
+    level_freq = {
+        35: -5.2,
+        40: -5.8,
+        50: -6.6,
+        55: -7.0,
+        60: -7.4,
+        70: -8.2,
+        80: -9.6,
+        95: -10.8,
+    }
+    return level_freq.get(level, -9.2)
 
 
 def corpus_log_frequency(word_lower: str) -> float | None:
@@ -185,12 +200,21 @@ def _parse_esdb(path: Path, max_level: int) -> dict[str, ExternalWord]:
         cleaned = form.strip().lower()
         if not (2 <= len(cleaned) <= 30) or not _WORD_RE.fullmatch(cleaned):
             return
+        # Short-token guard: 2- and 3-letter words from obscure SCOWL levels (> 60)
+        # are overwhelmingly archaic/Scrabble abbreviations ('aal', 'ae', 'qi')
+        # that would shadow real 3-letter typos ('teh', 'adn').
+        if len(cleaned) <= 3 and level > 60:
+            return
         existing = words.get(cleaned)
         if existing is not None and existing.level <= level:
             return
         rank = ranks.get(cleaned)
         if has_ranks:
-            can_suggest = rank is not None and rank <= SUGGEST_RANK_LIMIT
+            # Suggestible only when attested inside SCOWL's standard spell-checker range (<= 70)
+            # AND corpus-ranked within SUGGEST_RANK_LIMIT; SCOWL 80..95 obscure/dialectal words
+            # remain recognition-valid (MorphFlag.DO_NOT_SUGGEST) so they are never flagged when
+            # typed deliberately, but never compete against common words in SymSpell.
+            can_suggest = level <= 70 and rank is not None and rank <= 65_000
         else:  # wordfreq unavailable: fall back to ESDB commonality levels
             can_suggest = level <= 60
         words[cleaned] = ExternalWord(
@@ -288,6 +312,63 @@ def _split_forms(forms: str) -> list[str]:
             continue
         out.append(slot)
     return out
+
+
+def ensure_english_words_json_downloaded(cache_dir: Path = EXTERNAL_DATA_DIR) -> Path:
+    """Download the comprehensive dwyl/english-words JSON dictionary once and cache it locally."""
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    dest = cache_dir / ENGLISH_WORDS_JSON_FILENAME
+    if dest.exists() and dest.stat().st_size > 1_000_000:
+        return dest
+    request = urllib.request.Request(
+        ENGLISH_WORDS_JSON_URL, headers={"User-Agent": "AutoCorrect-LanguagePipeline/2.0"}
+    )
+    with urllib.request.urlopen(request, timeout=120) as response:  # noqa: S310 (fixed URL)
+        data = response.read()
+    tmp = dest.with_suffix(".tmp")
+    tmp.write_bytes(data)
+    tmp.replace(dest)
+    return dest
+
+
+@lru_cache(maxsize=2)
+def _load_english_words_json_cached(path_str: str, mtime: float) -> dict[str, ExternalWord]:
+    raw = json.loads(Path(path_str).read_text(encoding="utf-8", errors="replace"))
+    ranks = _frequency_ranks()
+    out: dict[str, ExternalWord] = {}
+    for word_key in raw:
+        cleaned = str(word_key).strip().lower()
+        # Require length >= 5 for raw JSON dictionary additions so 2..4 letter Scrabble/OCR
+        # noise ('paly') never pollutes short-word typo detection.
+        # Unranked niche words are admitted as recognition-only (`can_suggest=False`) so they
+        # are recognized as valid English words without polluting SymSpell candidate pools.
+        if not (5 <= len(cleaned) <= 30) or not _WORD_RE.fullmatch(cleaned):
+            continue
+        rank = ranks.get(cleaned)
+        can_suggest = rank is not None and rank <= 60_000
+        log_freq = _freq_from_rank(rank, 95)
+        out[cleaned] = ExternalWord(
+            word=cleaned,
+            log_freq=log_freq,
+            is_proper=False,
+            can_suggest=can_suggest,
+            level=90,
+            dialects="",
+        )
+    return out
+
+
+def load_comprehensive_json_dictionary(
+    cache_dir: Path = EXTERNAL_DATA_DIR,
+) -> dict[str, ExternalWord]:
+    """Load the comprehensive JSON English dictionary (~370k words), or {} if offline."""
+    if not external_data_enabled():
+        return {}
+    try:
+        path = ensure_english_words_json_downloaded(cache_dir)
+        return _load_english_words_json_cached(str(path), path.stat().st_mtime)
+    except Exception:
+        return {}
 
 
 def load_external_lexicon(

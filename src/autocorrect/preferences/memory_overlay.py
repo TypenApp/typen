@@ -9,7 +9,23 @@ from __future__ import annotations
 import threading
 from collections.abc import Callable
 
-from autocorrect.intelligence.schema import RegionFlag
+from autocorrect.intelligence.mmap_symspell import generate_delete_strings
+from autocorrect.intelligence.schema import CasingFlag, RegionFlag
+
+
+def infer_custom_word_casing(display_word: str) -> tuple[CasingFlag, str | None]:
+    """Infer CasingFlag and exact_mixed string from a user's saved display word."""
+    cleaned = display_word.strip()
+    if not cleaned:
+        return CasingFlag.LOWER, None
+    alphas = [c for c in cleaned if c.isalpha()]
+    if not alphas or all(c.islower() for c in alphas):
+        return CasingFlag.LOWER, None
+    if len(alphas) >= 2 and all(c.isupper() for c in alphas):
+        return CasingFlag.UPPER_ONLY | CasingFlag.EXACT_MIXED, cleaned
+    if cleaned[0].isupper() and cleaned[1:].islower():
+        return CasingFlag.TITLE_ONLY | CasingFlag.EXACT_MIXED, cleaned
+    return CasingFlag.EXACT_MIXED, cleaned
 
 
 class PreferenceMemoryOverlay:
@@ -18,15 +34,38 @@ class PreferenceMemoryOverlay:
     def __init__(self, active_region: RegionFlag = RegionFlag.EN_GB) -> None:
         self._lock = threading.RLock()
         self._custom_words: dict[str, str] = {}  # word_lower -> canonical_display
+        self._custom_delete_index: dict[str, set[str]] = {}  # delete_str -> set of word_lower
         self._rejected_pairs: set[tuple[str, str]] = set()
         self._preferred_variants: dict[str, str] = {}  # source_lower -> preferred_lower
         self._suggested_words: dict[str, dict[str, object]] = {}
         self._revert_sink: Callable[[str, str], None] | None = None
+        self._personal_lm_scorer: Callable[[str, str | None, str | None], float] | None = None
         self._active_region = active_region
 
     def set_revert_sink(self, sink: Callable[[str, str], None] | None) -> None:
         with self._lock:
             self._revert_sink = sink
+
+    def set_personal_lm_scorer(
+        self, scorer: Callable[[str, str | None, str | None], float] | None
+    ) -> None:
+        """Attach an in-memory adaptive personal LM scorer callback `(word, prev1, prev2) -> boost`."""
+        with self._lock:
+            self._personal_lm_scorer = scorer
+
+    def get_personal_lm_boost(
+        self,
+        word_lower: str,
+        prev1_lower: str | None = None,
+        prev2_lower: str | None = None,
+    ) -> float:
+        scorer = self._personal_lm_scorer
+        if scorer is None:
+            return 0.0
+        try:
+            return float(scorer(word_lower, prev1_lower, prev2_lower))
+        except Exception:
+            return 0.0
 
     @property
     def active_region(self) -> RegionFlag:
@@ -63,10 +102,48 @@ class PreferenceMemoryOverlay:
                 low = cleaned.lower()
                 self._custom_words[low] = cleaned
                 self._suggested_words.pop(low, None)
+                for del_str in generate_delete_strings(low, max_distance=2):
+                    self._custom_delete_index.setdefault(del_str, set()).add(low)
 
     def remove_custom_word(self, word: str) -> None:
         with self._lock:
-            self._custom_words.pop(word.strip().lower(), None)
+            low = word.strip().lower()
+            self._custom_words.pop(low, None)
+            for del_str in generate_delete_strings(low, max_distance=2):
+                bucket = self._custom_delete_index.get(del_str)
+                if bucket is not None:
+                    bucket.discard(low)
+                    if not bucket:
+                        self._custom_delete_index.pop(del_str, None)
+
+    def query_custom_candidates(self, word_lower: str, max_distance: int = 2) -> list[tuple[str, str]]:
+        """
+        Return `[(custom_lower, display_word), ...]` for custom words sharing a SymSpell
+        delete variant with `word_lower` within `max_distance`.
+        """
+        low = word_lower.lower()
+        if not low:
+            return []
+        with self._lock:
+            if not self._custom_words:
+                return []
+            matched_lows: set[str] = set()
+            for del_str in generate_delete_strings(low, max_distance=max_distance):
+                bucket = self._custom_delete_index.get(del_str)
+                if bucket:
+                    matched_lows.update(bucket)
+            out: list[tuple[str, str]] = []
+            for cand_low in matched_lows:
+                if abs(len(cand_low) - len(low)) <= max_distance:
+                    disp = self._custom_words.get(cand_low)
+                    if disp is not None:
+                        out.append((cand_low, disp))
+            return out
+
+    def list_custom_words_map(self) -> dict[str, str]:
+        """Return a copy of `{word_lower: display_word}`."""
+        with self._lock:
+            return dict(self._custom_words)
 
     def note_reverted_word(self, word: str, corrected_to: str = "", *, _from_store: bool = False) -> None:
         """
@@ -151,6 +228,7 @@ class PreferenceMemoryOverlay:
     def clear_all(self) -> None:
         with self._lock:
             self._custom_words.clear()
+            self._custom_delete_index.clear()
             self._rejected_pairs.clear()
             self._preferred_variants.clear()
             self._suggested_words.clear()

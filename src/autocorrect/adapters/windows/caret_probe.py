@@ -34,7 +34,7 @@ from typing import Any, Final
 
 log = logging.getLogger(__name__)
 
-DEFAULT_CONTEXT_CHARS: Final[int] = 64
+DEFAULT_CONTEXT_CHARS: Final[int] = 256
 PROBE_BUDGET_S: Final[float] = 0.25
 
 UIA_TextPattern2Id: Final[int] = 10024
@@ -46,26 +46,39 @@ TextPatternRangeEndpoint_Start: Final[int] = 0
 TextPatternRangeEndpoint_End: Final[int] = 1
 
 EM_GETSEL: Final[int] = 0x00B0
+EM_POSFROMCHAR: Final[int] = 0x00D6
 WM_GETTEXT: Final[int] = 0x000D
 WM_GETTEXTLENGTH: Final[int] = 0x000E
 SMTO_ABORTIFHUNG: Final[int] = 0x0002
 
 
 class CaretContext:
-    """Text before the caret, plus what we know about the field."""
+    """Text before the caret, plus what we know about the field and caret screen geometry."""
 
-    __slots__ = ("text_before", "is_empty_field", "is_password", "source")
+    __slots__ = ("text_before", "is_empty_field", "is_password", "source", "caret_rect", "dpi")
 
     def __init__(
-        self, text_before: str, *, is_empty_field: bool, is_password: bool = False, source: str = ""
+        self,
+        text_before: str,
+        *,
+        is_empty_field: bool,
+        is_password: bool = False,
+        source: str = "",
+        caret_rect: tuple[int, int, int, int] | None = None,
+        dpi: int = 96,
     ):
         self.text_before = text_before
         self.is_empty_field = is_empty_field
         self.is_password = is_password
         self.source = source
+        self.caret_rect = caret_rect
+        self.dpi = dpi
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return f"CaretContext({self.text_before!r}, empty={self.is_empty_field}, src={self.source})"
+        return (
+            f"CaretContext({self.text_before!r}, empty={self.is_empty_field}, "
+            f"src={self.source}, rect={self.caret_rect})"
+        )
 
 
 class WindowsCaretProbe:
@@ -141,6 +154,58 @@ class WindowsCaretProbe:
             pass
         self._com_threads.add(tid)
 
+    def read_geometry_fast(self) -> tuple[tuple[int, int, int, int] | None, int]:
+        """
+        Sub-millisecond Win32 GUIThreadInfo caret screen rectangle + DPI lookup.
+        Falls back to UIA bounding rectangles if Win32 rcCaret is not populated.
+        """
+        if sys.platform != "win32":
+            return None, 96
+        rect, dpi = self._read_win32_caret_rect()
+        if rect is not None:
+            return rect, dpi
+        try:
+            ctx = self._read_uia()
+            if ctx is not None and ctx.caret_rect is not None:
+                return ctx.caret_rect, ctx.dpi
+        except Exception:
+            pass
+        return None, dpi
+
+    @staticmethod
+    def _read_win32_caret_rect() -> tuple[tuple[int, int, int, int] | None, int]:
+        from autocorrect.adapters.windows import win32_api as w32
+
+        user32 = w32.user32
+        if user32 is None:
+            return None, 96
+        import ctypes.wintypes as wt
+
+        hwnd = user32.GetForegroundWindow()
+        if not hwnd:
+            return None, 96
+        dpi = 96
+        try:
+            d = int(user32.GetDpiForWindow(hwnd))
+            if d > 0:
+                dpi = d
+        except Exception:
+            pass
+        tid = user32.GetWindowThreadProcessId(hwnd, None)
+        gti = w32.GUITHREADINFO()
+        gti.cbSize = ctypes.sizeof(w32.GUITHREADINFO)
+        if not user32.GetGUIThreadInfo(tid, ctypes.byref(gti)):
+            return None, dpi
+        target_hwnd = gti.hwndCaret or gti.hwndFocus
+        rc = gti.rcCaret
+        if target_hwnd and (rc.right > rc.left or rc.bottom > rc.top):
+            pt = wt.POINT(rc.right, rc.top)
+            if user32.ClientToScreen(target_hwnd, ctypes.byref(pt)):
+                w = max(1, int(rc.right - rc.left))
+                h = max(14, int(rc.bottom - rc.top))
+                return (int(pt.x), int(pt.y), w, h), dpi
+        return None, dpi
+
     def _note_uia_failure(self) -> None:
         # Individual providers fail all the time (closed windows, hung apps);
         # only give up on UIA entirely if the factory itself is broken.
@@ -172,9 +237,15 @@ class WindowsCaretProbe:
         caret = text2.GetCaretRange(ctypes.byref(is_active))
         if caret is None:
             return None
+        win_rect, dpi = self._read_win32_caret_rect()
+        caret_rect = win_rect
+        if caret_rect is None:
+            caret_rect = self._extract_uia_range_rect(caret)
         # Walk the start of the range back N characters; the end stays at the caret.
         caret.MoveEndpointByUnit(TextPatternRangeEndpoint_Start, TextUnit_Character, -self._n)
         before = str(caret.GetText(self._n) or "")
+        if caret_rect is None:
+            caret_rect = self._extract_uia_range_rect(caret)
         # Also check whether the whole document is empty (so the first word is a sentence start).
         is_empty = False
         try:
@@ -183,7 +254,30 @@ class WindowsCaretProbe:
             is_empty = whole.strip() == ""
         except Exception:
             is_empty = before.strip() == ""
-        return CaretContext(before.replace("\r\n", "\n"), is_empty_field=is_empty, source="uia")
+        return CaretContext(
+            before.replace("\r\n", "\n"),
+            is_empty_field=is_empty,
+            source="uia",
+            caret_rect=caret_rect,
+            dpi=dpi,
+        )
+
+    @staticmethod
+    def _extract_uia_range_rect(text_range: Any) -> tuple[int, int, int, int] | None:
+        try:
+            rects = text_range.GetBoundingRectangles()
+            if rects and len(rects) >= 4:
+                # Take the last rectangle (closest to the caret endpoint)
+                base = len(rects) - 4
+                left = int(round(float(rects[base])))
+                top = int(round(float(rects[base + 1])))
+                width = max(1, int(round(float(rects[base + 2]))))
+                height = max(14, int(round(float(rects[base + 3]))))
+                if height > 0 and (left != 0 or top != 0):
+                    return (left + width, top, 1, height)
+        except Exception:
+            pass
+        return None
 
     # ----------------------------------------------------- classic EDIT
 
@@ -236,7 +330,14 @@ class WindowsCaretProbe:
         text = buf.value.replace("\r\n", "\n")
         caret_pos = max(0, min(caret_pos, len(text)))
         before = text[max(0, caret_pos - self._n) : caret_pos]
-        return CaretContext(before, is_empty_field=text.strip() == "", source="edit")
+        win_rect, dpi = self._read_win32_caret_rect()
+        return CaretContext(
+            before,
+            is_empty_field=text.strip() == "",
+            source="edit",
+            caret_rect=win_rect,
+            dpi=dpi,
+        )
 
 
 def create_caret_probe() -> WindowsCaretProbe | None:

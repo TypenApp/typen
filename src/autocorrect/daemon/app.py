@@ -30,6 +30,7 @@ from autocorrect.adapters.linux.session_type import LinuxSessionType, detect_lin
 from autocorrect.adapters.linux.x11_hook import X11HookError, X11KeyboardMouseHook
 from autocorrect.adapters.macos.quartz_tap import QuartzEventTapManager, QuartzTapError
 from autocorrect.adapters.windows.caret_probe import create_caret_probe
+from autocorrect.adapters.windows.inline_ghost_overlay import create_inline_ghost_overlay
 from autocorrect.adapters.windows.win32_hook import Win32HookError, Win32KeyboardMouseHook
 from autocorrect.ai.api_key_manager import ApiKeyManager
 from autocorrect.ai.local_model_manager import LocalModelManager
@@ -44,10 +45,11 @@ from autocorrect.daemon.hook_status import HookState, HookStatus
 from autocorrect.daemon.input_dispatcher import InputDispatcher
 from autocorrect.daemon.kill_switch import KillSwitch, create_escape_probe, migrate_hold_seconds
 from autocorrect.env_config import load_env_file
-from autocorrect.input.diff_planner import ReplacementPlan
+from autocorrect.input.diff_planner import ReplacementPlan, SuffixDiffPlanner
 from autocorrect.input.hotkeys import Hotkey, parse_hotkey
 from autocorrect.input.ports import FocusContext, KeyAction, KeyEvent
 from autocorrect.input.session_state import InputSessionManager, SessionEventOutcome
+from autocorrect.intelligence.adaptive_lm import AdaptivePersonalLM
 from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
 from autocorrect.intelligence.schema import RegionFlag
 from autocorrect.ipc.server import LocalIPCServer
@@ -74,6 +76,7 @@ AUTO_REGION_RECHECK_S: Final[float] = 60.0
 CLICK_SETTLE_S: Final[float] = 0.03
 HOTKEY_ID_PAUSE: Final[int] = 1
 HOTKEY_ID_SETTINGS: Final[int] = 2
+HOTKEY_ID_REWRITE: Final[int] = 3
 SAFE_MODE_REMEDIATION: Final[str] = (
     "Typing assistance was switched off (safe mode). "
     "Choose 'Resume' in the tray menu, or run with --resume, to switch it back on."
@@ -112,6 +115,7 @@ class AutoCorrectDaemon:
         self.on_state_changed: Callable[[], None] | None = None
         self.on_notify: Callable[[str, str], None] | None = None  # (title, message)
         self.on_open_settings_requested: Callable[[], None] | None = None
+        self.on_update_available: Callable[[dict[str, Any]], None] | None = None
         self.on_quit_requested: Callable[[], None] | None = None
         # Seconds left while Esc is being held (None once released/fired); for a tray countdown.
         self.on_hold_progress: Callable[[float | None], None] | None = None
@@ -126,8 +130,15 @@ class AutoCorrectDaemon:
         )
         self.resource_manager.load_best_available()
 
-        # 2. Load local preferences & custom vocabulary
+        # 2. Load local preferences & custom vocabulary + Adaptive Personal LM
         self.preference_store = SQLitePreferenceStore(self._data_dir / "preferences.sqlite3")
+        self.adaptive_lm = AdaptivePersonalLM()
+        try:
+            u_rows, n_rows = self.preference_store.load_adaptive_lm()
+            self.adaptive_lm.load_persisted(u_rows, n_rows)
+        except Exception:
+            log.debug("could not load adaptive_lm tables", exc_info=True)
+        self.preference_store.overlay.set_personal_lm_scorer(self.adaptive_lm.score_boost)
 
         # 3. Initialize core autocorrection engine
         self.engine = AutocorrectEngine(
@@ -161,7 +172,10 @@ class AutoCorrectDaemon:
         self.entitlement_manager = EntitlementManager()
 
         # 6. Initialize Pro AI (Layer 2 Local AI & Layer 3 BYOK Cloud AI)
-        self.local_ai = LocalModelManager(is_pro_entitled=True)
+        self.local_ai = LocalModelManager(
+            is_pro_entitled=True,
+            models_dir=self._data_dir / "models",
+        )
         self.api_key_manager = ApiKeyManager(use_memory_backend=dry_run_hooks)
         self.usage_tracker = UsageTracker(self._data_dir / "ai_usage.sqlite3")
         self.spending_controller = SpendingController(usage_tracker=self.usage_tracker)
@@ -205,16 +219,18 @@ class AutoCorrectDaemon:
             snippet_matcher=self.snippet_engine,
             entitlement_gate=self.entitlement_manager,
             active_region=self.preference_store.overlay.active_region,
+            adaptive_lm=self.adaptive_lm,
         )
         # Observers (tray pulse, first-correction toast). Called off the hook thread.
         self.on_correction: Callable[[str, str, str], None] | None = None  # (original, replacement, reason)
         self.last_correction: tuple[str, str, str, float] | None = None
         self.session_correction_count: int = 0
+        self._last_completed_sentence: str = ""
+        self._last_adaptive_flush_ts: float = time.monotonic()
 
-        # 8b. Caret-context probe (Windows UI Automation): tells the session what
-        # sits before the caret after a click / focus change, so the first word
-        # of a typing sequence is capitalised exactly when it should be.
+        # 8b. Caret-context probe (Windows UI Automation) and inline ghost overlay.
         self.caret_probe = create_caret_probe() if not dry_run_hooks else None
+        self.ghost_overlay = create_inline_ghost_overlay() if not dry_run_hooks else None
 
         # 9. Single worker thread that owns the session: hooks, mouse and focus all post to it.
         self.dispatcher = InputDispatcher(
@@ -291,12 +307,19 @@ class AutoCorrectDaemon:
         snapshot = self.entitlement_manager.evaluate()
         self._snapshot = snapshot
         self.local_ai.set_pro_entitled(snapshot.pro_features_enabled)
+        if snapshot.pro_features_enabled:
+            try:
+                self.local_ai.load_model()
+            except Exception:
+                log.debug("could not auto-load local_ai model", exc_info=True)
         # Restore persisted correction preferences and (Pro) domain packs.
         self.apply_log_level()
         self.apply_global_correction_settings()
         self.set_user_domain_packs(set(self.preference_store.get_typed("enabled_domain_packs")))
         if start_ipc:
             self.ipc_server.start()
+        if self.ghost_overlay is not None:
+            self.ghost_overlay.start()
         self.dispatcher.start()
         if self.preference_store.get_typed("panic_hotkey_enabled"):
             self.kill_switch.start()
@@ -315,7 +338,15 @@ class AutoCorrectDaemon:
 
     def _check_app_updates_on_launch(self) -> None:
         try:
-            self.app_update_coordinator.check()
+            state = self.app_update_coordinator.check()
+            if isinstance(state, dict) and state.get("status") in ("available", "ready", "unsigned"):
+                ver = str(state.get("available_version") or "").lstrip("v")
+                self._notify(
+                    f"Typen v{ver} is available" if ver else "Typen update available",
+                    "A new version of Typen is ready to install.",
+                )
+                if self.on_update_available is not None:
+                    self.on_update_available(state)
         except Exception:
             log = logging.getLogger(__name__)
             log.exception("launch-time app update check failed")
@@ -455,10 +486,21 @@ class AutoCorrectDaemon:
     def stop(self) -> None:
         """Release all OS keyboard/mouse hooks, stop Local IPC server, and close mmap files."""
         self.kill_switch.stop()
+        if self.ghost_overlay is not None:
+            self.ghost_overlay.stop()
         self._release_os_hooks()
         self.dispatcher.stop()
+        self._flush_adaptive_lm()
         self.ipc_server.stop()
         self.resource_manager.close()
+
+    def _flush_adaptive_lm(self) -> None:
+        try:
+            u, n = self.adaptive_lm.drain_dirty()
+            if u or n:
+                self.preference_store.flush_adaptive_lm(u, n)
+        except Exception:
+            log.debug("flush_adaptive_lm failed", exc_info=True)
 
     # ------------------------------------------------------- pause / resume
 
@@ -469,6 +511,8 @@ class AutoCorrectDaemon:
         watchdog, so one tray action always brings the daemon back.
         """
         if paused:
+            if self.ghost_overlay is not None:
+                self.ghost_overlay.hide()
             self.dispatcher.run_sync(lambda: self.session.set_paused(True))
         else:
             if self.in_safe_mode:
@@ -617,10 +661,19 @@ class AutoCorrectDaemon:
                 is_excluded_app=True,
                 control_id=focus.control_id,
             )
+        if self.ghost_overlay is not None:
+            self.ghost_overlay.hide()
+        self._flush_adaptive_lm()
         caret_before = None
+        probe_attempted = False
         if not (effective.is_password_or_secure or effective.is_excluded_app):
-            caret_before = self._read_caret_context()
-        self.session.on_focus_changed(effective, caret_text_before=caret_before)
+            probe_attempted = self.caret_probe is not None and not self._dry_run_hooks
+            caret_before = self._read_caret_context(with_settle=probe_attempted)
+        self.session.on_focus_changed(
+            effective,
+            caret_text_before=caret_before,
+            caret_probe_attempted=probe_attempted,
+        )
 
         if prof is not None and prof.enabled:
             self.session.configure_features(prof.effective_features(self.global_features()))
@@ -629,13 +682,18 @@ class AutoCorrectDaemon:
             self.apply_global_correction_settings()
         self._apply_effective_domain_packs(focus)
 
-    def _read_caret_context(self) -> str | None:
+    def _read_caret_context(self, *, with_settle: bool = False) -> str | None:
         """Text before the caret in the focused control, or None when unknown. Worker thread only."""
         probe = self.caret_probe
         if probe is None:
             return None
+        if with_settle:
+            time.sleep(0.02)
         try:
             ctx = probe.read()
+            if ctx is None and with_settle:
+                time.sleep(0.02)
+                ctx = probe.read()
         except Exception:
             log.debug("caret probe raised", exc_info=True)
             return None
@@ -650,6 +708,8 @@ class AutoCorrectDaemon:
         rebuild the sentence state. Also refreshes focus right away rather
         than waiting for the next monitor tick.
         """
+        if self.ghost_overlay is not None:
+            self.ghost_overlay.hide()
         if self.session.is_paused:
             return
         if self.caret_probe is not None:
@@ -728,6 +788,9 @@ class AutoCorrectDaemon:
         settings = parse_hotkey(prefs.get_setting("settings_hotkey", "Ctrl+Alt+,"))
         if settings is not None:
             out[HOTKEY_ID_SETTINGS] = settings
+        rewrite = parse_hotkey(prefs.get_setting("rewrite_hotkey", "Ctrl+Shift+R"))
+        if rewrite is not None:
+            out[HOTKEY_ID_REWRITE] = rewrite
         return out
 
     def _on_hotkey(self, hotkey_id: int) -> None:
@@ -738,6 +801,34 @@ class AutoCorrectDaemon:
             threading.Thread(
                 target=self.on_open_settings_requested, name="autocorrect-hotkey-settings", daemon=True
             ).start()
+        elif hotkey_id == HOTKEY_ID_REWRITE:
+            self.dispatcher.post_call(self._trigger_sentence_rewrite_on_worker)
+
+    def _trigger_sentence_rewrite_on_worker(self) -> None:
+        """Evaluate and rewrite the most recently completed or active sentence via LocalModelManager."""
+        if self.session.is_paused:
+            return
+        sentence = self._last_completed_sentence
+        if not sentence and self.caret_probe is not None:
+            caret_text = self._read_caret_context()
+            if caret_text:
+                sentence = caret_text.strip().splitlines()[-1] if caret_text.strip() else ""
+        if not sentence:
+            return
+        sugg = self.local_ai.evaluate_sentence(sentence, triggered_by_hotkey=True)
+        if sugg is None or sugg.suggested_sentence == sugg.original_sentence:
+            return
+        plan = SuffixDiffPlanner.plan(
+            original_full=sugg.original_sentence,
+            target_full=sugg.suggested_sentence,
+            delimiter_was_suppressed=True,
+        )
+        if not plan.is_noop:
+            try:
+                self.injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+                self._last_completed_sentence = sugg.suggested_sentence
+            except Exception:
+                log.debug("sentence rewrite injection failed", exc_info=True)
 
     def reload_hotkeys(self) -> None:
         """Re-register hotkeys after Settings changed them (Windows re-creates the hook thread)."""
@@ -915,21 +1006,85 @@ class AutoCorrectDaemon:
 
     def _dispatch_os_key(self, event: KeyEvent) -> KeyAction:
         """
-        Called on the OS hook thread. Never evaluates anything there: the event
-        is queued for the dispatcher worker and the keystroke is passed through.
-        Corrections therefore run in *passive* mode on every platform (the
-        delimiter has already been delivered and is deleted and re-typed by the
-        replacement plan), exactly as X11 always has.
+        Called on the OS hook thread. Never evaluates anything heavy there:
+        when an inline predictive placeholder is active and the user presses a plain Tab,
+        consume the physical Tab key (`SUPPRESS_AND_INJECT`) and queue the completion
+        acceptance on the worker so Tab never jumps focus to another field.
         """
+        if (
+            event.key_name == "Tab"
+            and not event.shift_pressed
+            and not event.ctrl_pressed
+            and not event.alt_pressed
+            and not event.meta_pressed
+            and self.session.has_active_prediction
+        ):
+            ts = event.timestamp_ms
+            self.dispatcher.post_call(
+                lambda: self._accept_prediction_on_worker(ts, tab_was_suppressed=True)
+            )
+            return KeyAction.SUPPRESS_AND_INJECT
         self.dispatcher.post_key(event)
         return KeyAction.PASS_THROUGH
 
-    # XRecord was always passive; it now shares the exact same path.
-    _dispatch_os_key_passive = _dispatch_os_key
+    def _dispatch_os_key_passive(self, event: KeyEvent) -> KeyAction:
+        """XRecord cannot suppress keys; queue the event and let the worker backspace Tab if needed."""
+        self.dispatcher.post_key(event)
+        return KeyAction.PASS_THROUGH
+
+    def _accept_prediction_on_worker(
+        self, timestamp_ms: float, *, tab_was_suppressed: bool = True
+    ) -> None:
+        if self.ghost_overlay is not None:
+            self.ghost_overlay.hide()
+        outcome = self.session.accept_active_prediction(
+            timestamp_ms=timestamp_ms,
+            tab_was_suppressed=tab_was_suppressed,
+        )
+        self._apply_outcome(outcome)
+        self._sync_ghost_overlay()
+
+    def _sync_ghost_overlay(self) -> None:
+        if self.ghost_overlay is None or self.caret_probe is None:
+            return
+        pred = self.session.active_prediction if self.session.has_active_prediction else None
+        if pred is None:
+            self.ghost_overlay.hide()
+            return
+        rect, dpi = self.caret_probe.read_geometry_fast()
+        if rect is not None:
+            self.ghost_overlay.show_at(pred.display_text, rect, dpi=dpi)
+        else:
+            self.ghost_overlay.hide()
 
     def _handle_key_on_worker(self, event: KeyEvent) -> None:
         outcome = self.session.handle_key_event(event, suppress_delimiter_on_replace=False)
+        if outcome.sentence_completed_text:
+            self._last_completed_sentence = outcome.sentence_completed_text
         self._apply_outcome(outcome)
+        self._sync_ghost_overlay()
+        now_m = time.monotonic()
+        if now_m - self._last_adaptive_flush_ts >= 30.0:
+            self._last_adaptive_flush_ts = now_m
+            self._flush_adaptive_lm()
+        # If the user passed through Tab or Backspace-into-tainted-buffer on a live hook,
+        # resync from the OS caret so sentence-start capitalisation matches the field.
+        if (
+            not self._dry_run_hooks
+            and self.caret_probe is not None
+            and not self.session.is_paused
+            and outcome.reason_tag != "PREDICTIVE_TAB"
+            and (
+                event.key_name == "Tab"
+                or (
+                    event.key_name == "Backspace"
+                    and self.session.word_buffer.state.value == "TAINTED"
+                )
+            )
+        ):
+            caret_text = self._read_caret_context(with_settle=(event.key_name == "Tab"))
+            if caret_text is not None:
+                self.session.resync_from_caret(caret_text)
 
     def _apply_outcome(self, outcome: SessionEventOutcome) -> None:
         """
@@ -1001,17 +1156,29 @@ class AutoCorrectDaemon:
         """
         Repeated-OOV learning: a word Typen keeps seeing but does not know is a
         candidate for the custom dictionary. Counted here (never the sentence),
-        and surfaced on the Dictionary screen; optionally announced.
+        surfaced on the Dictionary screen, and optionally auto-promoted into
+        `custom_words` when `auto_add_repeated_oov` is enabled.
         """
         decision = outcome.decision
         if decision is None or decision.should_replace:
             return
-        if decision.reason != CorrectionReason.INSUFFICIENT_CONFIDENCE:
+        if decision.reason not in (
+            CorrectionReason.INSUFFICIENT_CONFIDENCE,
+            CorrectionReason.GUARD_EXCLUDED,
+        ):
             return
-        word = decision.original_token
+        word = decision.original_token.strip()
         if len(word) < 3 or not word.isalpha():
             return
+        low = word.lower()
+        bundle = self.resource_manager.active_bundle
+        if bundle.lexicon.lookup(low) is not None:
+            return
+        if any(low in p.words for p in bundle.domain_packs.values()):
+            return
         prefs = self.preference_store
+        if prefs.overlay.is_custom_word(low):
+            return
         if not prefs.get_typed("learn_repeated_oov"):
             return
         threshold = int(prefs.get_typed("learn_repeated_threshold"))
@@ -1020,10 +1187,14 @@ class AutoCorrectDaemon:
         except Exception:
             log.debug("note_repeated_oov failed", exc_info=True)
             return
-        if reached and prefs.get_typed("notify_suggested_word"):
-            self._notify(
-                "New word for your dictionary?", f"You keep typing '{word}'. Add it in Typen > Dictionary."
-            )
+        if reached:
+            if prefs.get_typed("auto_add_repeated_oov"):
+                prefs.add_custom_word(word, keep_suggestion=True)
+            if prefs.get_typed("notify_suggested_word"):
+                self._notify(
+                    "New word for your dictionary?",
+                    f"You keep typing '{word}'. Add it in Typen > Dictionary.",
+                )
 
     def _announce_first_correction(self, original: str, replacement: str) -> None:
         """Once per installation: confirm the very first fix so the user knows it is working."""

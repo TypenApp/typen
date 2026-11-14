@@ -39,7 +39,7 @@ ARCH="$(uname -m)"            # x86_64 | aarch64
 case "$ARCH" in x86_64) DEB_ARCH="amd64" ;; aarch64) DEB_ARCH="arm64" ;; *) DEB_ARCH="$ARCH" ;; esac
 PLATFORM="linux-$ARCH"
 DIST="$ROOT/dist"
-APPDIR_SRC="$DIST/AutoCorrectDesktop"
+APPDIR_SRC="$DIST/Typen"
 OUT="$DIST/installer"
 
 echo "==> Typen $FULL_VERSION ($PLATFORM)"
@@ -58,7 +58,7 @@ rm -rf "$APPDIR_SRC"
 $PY -m PyInstaller --noconfirm --clean --distpath "$DIST" --workpath "$DIST/build" packaging/autocorrect.spec
 
 # 3. Smoke test (headless: no DISPLAY needed for --headless-check)
-BIN="$APPDIR_SRC/AutoCorrectDesktop"
+BIN="$APPDIR_SRC/typen"
 SMOKE="$(mktemp -d)/autocorrect_beta_smoke"
 "$BIN" --version
 CHECK="$("$BIN" --headless-check --data-dir "$SMOKE" 2>&1 || true)"
@@ -69,7 +69,7 @@ mkdir -p "$OUT"; rm -f "$OUT"/*."$PLATFORM".* "$OUT"/*.AppImage "$OUT"/*.deb "$O
 
 # 4a. Portable tarball
 TARBALL="$OUT/Typen-$FULL_VERSION-$PLATFORM-portable.tar.gz"
-tar -C "$DIST" -czf "$TARBALL" AutoCorrectDesktop
+tar -C "$DIST" -czf "$TARBALL" Typen
 
 # Shared desktop entry + icon theme (used by AppImage and .deb)
 DESKTOP_FILE="$(mktemp)"
@@ -80,7 +80,7 @@ Version=1.0
 Name=Typen
 GenericName=Autocorrect
 Comment=System-wide offline autocorrect and writing assistant
-Exec=AutoCorrectDesktop
+Exec=typen
 Icon=autocorrect-desktop
 Terminal=false
 Categories=Utility;Accessibility;
@@ -92,7 +92,7 @@ EOF
 # 4b. AppImage
 APPIMAGETOOL="${APPIMAGETOOL:-$(command -v appimagetool || true)}"
 if [[ -n "$APPIMAGETOOL" ]]; then
-  APPDIR="$DIST/AutoCorrectDesktop.AppDir"
+  APPDIR="$DIST/Typen.AppDir"
   rm -rf "$APPDIR"; mkdir -p "$APPDIR/usr/bin" "$APPDIR/usr/share/applications"
   cp -R "$APPDIR_SRC"/. "$APPDIR/usr/bin/"
   cp -R packaging/icons/hicolor "$APPDIR/usr/share/icons/" 2>/dev/null || { mkdir -p "$APPDIR/usr/share/icons"; cp -R packaging/icons/hicolor "$APPDIR/usr/share/icons/"; }
@@ -102,7 +102,7 @@ if [[ -n "$APPIMAGETOOL" ]]; then
   cat > "$APPDIR/AppRun" <<'EOF'
 #!/bin/sh
 HERE="$(dirname "$(readlink -f "$0")")"
-exec "$HERE/usr/bin/AutoCorrectDesktop" "$@"
+exec "$HERE/usr/bin/typen" "$@"
 EOF
   chmod +x "$APPDIR/AppRun"
   # mktemp creates the desktop file 0600 and cp preserves it; appimagetool refuses non-world-readable AppDirs.
@@ -119,8 +119,9 @@ if command -v dpkg-deb >/dev/null 2>&1; then
   PKG="$DIST/deb/autocorrect-desktop_${VERSION}~${CHANNEL}_${DEB_ARCH}"
   rm -rf "$PKG"; mkdir -p "$PKG/DEBIAN" "$PKG/opt/autocorrect-desktop" "$PKG/usr/bin" "$PKG/usr/share/applications" "$PKG/usr/share/icons" "$PKG/etc/xdg/autostart"
   cp -R "$APPDIR_SRC"/. "$PKG/opt/autocorrect-desktop/"
-  ln -s /opt/autocorrect-desktop/AutoCorrectDesktop "$PKG/usr/bin/AutoCorrectDesktop"
-  ln -s /opt/autocorrect-desktop/AutoCorrectDesktop "$PKG/usr/bin/autocorrect-desktop"
+  ln -s /opt/autocorrect-desktop/typen "$PKG/usr/bin/typen"
+  ln -s /opt/autocorrect-desktop/typen "$PKG/usr/bin/AutoCorrectDesktop"
+  ln -s /opt/autocorrect-desktop/typen "$PKG/usr/bin/autocorrect-desktop"
   cp "$DESKTOP_FILE" "$PKG/usr/share/applications/autocorrect-desktop.desktop"
   cp -R packaging/icons/hicolor "$PKG/usr/share/icons/"
   # IBus component so Wayland users can pick "English (AutoCorrect)" as an input source.
@@ -130,7 +131,7 @@ if command -v dpkg-deb >/dev/null 2>&1; then
 #!/bin/sh
 # IBus engine wrapper: runs with the system Python (needs python3-gi + gir1.2-ibus-1.0)
 # but reuses the bundled AutoCorrect runtime for the lexicon/engine.
-exec /opt/autocorrect-desktop/AutoCorrectDesktop --ibus "$@"
+exec /opt/autocorrect-desktop/typen --ibus "$@"
 EOF
   chmod +x "$PKG/usr/libexec/ibus-engine-autocorrect"
   INSTALLED_KB="$(du -sk "$PKG/opt" | cut -f1)"

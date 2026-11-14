@@ -246,6 +246,25 @@ if IS_WINDOWS:
     user32.EnumWindows.restype = wt.BOOL
     user32.IsWindowVisible.argtypes = [wt.HWND]
     user32.IsWindowVisible.restype = wt.BOOL
+    user32.ClientToScreen.argtypes = [wt.HWND, ctypes.POINTER(wt.POINT)]
+    user32.ClientToScreen.restype = wt.BOOL
+    user32.ShowWindow.argtypes = [wt.HWND, ctypes.c_int]
+    user32.ShowWindow.restype = wt.BOOL
+    user32.SetWindowPos.argtypes = [
+        wt.HWND,
+        wt.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wt.UINT,
+    ]
+    user32.SetWindowPos.restype = wt.BOOL
+    try:
+        user32.GetDpiForWindow.argtypes = [wt.HWND]
+        user32.GetDpiForWindow.restype = wt.UINT
+    except Exception:
+        pass
 
     # --- injection ---------------------------------------------------------
     user32.SendInput.argtypes = [wt.UINT, ctypes.POINTER(INPUT), ctypes.c_int]

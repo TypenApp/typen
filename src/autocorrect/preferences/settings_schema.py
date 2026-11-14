@@ -83,8 +83,14 @@ def _s(key: str, default: str, group: str, label: str, desc: str = "") -> Settin
     return SettingSpec(key, "str", default, group, label, desc)
 
 
-def _l(key: str, group: str, label: str, desc: str = "") -> SettingSpec:
-    return SettingSpec(key, "list", [], group, label, desc)
+def _l(
+    key: str,
+    group: str,
+    label: str,
+    desc: str = "",
+    default: tuple[str, ...] | list[str] = (),
+) -> SettingSpec:
+    return SettingSpec(key, "list", list(default), group, label, desc)
 
 
 SETTINGS_SCHEMA: Final[tuple[SettingSpec, ...]] = (
@@ -144,6 +150,14 @@ SETTINGS_SCHEMA: Final[tuple[SettingSpec, ...]] = (
     _b("uk_ize_spelling", False, "language", "Prefer -ize spellings for UK English (Oxford)"),
     _l("enabled_domain_packs", "language", "Domain vocabulary packs"),
     # --------------------------------------------------------- correction
+    _b(
+        "enable_predictive_tab",
+        True,
+        "correction",
+        "Predictive typing on Tab",
+        "Show inline placeholder suggestions for word completions and next words.",
+        po=True,
+    ),
     _b("enable_spelling", True, "correction", "Spelling corrections", "", po=True),
     _f(
         "aggressiveness",
@@ -203,9 +217,16 @@ SETTINGS_SCHEMA: Final[tuple[SettingSpec, ...]] = (
     ),
     # --------------------------------------------------------- dictionary
     _i("suggest_after_reverts", 1, "dictionary", "Suggest a word after N reverts", "", 1, 10),
-    _i("auto_learn_after_reverts", 0, "dictionary", "Add to dictionary after N reverts", "0 = off.", 0, 10),
-    _b("learn_repeated_oov", False, "dictionary", "Suggest words I type repeatedly"),
-    _i("learn_repeated_threshold", 5, "dictionary", "...after N uses in a week", "", 2, 50),
+    _i("auto_learn_after_reverts", 2, "dictionary", "Add to dictionary after N reverts", "0 = off.", 0, 10),
+    _b("learn_repeated_oov", True, "dictionary", "Suggest words I type repeatedly"),
+    _i("learn_repeated_threshold", 3, "dictionary", "...after N uses in a week", "", 2, 50),
+    _b(
+        "auto_add_repeated_oov",
+        True,
+        "dictionary",
+        "Auto-add repeated words to dictionary",
+        "Automatically promote words typed above the repeated threshold into your dictionary.",
+    ),
     _b("ignore_words_with_digits", True, "dictionary", "Ignore words with digits"),
     _b("ignore_acronyms", True, "dictionary", "Ignore ALL-CAPS acronyms"),
     _b("ignore_symbol_words", True, "dictionary", "Ignore words containing _ - ."),

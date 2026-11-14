@@ -3,14 +3,14 @@
 ; MyChannel "stable" (the Windows build) yields plain 1.3.0; anything else is a
 ; pre-release suffix (beta.1 -> 1.3.0-beta.1).
 #ifndef MyAppVersion
-  #define MyAppVersion "1.3.0"
+  #define MyAppVersion "2.0.0"
 #endif
 #ifndef MyChannel
   #define MyChannel "stable"
 #endif
 #define MyAppName "Typen"
 #define MyAppPublisher "Omnii"
-#define MyAppExeName "AutoCorrectDesktop.exe"
+#define MyAppExeName "typen.exe"
 #if MyChannel == "stable"
   #define MyFullVersion MyAppVersion
 #else
@@ -59,7 +59,7 @@ Name: "startup"; Description: "Start {#MyAppName} automatically when Windows sta
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\AutoCorrectDesktop\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Typen\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 ; One entry, "Typen": starts the background service when it is not running, and
 ; opens the Typen window when it already is (see launcher._run_daemon).
@@ -117,19 +117,29 @@ end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ExePath: String;
+  LegacyExePath: String;
   ResultCode: Integer;
 begin
   Result := '';
   ExePath := ExpandConstant('{app}\{#MyAppExeName}');
-  if not FileExists(ExePath) then
-    Exit;
+  LegacyExePath := ExpandConstant('{app}\AutoCorrectDesktop.exe');
+  if FileExists(ExePath) then
+    Exec(ExePath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  else if FileExists(LegacyExePath) then
+    Exec(LegacyExePath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-  { Graceful stop via IPC / lock file; then force-kill any leftover process. }
-  Exec(ExePath, '--stop', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Sleep(1500);
+  Sleep(1000);
   Exec(
     ExpandConstant('{sys}\taskkill.exe'),
     '/F /IM {#MyAppExeName}',
+    '',
+    SW_HIDE,
+    ewWaitUntilTerminated,
+    ResultCode
+  );
+  Exec(
+    ExpandConstant('{sys}\taskkill.exe'),
+    '/F /IM AutoCorrectDesktop.exe',
     '',
     SW_HIDE,
     ewWaitUntilTerminated,

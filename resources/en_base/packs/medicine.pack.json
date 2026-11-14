@@ -1,36 +1,308 @@
 {
   "pack_id": "medicine",
-  "version": "1.0.2",
-  "released_at": "2026-11-02T00:00:00Z",
+  "version": "2.0.0",
+  "released_at": "2026-11-14T00:00:00Z",
   "words": {
     "cardiovascular": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "hypertension": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "pathophysiology": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "pharmacokinetics": {
-      "log_freq": -6.5,
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pharmacodynamics": {
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "arrhythmia": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
+    },
+    "tachycardia": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "bradycardia": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "atherosclerosis": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "cardiomyopathy": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "myocardial": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "infarction": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ischemia": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "thrombosis": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "embolism": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "prophylaxis": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "contraindication": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "contraindications": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "comorbidity": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "comorbidities": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "etiology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "epidemiology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "oncology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "immunotherapy": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hematology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "endocrinology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "neurology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "gastroenterology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "nephrology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pulmonology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "rheumatology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "dermatology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "ophthalmology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "otolaryngology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "anesthesiology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "radiology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pathology": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "biopsies": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "biopsy": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "intubation": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "resuscitation": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "defibrillation": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "analgesic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "analgesics": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "antipyretic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "antibiotic": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "antibiotics": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "corticosteroid": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "corticosteroids": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "immunosuppressant": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "anticoagulants": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "bioavailability": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "half-life": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "hipaa": {
+      "log_freq": -5.6,
+      "casing_flag": 2,
+      "exact_casing": "HIPAA"
+    },
+    "nsaid": {
+      "log_freq": -5.6,
+      "casing_flag": 2,
+      "exact_casing": "NSAID"
+    },
+    "mrna": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "mRNA"
+    },
+    "crispr": {
+      "log_freq": -5.6,
+      "casing_flag": 2,
+      "exact_casing": "CRISPR"
+    },
+    "ekg": {
+      "log_freq": -5.6,
+      "casing_flag": 2,
+      "exact_casing": "EKG"
+    },
+    "ecg": {
+      "log_freq": -5.6,
+      "casing_flag": 2,
+      "exact_casing": "ECG"
     }
   },
   "direct_typos": {
     "arythmia": "arrhythmia",
-    "hypertention": "hypertension"
+    "hypertention": "hypertension",
+    "cardiovasular": "cardiovascular",
+    "pathophisiology": "pathophysiology"
   }
 }

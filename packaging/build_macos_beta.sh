@@ -54,7 +54,7 @@ $PY -c "import PySide6.QtQml" 2>/dev/null || $PY -m pip install --quiet -e ".[ui
 $PY packaging/make_icon.py --icns
 
 # 2. PyInstaller
-rm -rf "$APP" "$DIST/AutoCorrectDesktop"
+rm -rf "$APP" "$DIST/Typen"
 $PY -m PyInstaller --noconfirm --clean --distpath "$DIST" --workpath "$DIST/build" packaging/autocorrect.spec
 
 # 3. Code signing
@@ -75,7 +75,7 @@ else
 fi
 
 # 4. Smoke test
-BIN="$APP/Contents/MacOS/AutoCorrectDesktop"
+BIN="$APP/Contents/MacOS/typen"
 SMOKE="$(mktemp -d)/autocorrect_beta_smoke"
 "$BIN" --version
 CHECK="$("$BIN" --headless-check --data-dir "$SMOKE" 2>&1 || true)"

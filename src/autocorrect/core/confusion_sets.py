@@ -316,9 +316,9 @@ def score_confusion_context(
     # Group 3: your / you're
     if candidate_lower in ("your", "you're"):
         if p1 in ("that", "if", "when", "while", "because", "since", "think", "know", "hope", "glad", "sure"):
-            # Subordinate clause start strongly favors subject+verb "you're" when followed by predicate,
-            # or when 'your' is followed by predicate in N-gram.
-            pass
+            # Subordinate clause start marginally favors subject+verb "you're" before predicate
+            if candidate_lower == "you're":
+                return 0.8
         if p1 in ("in", "on", "at", "for", "with", "from", "about", "into", "by", "of", "to"):
             # Prepositions take noun phrases ("in your house", "for your help"), rarely "in you're"
             if candidate_lower == "your":
@@ -628,7 +628,11 @@ def evaluate_retroactive_two_word_confusion(
         "working",
         "trying",
     ):
-        # Note: "we were going" vs "Initial: Were going to the store" -> only if sentence-initial
-        pass
+        if p2_low in ("", ".", "!", "?", ",", ";", ":", "and", "but", "so", "because"):
+            return "we're"
+
+    if p_low == "where" and c_low in ("going", "ready", "excited", "happy", "glad", "done"):
+        if p2_low in ("we", "they", "you"):
+            return "were"
 
     return None

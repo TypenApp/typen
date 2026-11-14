@@ -14,7 +14,7 @@
 <a id="cli-commands"></a>
 ## Installed CLI Entry Points (pyproject.toml)
 
-The packaged AutoCorrectDesktop.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:
+The packaged typen.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:
 
 **CLI Commands Reference**
 

@@ -34,6 +34,12 @@ ApplicationWindow {
     }
 
     property int currentIndex: 0
+    property bool updateModalDismissed: false
+    readonly property var appUpdateInfo: (bridge.updates && bridge.updates.app) ? bridge.updates.app : ({})
+    readonly property string appUpdateStatus: String(appUpdateInfo.status || "idle")
+    readonly property bool showUpdateModal: !win.updateModalDismissed && (
+        appUpdateStatus === "available" || appUpdateStatus === "ready" || appUpdateStatus === "unsigned"
+    )
 
     function indexForScreen(name) {
         var wanted = String(name || "").trim().toLowerCase().replace(/[-_ ]+/g, " ")
@@ -48,6 +54,9 @@ ApplicationWindow {
     Component.onCompleted: {
         var initial = (typeof initialScreen === "string" && initialScreen) ? initialScreen : bridge.initialScreen
         if (initial) currentIndex = indexForScreen(initial)
+        if (bridge.settings.updates_check_on_launch !== false) {
+            bridge.checkForUpdatesSilently()
+        }
     }
 
     RowLayout {
@@ -212,6 +221,85 @@ ApplicationWindow {
                     font.weight: Font.DemiBold
                 }
                 Timer { id: toastTimer; interval: 3200; onTriggered: toastBox.opacity = 0 }
+            }
+
+            // Update Available Modal Popup
+            Rectangle {
+                id: updateModalBackdrop
+                anchors.fill: parent
+                color: Qt.rgba(0, 0, 0, 0.45)
+                visible: win.showUpdateModal
+                z: 50
+                MouseArea { anchors.fill: parent; onClicked: {} }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 440
+                    implicitHeight: modalCol.implicitHeight + 48
+                    radius: Theme.radius
+                    color: Theme.paper
+                    border.color: Theme.lineStrong
+                    border.width: 1
+
+                    ColumnLayout {
+                        id: modalCol
+                        anchors.fill: parent
+                        anchors.margins: 24
+                        spacing: 14
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Eyebrow { label: "Update available" }
+                            Item { Layout.fillWidth: true }
+                            Pill { label: "v" + String(win.appUpdateInfo.available_version || "new"); tone: "proof" }
+                        }
+
+                        Text {
+                            text: "Typen v" + String(win.appUpdateInfo.available_version || "") + " is ready"
+                            color: Theme.ink
+                            font.family: Theme.display
+                            font.pixelSize: Theme.fsTitle
+                            font.weight: Font.Bold
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                        }
+
+                        Body {
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                            text: win.appUpdateStatus === "unsigned"
+                                ? "A newer version of Typen (v" + String(win.appUpdateInfo.available_version || "") + ") is available on the download page. You are currently running v" + bridge.appVersion + "."
+                                : "A signed update (v" + String(win.appUpdateInfo.available_version || "") + ") is ready to install. Typen will update and restart automatically."
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.topMargin: 6
+                            spacing: 10
+                            GhostButton {
+                                text: "Later"
+                                onClicked: win.updateModalDismissed = true
+                            }
+                            Item { Layout.fillWidth: true }
+                            SecondaryButton {
+                                text: "Release notes"
+                                onClicked: bridge.openUrl(String(bridge.about.source_url || "https://github.com/TypenApp/typen") + "/releases")
+                            }
+                            PrimaryButton {
+                                text: win.appUpdateStatus === "unsigned" ? "Download update" : "Update & restart"
+                                onClicked: {
+                                    win.updateModalDismissed = true
+                                    if (win.appUpdateStatus === "unsigned") {
+                                        bridge.openUrl(String(win.appUpdateInfo.download_page_url || "https://typen.org/download"))
+                                    } else {
+                                        win.currentIndex = win.indexForScreen("updates")
+                                        bridge.call("apply_app_update", "{}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

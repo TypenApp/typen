@@ -121,9 +121,10 @@ class ContextRingBuffer:
     def __init__(self, capacity: int = CONTEXT_RING_CAPACITY) -> None:
         self._ring: deque[ContextTokenEntry] = deque(maxlen=capacity)
 
-    def push(self, word_id: int, word_lower: str) -> None:
+    def push(self, word_id: int, word_lower: str, *, is_trusted_custom: bool = False) -> None:
         # Privacy guarantee: only store the string if it is a known dictionary word (word_id > 0)
-        safe_str = word_lower if word_id > 0 else ""
+        # or an approved user custom dictionary word.
+        safe_str = word_lower if (word_id > 0 or is_trusted_custom) else ""
         self._ring.append(ContextTokenEntry(word_id=word_id, normalized_in_vocab_word=safe_str))
 
     def prev1(self) -> ContextTokenEntry | None:
@@ -138,6 +139,11 @@ class ContextRingBuffer:
                 word_id=word_id,
                 normalized_in_vocab_word=word_lower if word_id > 0 else "",
             )
+
+    def pop_last(self) -> ContextTokenEntry | None:
+        if self._ring:
+            return self._ring.pop()
+        return None
 
     def clear(self) -> None:
         self._ring.clear()

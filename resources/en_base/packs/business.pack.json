@@ -1,41 +1,359 @@
 {
   "pack_id": "business",
-  "version": "1.0.1",
-  "released_at": "2026-11-02T00:00:00Z",
+  "version": "2.0.0",
+  "released_at": "2026-11-14T00:00:00Z",
   "words": {
+    "deliverable": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
     "deliverables": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "stakeholder": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "stakeholders": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "onboarding": {
-      "log_freq": -6.0,
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "offboarding": {
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "monetisation": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
     },
     "monetization": {
-      "log_freq": -6.2,
+      "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
+    },
+    "productization": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "go-to-market": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "omnichannel": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "touchpoint": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "touchpoints": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "headcountworkstream": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "workstreams": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "kpis": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "okrs": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "saas": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "paas": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "iaas": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "b2b": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "b2c": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "d2c": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "churn": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "retention": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "upsell": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "cross-sell": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "pipeline": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "enablement": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "alignment": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "synergy": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "procurement": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "sla": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "slas": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "rfp": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "rfps": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "rfq": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "kpi": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "okr": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "typen": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Typen"
+    },
+    "figma": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Figma"
+    },
+    "notion": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Notion"
+    },
+    "linear": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Linear"
+    },
+    "stripe": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Stripe"
+    },
+    "shopify": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Shopify"
+    },
+    "slack": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Slack"
+    },
+    "discord": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Discord"
+    },
+    "zoom": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Zoom"
+    },
+    "asana": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Asana"
+    },
+    "jira": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Jira"
+    },
+    "confluence": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Confluence"
+    },
+    "atlassian": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Atlassian"
+    },
+    "hubspot": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "HubSpot"
+    },
+    "salesforce": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Salesforce"
+    },
+    "zendesk": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Zendesk"
+    },
+    "airtable": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Airtable"
+    },
+    "miro": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Miro"
+    },
+    "canva": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Canva"
+    },
+    "linkedin": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "LinkedIn"
+    },
+    "youtube": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "YouTube"
+    },
+    "tiktok": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "TikTok"
+    },
+    "whatsapp": {
+      "log_freq": -5.6,
+      "casing_flag": 4,
+      "exact_casing": "WhatsApp"
+    },
+    "telegram": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Telegram"
+    },
+    "signal": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Signal"
+    },
+    "spotify": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Spotify"
+    },
+    "netflix": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Netflix"
+    },
+    "reddit": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Reddit"
+    },
+    "substack": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Substack"
+    },
+    "intercom": {
+      "log_freq": -5.6,
+      "casing_flag": 1,
+      "exact_casing": "Intercom"
     }
   },
   "direct_typos": {
     "stakholder": "stakeholder",
-    "deliverbles": "deliverables"
+    "deliverbles": "deliverables",
+    "monetizaton": "monetization",
+    "shpoify": "Shopify",
+    "linkdin": "LinkedIn"
   }
 }
