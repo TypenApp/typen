@@ -1,4 +1,4 @@
-"""PyInstaller entry stub for `AutoCorrectDesktop.exe` (see `autocorrect.launcher`)."""
+"""PyInstaller entry stub for `typen.exe` (see `autocorrect.launcher`)."""
 
 from __future__ import annotations
 

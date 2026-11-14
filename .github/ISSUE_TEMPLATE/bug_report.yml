@@ -24,8 +24,8 @@ body:
     id: version
     attributes:
       label: Typen Version
-      description: Output of `AutoCorrectDesktop --version` or shown in Settings -> About
-      placeholder: "1.2.0-beta.4"
+      description: Output of `typen --version` or shown in Settings -> About
+      placeholder: "2.0.0"
     validations:
       required: true
   - type: input
@@ -45,5 +45,5 @@ body:
     id: health_check
     attributes:
       label: Output of `--headless-check` (optional)
-      description: Run `AutoCorrectDesktop --headless-check` in a terminal and paste the one-line output.
+      description: Run `typen --headless-check` in a terminal and paste the one-line output.
       render: shell

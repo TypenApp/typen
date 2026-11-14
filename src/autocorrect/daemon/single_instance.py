@@ -1,6 +1,6 @@
 """
 Single-Instance Daemon Lock.
-Ensures only one instance of AutoCorrect monitors the system keyboard at any time.
+Ensures only one instance of Typen monitors the system keyboard at any time.
 
 Windows: a named mutex (`Local\\Typen-Daemon-<hash of data dir>`) is the real
 guard; the kernel releases it the instant the owning process dies, so a crash

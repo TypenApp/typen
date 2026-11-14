@@ -77,6 +77,12 @@ ui = [
 
 [project.scripts]
 typen = "autocorrect.launcher:main"
+typen-desktop = "autocorrect.launcher:main"
+typen-daemon = "autocorrect.daemon.app:main"
+typen-settings = "autocorrect.ui.settings_main:main"
+typen-sandbox = "autocorrect.sandbox:main"
+typen-pipeline = "pipeline.cli:main"
+typen-issue-licence = "pipeline.issue_licence:main"
 autocorrect-desktop = "autocorrect.launcher:main"
 autocorrect-daemon = "autocorrect.daemon.app:main"
 autocorrect-settings = "autocorrect.ui.settings_main:main"

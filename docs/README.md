@@ -17,7 +17,7 @@ Official documentation, architecture specifications, security guarantees, and CL
 | `05` | Features | [AI: Layer 2 Local Models & Layer 3 BYOK Cloud AI](ai-intelligence.md) | Hardware-aware local ONNX/GGUF sentence analysis (400ms Pause Pill & Ctrl+Shift+R hotkey) and consent-gated BYOK Cloud AI with hard USD spending limits. |
 | `06` | Security | [Security, Privacy & Cryptographic Update Architecture](security-privacy.md) | How Typen guarantees zero keystroke logging, automatic password field exclusion, Ed25519 manifest verification, and atomic Zstandard delta updates. |
 | `07` | Project | [Open Source, Free for Everyone, Funded by Donations](open-source.md) | Typen is MIT-licensed with a single edition and no trial, licence key or activation. How the project is funded, what changed from the earlier commercial betas, and how to contribute. |
-| `08` | Developers | [CLI Entry Points, Local Sandbox & Lexicon Pipeline Reference](cli-reference.md) | Command-line reference for autocorrect-daemon, autocorrect-settings, autocorrect-sandbox, and the ESDB/SCOWL binary lexicon compiler (autocorrect-pipeline). |
+| `08` | Developers | [CLI Entry Points, Local Sandbox & Lexicon Pipeline Reference](cli-reference.md) | Command-line reference for typen, typen-daemon, typen-settings, typen-sandbox, and the ESDB/SCOWL binary lexicon compiler (typen-pipeline). |
 
 ## Official `TypenApp` Repositories
 

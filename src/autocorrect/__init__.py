@@ -1,5 +1,5 @@
 """
-AutoCorrect: Offline-First, Intelligent, System-Wide Desktop Autocorrect Application.
+Typen: Offline-First, Intelligent, System-Wide Desktop Autocorrect Application.
 """
 
 from autocorrect.version import (

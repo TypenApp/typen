@@ -1,7 +1,7 @@
 """
 File logging for the frozen, console-less desktop build.
 
-`AutoCorrectDesktop.exe` is built with `console=False`, so without this every
+`typen.exe` is built with `console=False`, so without this every
 traceback, hook failure and watchdog decision vanished. Logs go to
 `<data_dir>/logs/typen.log` (rotating, 1 MB x 5) and, when a console exists,
 to stderr as well. Unhandled exceptions on any thread are logged too.

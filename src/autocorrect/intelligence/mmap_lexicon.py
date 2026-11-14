@@ -111,6 +111,56 @@ class MmapLexicon:
                 hi = mid - 1
         return None
 
+    def find_word_ids_by_prefix(
+        self,
+        prefix_lower: str,
+        *,
+        min_log_freq: float = -7.6,
+        min_len: int = 5,
+        limit: int = 24,
+    ) -> list[tuple[int, str, float, str | None]]:
+        """
+        Binary search the sorted UTF-8 lexicon for words starting with `prefix_lower`,
+        scanning only the matching prefix range (O(log N + K)) and returning the top
+        `limit` suggestible words as `(word_id, word_lower, log_freq, exact_casing)`.
+        """
+        if not prefix_lower:
+            return []
+        pref_bytes = prefix_lower.encode("utf-8")
+
+        # Find lower bound (first entry >= pref_bytes)
+        lo = 1
+        hi = self._count - 1
+        start_idx = self._count
+        while lo <= hi:
+            mid = (lo + hi) >> 1
+            mb = bytes(self._word_bytes_at(mid))
+            if mb >= pref_bytes:
+                start_idx = mid
+                hi = mid - 1
+            else:
+                lo = mid + 1
+
+        matches: list[tuple[int, str, float, str | None]] = []
+        # Scan at most 512 entries starting with pref_bytes
+        end_scan = min(self._count, start_idx + 512)
+        for wid in range(start_idx, end_scan):
+            wb = bytes(self._word_bytes_at(wid))
+            if not wb.startswith(pref_bytes):
+                break
+            if len(wb) < min_len:
+                continue
+            meta = self.get_meta(wid)
+            if not meta.can_suggest or meta.log_freq < min_log_freq:
+                continue
+            word_str = wb.decode("utf-8")
+            if not word_str.isalpha():
+                continue
+            matches.append((wid, word_str, meta.log_freq, self._exact_casing.get(wid)))
+
+        matches.sort(key=lambda item: item[2], reverse=True)
+        return matches[:limit]
+
     def get_meta(self, word_id: int) -> LexiconMeta:
         """Unpack the 8-byte metadata struct for word_id."""
         if word_id < 0 or word_id >= self._count:

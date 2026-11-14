@@ -1,5 +1,5 @@
 """
-IBus engine process entry point (`AutoCorrectDesktop --ibus`).
+IBus engine process entry point (`typen --ibus`).
 
 Binds `WaylandIBusEngineAdapter` to a real `IBus.Engine` GObject subclass via
 PyGObject. The engine runs as its own process spawned by ibus-daemon (see
@@ -38,7 +38,7 @@ def _load_gi() -> tuple[Any, Any, Any]:
         return GLib, GObject, IBus
     except (ImportError, ValueError) as exc:
         sys.stderr.write(
-            "AutoCorrect IBus engine: PyGObject with the IBus typelib is required "
+            "Typen IBus engine: PyGObject with the IBus typelib is required "
             "(Debian/Ubuntu: sudo apt install python3-gi gir1.2-ibus-1.0; "
             f"Fedora: sudo dnf install python3-gobject ibus). Details: {exc}\n"
         )
@@ -56,7 +56,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
 
     daemon = AutoCorrectDaemon(data_dir=data_dir, dry_run_hooks=True)
     snapshot = daemon.start(start_ipc=True)
-    sys.stderr.write(f"AutoCorrect IBus engine: {snapshot.status_message}\n")
+    sys.stderr.write(f"Typen IBus engine: {snapshot.status_message}\n")
 
     engine_base: Any = IBus.Engine
 
@@ -118,7 +118,7 @@ def main(data_dir: Path, *, standalone: bool = False) -> int:
     IBus.init()
     bus = IBus.Bus()
     if not bus.is_connected():
-        sys.stderr.write("AutoCorrect IBus engine: cannot connect to ibus-daemon (is IBus running?)\n")
+        sys.stderr.write("Typen IBus engine: cannot connect to ibus-daemon (is IBus running?)\n")
         daemon.stop()
         return 4
 

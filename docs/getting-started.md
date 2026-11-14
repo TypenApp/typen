@@ -23,7 +23,7 @@ Typen is engineered around a strict two-process separation: a lightweight, alway
 When you close the Settings window, the UI process terminates completely (0% UI CPU and 0 MB GUI RAM), while the background daemon continues correcting typos across every native and web application on your machine.
 
 - 100% Offline Core: Zero cloud dependency for everyday spelling, grammar, homophone, and punctuation corrections.
-- 166,000+-Word Memory-Mapped Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.
+- 464,000+-Word Memory-Mapped V2 Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.
 - Free and open source: every feature is available to everyone; there is no trial, licence key or account.
 
 <a id="windows-setup"></a>
@@ -59,7 +59,7 @@ The macOS build is in public beta: feature-complete, with less real-world mileag
 
 On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings remains available.
 
-Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/AutoCorrect.
+Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/Typen.
 
 <a id="linux-setup"></a>
 ## Linux Setup (X11 & Wayland via IBus) — Beta
@@ -87,7 +87,7 @@ Once the kill switch has fired, Typen stays in safe mode across restarts: the se
 <a id="logs-and-flags"></a>
 ## Logs and Command-Line Flags
 
-Typen writes a rotating log (1 MB x 5 files) to <data dir>/logs/typen.log; the service's data directory is %USERPROFILE%\.autocorrect_desktop on Windows, ~/Library/Application Support/AutoCorrect on macOS and ~/.local/share/autocorrect on Linux. The log records hook installation, hotkey registration, health degradations and any unhandled exception, so it is the first thing to attach to a bug report. Set TYPEN_LOG_LEVEL=DEBUG for more detail.
+Typen writes a rotating log (1 MB x 5 files) to <data dir>/logs/typen.log; the service's data directory is %USERPROFILE%\.autocorrect_desktop on Windows, ~/Library/Application Support/Typen on macOS and ~/.local/share/typen on Linux. The log records hook installation, hotkey registration, health degradations and any unhandled exception, so it is the first thing to attach to a bug report. Set TYPEN_LOG_LEVEL=DEBUG for more detail.
 
 The same flags work with python -m autocorrect.launcher when running from source, and --data-dir <path> points any of them at an alternative data directory.
 

@@ -17,11 +17,19 @@ export function PageHeader({
   children?: React.ReactNode;
 }) {
   return (
-    <header className="container-site pb-10 pt-14 sm:pt-20">
+    <header className="container-site pb-10 pt-12 sm:pt-16 lg:pb-14 lg:pt-20">
       <p className="eyebrow">{eyebrow}</p>
-      <h1 className="display mt-4 max-w-3xl text-4xl leading-[1.05] sm:text-5xl">{title}</h1>
-      {lede && <div className="prose-site mt-5 max-w-2xl text-lg">{lede}</div>}
-      {children}
+      <div className="mt-4 grid gap-6 lg:grid-cols-12 lg:items-end lg:gap-12">
+        <div className={lede || children ? "lg:col-span-7" : "lg:col-span-10"}>
+          <h1 className="display text-4xl leading-[1.04] sm:text-5xl xl:text-6xl">{title}</h1>
+        </div>
+        {(lede || children) && (
+          <div className="lg:col-span-5">
+            {lede && <div className="prose-site text-base sm:text-lg">{lede}</div>}
+            {children}
+          </div>
+        )}
+      </div>
     </header>
   );
 }

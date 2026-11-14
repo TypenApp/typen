@@ -51,9 +51,9 @@ MACOS_KEYCODE_MAP: Final[dict[int, str]] = {
 TAP_CREATE_TIMEOUT_S: Final[float] = 5.0
 
 PERMISSION_REMEDIATION: Final[str] = (
-    "Open System Settings → Privacy & Security → Input Monitoring and enable AutoCorrect, "
+    "Open System Settings → Privacy & Security → Input Monitoring and enable Typen, "
     "then also enable it under Accessibility (needed to type corrections). "
-    "Quit and reopen AutoCorrect afterwards."
+    "Quit and reopen Typen afterwards."
 )
 
 

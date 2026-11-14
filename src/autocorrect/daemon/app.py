@@ -328,7 +328,7 @@ class AutoCorrectDaemon:
         if self.preference_store.get_typed("start_paused"):
             self.session.set_paused(True)
             self._notify_state_changed()
-        if self.preference_store.get_typed("updates_check_on_launch"):
+        if self.preference_store.get_typed("updates_check_on_launch") and not self._dry_run_hooks:
             threading.Thread(
                 target=self._check_app_updates_on_launch,
                 name="typen-app-update-check",
@@ -953,7 +953,7 @@ class AutoCorrectDaemon:
                     backend="ibus",
                     detail="Wayland session: compositors do not allow global key hooks.",
                     remediation=(
-                        "Enable the AutoCorrect IBus input method "
+                        "Enable the Typen IBus input method "
                         "(Settings → Keyboard → Input Sources → add 'English (Typen)') "
                         "and select it as your active input source."
                     ),
@@ -962,7 +962,7 @@ class AutoCorrectDaemon:
                 return HookStatus(
                     HookState.UNSUPPORTED,
                     detail="No DISPLAY/WAYLAND_DISPLAY in the environment.",
-                    remediation="Start AutoCorrect from inside a graphical desktop session.",
+                    remediation="Start Typen from inside a graphical desktop session.",
                 )
             self._x11_hook = X11KeyboardMouseHook(
                 on_key_event=self._dispatch_os_key_passive,
@@ -984,7 +984,7 @@ class AutoCorrectDaemon:
         return HookStatus(
             HookState.UNSUPPORTED,
             detail=f"No input hook for platform {sys.platform!r}.",
-            remediation="AutoCorrect supports Windows, macOS and Linux desktops.",
+            remediation="Typen supports Windows, macOS and Linux desktops.",
         )
 
     def _release_os_hooks(self) -> None:
@@ -1287,7 +1287,7 @@ def main(argv: list[str] | None = None) -> int:
     import argparse
     import time
 
-    parser = argparse.ArgumentParser(description="AutoCorrect System-Wide Desktop Background Daemon")
+    parser = argparse.ArgumentParser(description="Typen System-Wide Desktop Background Daemon")
     parser.add_argument(
         "--data-dir",
         type=Path,
@@ -1308,7 +1308,7 @@ def main(argv: list[str] | None = None) -> int:
         dry_run_hooks=not args.live,
     )
     snap = daemon.start()
-    print(f"AutoCorrect Daemon initialized: {snap.status_message}")
+    print(f"Typen Daemon initialized: {snap.status_message}")
     if not args.live:
         daemon.stop()
         return 0
@@ -1319,7 +1319,7 @@ def main(argv: list[str] | None = None) -> int:
         while True:
             time.sleep(0.5)
     except KeyboardInterrupt:
-        print("\nStopping AutoCorrect Daemon and releasing OS keyboard hooks...")
+        print("\nStopping Typen Daemon and releasing OS keyboard hooks...")
     finally:
         daemon.stop()
     return 0

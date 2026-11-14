@@ -401,10 +401,12 @@ export const BASE_LANGUAGE_BUNDLE = {
 
 /** Release scope: what ships, what does not. Rendered verbatim on /download. */
 export const RELEASE_INCLUDED = [
-  "System-wide keyboard hook, spelling, direct typos, homophones, punctuation and capitalisation (Layer 1, offline)",
-  `${LEXICON_WORD_COUNT.toLocaleString()}-word English lexicon with EN_GB / EN_US / EN_CA / EN_AU variants`,
-  "System tray with Pause/Resume, and the Settings window (10 screens) over authenticated local IPC",
-  "Custom dictionary, suggested words, rejected pairs, per-app profiles, domain packs and text-expansion snippets",
+  "System-wide keyboard hook, spelling, direct typos, homophones, joined-word splitting, punctuation and capitalisation (Layer 1, offline)",
+  "Inline placeholder predictive typing on Tab (word suffix completions & next-word predictions) with adaptive personal learning",
+  `${LEXICON_WORD_COUNT.toLocaleString()}-word V2 English lexicon with EN_GB / EN_US / EN_CA / EN_AU variants`,
+  "System tray with Pause/Resume, and the 11-screen PySide6 / Qt Quick Settings window over authenticated local IPC",
+  "Custom dictionary with fuzzy SymSpell matching, suggested words, rejected pairs, per-app profiles, 6 expanded domain packs and snippets",
+  "Signed in-app application updates with launch-time update modal and automatic restart",
   "Every feature, for everyone: no editions, trials or licence keys",
   ...AVAILABLE_PLATFORMS.map(
     (p) => `${p.osName} build, ${PLATFORM_STATUS_LABEL[p.status].toLowerCase()} (${p.architecture})`
@@ -412,11 +414,9 @@ export const RELEASE_INCLUDED = [
 ];
 
 export const RELEASE_NOT_INCLUDED = [
-  ...(winSigned ? [] : ["Windows code signing (SmartScreen warning on first run)"]),
+  ...(winSigned ? [] : ["Windows Authenticode certificate signing (SmartScreen warning on first run; verify SHA-256)"]),
   // Only call a platform "not included" once something else *is* included;
   // before the first publish of a version every platform is simply still building.
   ...(AVAILABLE_PLATFORMS.length > 0 ? UPCOMING_PLATFORMS.map((p) => `${p.osName} build`) : []),
-  "Local AI (Layer 2) models and BYOK cloud AI (Layer 3) — the screens exist, model downloads are not published",
-  "Qt (PySide6) Settings UI — the current builds ship the lightweight native fallback window",
-  "Automatic application updates — reinstall over the top to upgrade",
+  "Wayland global key hooks without IBus (Wayland compositors require the bundled IBus input method)",
 ];

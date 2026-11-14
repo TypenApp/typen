@@ -59,7 +59,7 @@ const config: Config = {
         lg: "14px",
       },
       maxWidth: {
-        site: "66rem",
+        site: "96rem",
       },
       keyframes: {
         caret: {

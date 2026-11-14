@@ -183,7 +183,7 @@ Typen is one small background service that fixes typos, homophones, punctuation,
 | Repository | Description |
 | --- | --- |
 | [**`TypenApp/typen`**](https://github.com/TypenApp/typen) | Main desktop application, OS keyboard hooks (Win32, Quartz, X11, Wayland/IBus), authenticated Local IPC, 10-screen Settings UI, cross-platform installers, and public website. |
-| [**`TypenApp/language-data`**](https://github.com/TypenApp/language-data) | Global English lexicon build pipeline (166,475 words from SCOWL/ESDB), SymSpell delete-distance index, trigram context model, confusion sets, 6 domain vocabulary packs, and held-out quality benchmarks. |
+| [**`TypenApp/language-data`**](https://github.com/TypenApp/language-data) | Global English lexicon build pipeline (464,269 words from SCOWL/ESDB & comprehensive dictionary JSON), SymSpell delete-distance index, trigram context model, confusion sets, 6 domain vocabulary packs, and held-out quality benchmarks. |
 | [**`TypenApp/model-resources`**](https://github.com/TypenApp/model-resources) | Optional Layer 2 on-device AI model descriptors (`grammar-onnx-int8-small`, `rewrite-gguf-q4-360m`), hardware capability profiles, and Ed25519 manifest signing tools. |
 | [**`TypenApp/docs`**](https://github.com/TypenApp/docs) | Product documentation, core engine architecture specs, security & privacy guarantees, and CLI reference. |
 
@@ -192,7 +192,7 @@ Typen is one small background service that fixes typos, homophones, punctuation,
 ## Why Typen?
 
 - **Every application**: A low-level OS keyboard hook sees keystrokes before the application does and injects flicker-free suffix-diff replacements.
-- **Nothing leaves your computer**: A 166k-word lexicon is memory-mapped from disk (`mmap`) and queried in under a millisecond. Zero keystroke logging, automatic password-field exclusion, and zero telemetry.
+- **Nothing leaves your computer**: A 464k-word lexicon is memory-mapped from disk (`mmap`) and queried in under a millisecond. Zero keystroke logging, automatic password-field exclusion, and zero telemetry.
 - **Reversible by design**: Every correction is a transaction. Press `Backspace` twice immediately after a correction to restore your original word and queue it for your personal dictionary.
 - **Free forever**: MIT-licensed with a single edition, no trial, no licence key, and no paid tier.
 """
@@ -246,11 +246,11 @@ def build_language_data_repo(out_dir: Path) -> Path:
     _copy_tree_filtered(ROOT / "pipeline", repo_dir / "pipeline")
     _copy_tree_filtered(ROOT / "resources", repo_dir / "resources")
 
-    # Include the core & intelligence packages so `autocorrect-pipeline` and held-out
+    # Include the core & intelligence packages so `typen-pipeline` and held-out
     # quality tests run standalone inside `TypenApp/language-data`.
     for subpkg in ("__init__.py", "version.py"):
         _copy_file(ROOT / "src" / "autocorrect" / subpkg, repo_dir / "src" / "autocorrect" / subpkg)
-    for pkg_name in ("core", "intelligence", "input", "licensing"):
+    for pkg_name in ("core", "intelligence", "input", "licensing", "preferences"):
         _copy_tree_filtered(
             ROOT / "src" / "autocorrect" / pkg_name,
             repo_dir / "src" / "autocorrect" / pkg_name,
@@ -276,7 +276,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "typen-language-data"
-version = "1.0.9"
+version = "2.0.0"
 description = "Global English lexicon pipeline, confusion sets, domain packs and held-out quality corpus for Typen"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -302,6 +302,7 @@ MainApp = "https://github.com/TypenApp/typen"
 Issues = "https://github.com/TypenApp/language-data/issues"
 
 [project.scripts]
+typen-pipeline = "pipeline.cli:main"
 autocorrect-pipeline = "pipeline.cli:main"
 
 [tool.setuptools.packages.find]
@@ -351,12 +352,12 @@ This repository contains the lexicon ingestion pipeline, binary compiler, homoph
 | Path | Description |
 | --- | --- |
 | `pipeline/ingest.py` | Master English dataset builder combining SCOWL/ESDB headwords, dialect tags (`EN_GB`, `EN_US`, `EN_CA`, `EN_AU`), wordfreq tiers, and direct typo maps |
-| `pipeline/external_sources.py` | Loader for `pipeline/data/external/scowl-pre.txt` (166,475 attested English words and inflections) |
+| `pipeline/external_sources.py` | Loader for `pipeline/data/external/scowl-pre.txt` and `words_dictionary.json` (464,269 attested English words and inflections) |
 | `pipeline/validate.py` | Dataset sanitisation and invariant checks (ensures known misspellings never enter the valid lexicon) |
 | `pipeline/compile_binary.py` | Zero-copy `mmap` binary compiler (`lexicon.bin`, `lexicon_meta.bin`, `symspell_idx.bin`, `direct_typos.bin`, `context_ngram.bin`, `abbreviations.bin`) |
 | `pipeline/regression_runner.py` | Golden corpus regression runner enforcing minimum typo accuracy, confusion accuracy, and near-zero false-positive rate |
 | `pipeline/sign_release.py` | Ed25519 manifest signer and Zstandard `.tar.zst` full / `.patch.zst` delta archive builder |
-| `resources/en_base/` | Compiled binary baseline bundle (`schema_version = 1`) and `manifest.json` |
+| `resources/en_base/` | Compiled binary baseline bundle (`schema_version = 2`) and `manifest.json` |
 | `resources/en_base/packs/` | 6 domain vocabulary packs: `programming`, `medicine`, `finance`, `law`, `business`, `academic` |
 | `tests/` | Held-out corpus quality gate (`test_engine_quality_heldout.py`); the full curated suite lives in `TypenApp/typen` |
 

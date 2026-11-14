@@ -39,7 +39,7 @@ export const DOC_ARTICLES: DocArticle[] = [
         ],
         bullets: [
           "100% Offline Core: Zero cloud dependency for everyday spelling, grammar, homophone, and punctuation corrections.",
-          "166,000+-Word Memory-Mapped Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.",
+          "464,000+-Word Memory-Mapped V2 Lexicon: Instant cold startup (< 150ms) via zero-copy mmap binary tables.",
           "Free and open source: every feature is available to everyone; there is no trial, licence key or account.",
         ],
       },
@@ -74,7 +74,7 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
         paragraphs: [
           "The macOS build is in public beta: feature-complete, with less real-world mileage than the Windows build. Check the Downloads page for availability: the macOS build is listed there only once it has been published. Open the .dmg and drag Typen to /Applications. Because Typen listens to keystrokes through a Quartz Event Tap (CGEventTapCreate) and types corrections with CGEventPost, macOS requires two permissions: Input Monitoring (to read keys) and Accessibility (to inject replacements).",
           "On first launch macOS shows both prompts. Approve them in System Settings -> Privacy & Security -> Input Monitoring and -> Accessibility, then relaunch. If a permission is missing, the menu-bar status reads 'Not correcting' with the exact step to fix it; the service keeps running so Settings remains available.",
-          "Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/AutoCorrect.",
+          "Every focus change checks IsSecureEventInputEnabled() and the focused element's AXSecureTextField role, so password prompts and Secure Keyboard Entry terminals are never read. Launch at login is a per-user LaunchAgent (~/Library/LaunchAgents/io.autocorrect.desktop.plist) that is loaded with launchctl immediately. Data lives in ~/Library/Application Support/Typen.",
         ],
       },
       {
@@ -109,7 +109,7 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
         id: "logs-and-flags",
         heading: "Logs and Command-Line Flags",
         paragraphs: [
-          "Typen writes a rotating log (1 MB x 5 files) to <data dir>/logs/typen.log; the service's data directory is %USERPROFILE%\\.autocorrect_desktop on Windows, ~/Library/Application Support/AutoCorrect on macOS and ~/.local/share/autocorrect on Linux. The log records hook installation, hotkey registration, health degradations and any unhandled exception, so it is the first thing to attach to a bug report. Set TYPEN_LOG_LEVEL=DEBUG for more detail.",
+          "Typen writes a rotating log (1 MB x 5 files) to <data dir>/logs/typen.log; the service's data directory is %USERPROFILE%\\.autocorrect_desktop on Windows, ~/Library/Application Support/Typen on macOS and ~/.local/share/typen on Linux. The log records hook installation, hotkey registration, health degradations and any unhandled exception, so it is the first thing to attach to a bug report. Set TYPEN_LOG_LEVEL=DEBUG for more detail.",
           "The same flags work with python -m autocorrect.launcher when running from source, and --data-dir <path> points any of them at an alternative data directory.",
         ],
         codeBlock: {
@@ -202,7 +202,7 @@ Get-FileHash .\\Typen-<version>-win64-setup.exe -Algorithm SHA256
         id: "out-of-process-ipc",
         heading: "Out-of-Process UI & Authenticated Local IPC",
         paragraphs: [
-          "The Settings interface (autocorrect-settings) never opens SQLite for direct writes while the daemon is active, and never loads duplicate mmap lexicon files. Instead, it connects to LocalIPCServer inside autocorrect-daemon over a Windows Named Pipe (\\\\.\\pipe\\AutoCorrectIPC_<hash>) or a 0600 Unix Domain Socket (~/.autocorrect_desktop/ipc.sock).",
+          "The Settings interface (typen-settings) never opens SQLite for direct writes while the daemon is active, and never loads duplicate mmap lexicon files. Instead, it connects to LocalIPCServer inside typen-daemon over a Windows Named Pipe or a 0600 Unix Domain Socket (~/.autocorrect_desktop/ipc.sock).",
           "Every request is authenticated using a 256-bit random hex token stored in ~/.autocorrect_desktop/ipc.token (chmod 0600). Changes made in any screen update the daemon's zero-latency PreferenceMemoryOverlay between keystrokes.",
         ],
       },
@@ -438,57 +438,57 @@ python -m autocorrect.launcher --headless-check`,
     shortTitle: "CLI & Pipeline Reference",
     category: "Developers",
     summary:
-      "Command-line reference for autocorrect-daemon, autocorrect-settings, autocorrect-sandbox, and the ESDB/SCOWL binary lexicon compiler (autocorrect-pipeline).",
+      "Command-line reference for typen, typen-daemon, typen-settings, typen-sandbox, and the ESDB/SCOWL binary lexicon compiler (typen-pipeline).",
     readingTime: "5 min read",
     sections: [
       {
         id: "cli-commands",
         heading: "Installed CLI Entry Points (pyproject.toml)",
         paragraphs: [
-          "The packaged typen.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, AutoCorrect registers these command-line entry points in pyproject.toml:",
+          "The packaged typen.exe accepts --settings, --headless-check, --no-tray, --data-dir, --version, --stop, --safe-mode and --resume. From a source checkout, Typen registers these command-line entry points in pyproject.toml:",
         ],
         codeBlock: {
           language: "bash",
           title: "CLI Commands Reference",
           code: `# 0. Same entry point as the packaged executable (service + tray, or --settings)
-autocorrect-desktop --data-dir ~/.autocorrect_desktop
-autocorrect-desktop --settings
+typen --data-dir ~/.autocorrect_desktop
+typen --settings
 
 # 0b. Service control: shut down cleanly, start without hooks, or leave safe mode
-autocorrect-desktop --stop
-autocorrect-desktop --safe-mode
-autocorrect-desktop --resume
+typen --stop
+typen --safe-mode
+typen --resume
 
 # 1. Start only the background hook daemon & Local IPC server (foreground, Ctrl+C to stop)
-autocorrect-daemon --live --data-dir ~/.autocorrect_desktop
+typen-daemon --live --data-dir ~/.autocorrect_desktop
 
-# 2. Launch the out-of-process 10-screen Settings UI (QML when PySide6 is installed)
-autocorrect-settings --data-dir ~/.autocorrect_desktop
+# 2. Launch the out-of-process Settings UI (QML when PySide6 is installed)
+typen-settings --data-dir ~/.autocorrect_desktop
 
-# 3. Run headless health check of all 10 UI controller screens & SQLite store
-autocorrect-settings --headless-check
+# 3. Run headless health check of all UI controller screens & SQLite store
+typen-settings --headless-check
 
 # 4. Launch the Controlled Local Browser Sandbox on http://127.0.0.1:8765
-autocorrect-sandbox --host 127.0.0.1 --port 8765
+typen-sandbox --host 127.0.0.1 --port 8765
 
 # 5. Compile & cryptographically sign a language resource bundle
-autocorrect-pipeline build --version 1.0.9 --out-dir ./build/en_1.0.9`,
+typen-pipeline build --version 2.0.0 --out-dir ./build/en_2.0.0`,
         },
       },
       {
         id: "local-sandbox",
-        heading: "Testing Safely with autocorrect-sandbox",
+        heading: "Testing Safely with typen-sandbox",
         paragraphs: [
-          "During development or evaluation, autocorrect-sandbox starts a local HTTP server on 127.0.0.1:8765 connected to the real Python InputSessionManager and AutocorrectEngine with dry_run_hooks=True.",
+          "During development or evaluation, typen-sandbox starts a local HTTP server on 127.0.0.1:8765 connected to the real Python InputSessionManager and AutocorrectEngine with dry_run_hooks=True.",
           "Every keystroke in the browser textarea is serialized and evaluated against the mmap lexicon, displaying live telemetry for Active Word Buffer, Caret State, Sentence Capitaliser, Undo Transaction Slot, and evaluation latency in milliseconds.",
-          "The same code powers the demo on this website. The site never simulates corrections: /api/demo is a Python serverless function that imports the engine and the en_base resources vendored from the same commit, and every visitor gets an isolated session (own word buffer, undo ledger and custom dictionary) keyed by an X-Session-Id header. Because a request may land on a fresh instance, each keystroke also carries the text before the caret and the visitor's dictionary words, from which a new instance primes an equivalent session without re-correcting anything. During local development `next dev` proxies /api/demo to autocorrect-sandbox on 127.0.0.1:8765 instead.",
+          "The same code powers the demo on this website. The site never simulates corrections: /api/demo is a Python serverless function that imports the engine and the en_base resources vendored from the same commit, and every visitor gets an isolated session (own word buffer, undo ledger and custom dictionary) keyed by an X-Session-Id header. Because a request may land on a fresh instance, each keystroke also carries the text before the caret and the visitor's dictionary words, from which a new instance primes an equivalent session without re-correcting anything. During local development `next dev` proxies /api/demo to typen-sandbox on 127.0.0.1:8765 instead.",
         ],
       },
       {
         id: "binary-pipeline",
         heading: "ESDB / SCOWL Lexicon Ingestion & Binary Compilation Pipeline",
         paragraphs: [
-          "The offline build pipeline (pipeline/ingest.py, pipeline/validate.py, pipeline/compile_binary.py, pipeline/sign_release.py) ingests over 166,000 attested English words and inflections from SCOWL/ESDB (size levels up to 70, including dialect-tagged headwords and irregular forms), ranks every word by wordfreq corpus frequency, strips known misspellings so corpus noise never validates a typo, adds a recognition-only technical vocabulary, compiles zero-copy binary artifacts (lexicon.bin, symspell_idx.bin, context_ngram.bin), and packages Zstandard full and delta archives signed with Ed25519.",
+          "The offline build pipeline (pipeline/ingest.py, pipeline/validate.py, pipeline/compile_binary.py, pipeline/sign_release.py) ingests over 464,000 attested English words and inflections from SCOWL/ESDB (up to level 100, including dialect-tagged headwords and irregular forms) and the comprehensive English dictionary JSON, ranks every word by wordfreq corpus frequency, strips known misspellings so corpus noise never validates a typo, adds technical and modern vocabulary, compiles zero-copy binary artifacts (lexicon.bin, symspell_idx.bin, context_ngram.bin), and packages Zstandard full and delta archives signed with Ed25519.",
         ],
       },
     ],

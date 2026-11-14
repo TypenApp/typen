@@ -14,7 +14,7 @@
 <a id="out-of-process-ipc"></a>
 ## Out-of-Process UI & Authenticated Local IPC
 
-The Settings interface (autocorrect-settings) never opens SQLite for direct writes while the daemon is active, and never loads duplicate mmap lexicon files. Instead, it connects to LocalIPCServer inside autocorrect-daemon over a Windows Named Pipe (\\.\pipe\AutoCorrectIPC_<hash>) or a 0600 Unix Domain Socket (~/.autocorrect_desktop/ipc.sock).
+The Settings interface (typen-settings) never opens SQLite for direct writes while the daemon is active, and never loads duplicate mmap lexicon files. Instead, it connects to LocalIPCServer inside typen-daemon over a Windows Named Pipe or a 0600 Unix Domain Socket (~/.autocorrect_desktop/ipc.sock).
 
 Every request is authenticated using a 256-bit random hex token stored in ~/.autocorrect_desktop/ipc.token (chmod 0600). Changes made in any screen update the daemon's zero-latency PreferenceMemoryOverlay between keystrokes.
 

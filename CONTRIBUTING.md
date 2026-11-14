@@ -70,7 +70,7 @@ pytest
 ruff check src pipeline tests
 
 # 3. Run headless end-to-end daemon & resource smoke check
-python -m autocorrect.launcher --headless-check
+typen --headless-check
 ```
 
 ### Testing in the Local Browser Sandbox
@@ -78,7 +78,7 @@ python -m autocorrect.launcher --headless-check
 To test typing behaviour safely without installing a system-wide OS keyboard hook:
 
 ```bash
-autocorrect-sandbox --host 127.0.0.1 --port 8765
+typen-sandbox --host 127.0.0.1 --port 8765
 ```
 
 ---

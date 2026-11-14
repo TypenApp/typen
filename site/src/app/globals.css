@@ -95,7 +95,7 @@ samp {
 
 @layer components {
   .container-site {
-    @apply mx-auto w-full max-w-site px-5 sm:px-8;
+    @apply mx-auto w-full max-w-site px-5 sm:px-8 lg:px-12 xl:px-16 2xl:px-20;
   }
 
   /* Headline type: Syne at its heavier end, tight tracking, large but calm. */

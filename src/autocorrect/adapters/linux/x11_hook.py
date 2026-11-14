@@ -94,7 +94,7 @@ class X11KeyboardMouseHook:
         except Exception as exc:
             raise X11HookError(
                 f"Cannot connect to the X server: {exc}",
-                "AutoCorrect needs a running X11 session (DISPLAY). Under Wayland use the "
+                "Typen needs a running X11 session (DISPLAY). Under Wayland use the "
                 "IBus engine instead.",
             ) from exc
 

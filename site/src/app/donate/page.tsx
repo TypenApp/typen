@@ -9,12 +9,12 @@ import {
 } from "@/data/releases";
 
 const EVERYONE_GETS = [
-  "Offline spelling, homophone, punctuation and capitalisation correction in every application",
-  "English variants: EN_GB, EN_US, EN_CA, EN_AU, and the domain vocabulary packs",
-  "Custom dictionary, suggested words, CSV / JSON backup, Backspace-to-undo",
+  "Offline spelling, homophone, joined-word splitting, punctuation and capitalisation correction in every application",
+  "Inline placeholder predictive typing on Tab with an adaptive personal language model",
+  "English variants: EN_GB, EN_US, EN_CA, EN_AU, and the 6 specialist domain vocabulary packs",
+  "Custom dictionary with fuzzy SymSpell matching, suggested words, CSV / JSON backup, Backspace-to-undo",
   "Per-application profiles and text-expansion snippets with date / time macros",
-  "Local AI and bring-your-own-key cloud AI (as they are published)",
-  "Every update, for as long as the project exists",
+  "Layer 2 on-device hybrid model, BYOK cloud AI, and signed in-app updates forever",
 ];
 
 const WHAT_IT_PAYS_FOR = [
@@ -49,7 +49,6 @@ export default function DonatePage() {
       <PageHeader
         eyebrow="Donate"
         title={
-          
           <>
             Free for everyone.
             <br />
@@ -64,7 +63,7 @@ export default function DonatePage() {
           </p>
         }
       >
-        <div className="mt-8 flex flex-wrap items-center gap-3">
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           <a
             href={DONATE_URL}
             target="_blank"
@@ -86,40 +85,48 @@ export default function DonatePage() {
 
       <Section
         index="01"
-        title="What everyone gets"
+        title="What everyone gets & what donations fund"
         aside="No editions, no gates"
       >
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {EVERYONE_GETS.map((f) => (
-            <Check key={f}>{f}</Check>
-          ))}
-        </ul>
+        <div className="grid gap-8 lg:grid-cols-12">
+          <div className="card p-6 sm:p-8 lg:col-span-7">
+            <p className="eyebrow">Included for everyone</p>
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+              {EVERYONE_GETS.map((f) => (
+                <Check key={f}>{f}</Check>
+              ))}
+            </ul>
+          </div>
+
+          <div className="card flex flex-col justify-between p-6 sm:p-8 lg:col-span-5">
+            <div>
+              <p className="eyebrow">What donations pay for</p>
+              <ul className="mt-4 space-y-3">
+                {WHAT_IT_PAYS_FOR.map((f) => (
+                  <Dash key={f}>{f}</Dash>
+                ))}
+              </ul>
+            </div>
+            <p className="mt-6 border-t border-line pt-4 text-xs text-ink-muted">
+              Donations are handled by GitHub Sponsors; Typen never sees card
+              details and never stores anything about you.
+            </p>
+          </div>
+        </div>
       </Section>
 
-      <Section index="02" title="What donations pay for">
-        <ul className="grid gap-3 sm:grid-cols-2">
-          {WHAT_IT_PAYS_FOR.map((f) => (
-            <Dash key={f}>{f}</Dash>
-          ))}
-        </ul>
-        <p className="mt-8 text-sm text-ink-muted">
-          Donations are handled by GitHub Sponsors; Typen never sees card
-          details and never stores anything about you.
-        </p>
-      </Section>
-
-      <Section index="03" title="Questions">
-        <dl className="grid gap-x-10 gap-y-8 sm:grid-cols-2">
+      <Section index="02" title="Questions">
+        <dl className="grid gap-6 sm:grid-cols-2">
           {FAQ.map(([q, a]) => (
-            <div key={q}>
-              <dt className="font-medium text-ink">{q}</dt>
-              <dd className="mt-2 text-sm leading-relaxed text-ink-muted">
+            <div key={q} className="card p-6">
+              <dt className="font-display text-lg font-medium text-ink">{q}</dt>
+              <dd className="mt-2.5 text-sm leading-relaxed text-ink-muted">
                 {a}
               </dd>
             </div>
           ))}
         </dl>
-        <p className="mt-10 text-sm text-ink-muted">
+        <p className="mt-8 text-sm text-ink-muted">
           Licence text:{" "}
           <a
             href={LICENSE_URL}

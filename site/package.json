@@ -1,8 +1,8 @@
 {
-  "name": "autocorrect-site",
-  "version": "1.3.0",
+  "name": "typen-site",
+  "version": "2.0.0",
   "private": true,
-  "description": "Official Downloads, Pricing, and Documentation Portal for AutoCorrect Desktop",
+  "description": "Official Downloads, Live Demo, and Documentation Portal for Typen",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

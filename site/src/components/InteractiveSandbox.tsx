@@ -87,6 +87,7 @@ const API = "/api/demo";
 const SAMPLES: Array<{ label: string; text: string }> = [
   { label: "i recieved your mesage", text: "i recieved your mesage. its still not woking propaly. " },
   { label: "your welcome", text: "your welcome. raw eggs is best. " },
+  { label: "dontknow thecat", text: "i dontknow why thecat is on myhouse. " },
   { label: "dont forget teh milk", text: "dont forget teh milk ,and the braed. " },
   { label: ";sig", text: ";sig " },
 ];
@@ -506,15 +507,15 @@ export function InteractiveSandbox() {
           </button>
         </div>
       ) : (
-        <div className="grid gap-6 p-5 lg:grid-cols-[1fr_260px]">
-          <div>
+        <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-12 lg:gap-8">
+          <div className="lg:col-span-8">
             <textarea
               ref={editorRef}
               defaultValue=""
               onKeyDown={onKeyDown}
               onPaste={onPaste}
               onMouseDown={() => mode === "live" && invalidateCaret()}
-              rows={6}
+              rows={7}
               spellCheck={false}
               autoComplete="off"
               autoCorrect="off"
@@ -522,7 +523,7 @@ export function InteractiveSandbox() {
               disabled={mode !== "live"}
               placeholder={mode === "live" ? "dont forget teh milk" : "Connecting…"}
               aria-label="Live demo editor"
-              className="field min-h-[9.5rem] resize-none p-4 font-mono text-base leading-relaxed sm:text-lg"
+              className="field min-h-[11rem] resize-none p-4 font-mono text-base leading-relaxed sm:text-lg"
             />
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span className="eyebrow mr-1">Try</span>
@@ -547,7 +548,7 @@ export function InteractiveSandbox() {
               </button>
             </div>
 
-            <ol className="mt-4 max-h-32 space-y-1.5 overflow-y-auto font-mono text-xs text-ink-muted" aria-live="polite">
+            <ol className="mt-4 max-h-36 space-y-1.5 overflow-y-auto rounded border border-line bg-paper-1/50 p-3 font-mono text-xs text-ink-muted" aria-live="polite">
               {logs.length === 0 && <li className="text-ink-faint">Ready.</li>}
               {logs.map((log) => (
                 <li key={log.id} className="flex gap-3">
@@ -564,7 +565,7 @@ export function InteractiveSandbox() {
             </ol>
           </div>
 
-          <aside className="text-sm">
+          <aside className="text-sm lg:col-span-4 lg:border-l lg:border-line lg:pl-8">
             <p className="eyebrow">Your words</p>
             <p className="mt-2 text-xs text-ink-faint">Anything here is never corrected. Lives only in this session.</p>
             <div className="mt-3 flex gap-2">

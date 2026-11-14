@@ -50,42 +50,61 @@ export default async function FeedbackPage({
         }
       />
 
-      <Section index="01" title="Send it">
-        <FeedbackForm initialKind={initialKind} />
-      </Section>
+      <Section index="01" title="Send it" aside="Tracked publicly on GitHub">
+        <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
+          <div className="lg:col-span-7">
+            <FeedbackForm initialKind={initialKind} />
+          </div>
 
-      <Section index="02" title="What helps">
-        <div className="grid gap-10 sm:grid-cols-2">
-          <div>
-            <p className="font-medium text-ink">For a bug</p>
-            <ul className="mt-4 grid gap-3">
-              {GOOD_BUG_REPORT.map((f) => (
-                <Dash key={f}>{f}</Dash>
-              ))}
-            </ul>
-          </div>
-          <div>
-            <p className="font-medium text-ink">For a suggestion</p>
-            <ul className="mt-4 grid gap-3">
-              {GOOD_SUGGESTION.map((f) => (
-                <Dash key={f}>{f}</Dash>
-              ))}
-            </ul>
-          </div>
+          <aside className="space-y-6 lg:col-span-5">
+            <div className="card p-6">
+              <p className="eyebrow">For a bug</p>
+              <ul className="mt-4 grid gap-3">
+                {GOOD_BUG_REPORT.map((f) => (
+                  <Dash key={f}>{f}</Dash>
+                ))}
+              </ul>
+            </div>
+
+            <div className="card p-6">
+              <p className="eyebrow">For a suggestion</p>
+              <ul className="mt-4 grid gap-3">
+                {GOOD_SUGGESTION.map((f) => (
+                  <Dash key={f}>{f}</Dash>
+                ))}
+              </ul>
+            </div>
+
+            <div className="card p-6 text-sm text-ink-muted">
+              <p className="leading-relaxed">
+                Typen never sends what you type. The desktop app&apos;s optional
+                diagnostics contain the version, Windows build, hook state and
+                which features are switched on — nothing else.
+              </p>
+              <p className="mt-4 border-t border-line pt-4">
+                Prefer GitHub directly?{" "}
+                <a
+                  href={`${GITHUB_REPO_URL}/issues`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  Issues
+                </a>{" "}
+                and{" "}
+                <a
+                  href={`${GITHUB_REPO_URL}/discussions`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="link"
+                >
+                  Discussions
+                </a>{" "}
+                are open to everyone.
+              </p>
+            </div>
+          </aside>
         </div>
-        <p className="mt-10 text-sm text-ink-muted">
-          Typen never sends what you type. The desktop app&apos;s optional
-          diagnostics contain the version, Windows build, hook state and which
-          features are switched on — nothing else. Prefer GitHub directly?{" "}
-          <a href={`${GITHUB_REPO_URL}/issues`} target="_blank" rel="noopener noreferrer" className="link">
-            Issues
-          </a>{" "}
-          and{" "}
-          <a href={`${GITHUB_REPO_URL}/discussions`} target="_blank" rel="noopener noreferrer" className="link">
-            Discussions
-          </a>{" "}
-          are open to everyone.
-        </p>
       </Section>
     </>
   );

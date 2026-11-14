@@ -148,8 +148,9 @@ class AdaptivePersonalLM:
         custom_words: dict[str, str] | None = None,
     ) -> None:
         """
-        Seed the fast prefix index from the active lexicon bundle (top frequent words >= 4 chars),
-        active domain packs, and user custom dictionary.
+        Seed the fast prefix index from active domain packs, user custom dictionary,
+        and learned personal vocabulary (base lexicon prefixes are queried via O(log N)
+        binary search in `MmapLexicon.find_word_ids_by_prefix` and cached on demand).
         """
         with self._lock:
             custom_sig = len(custom_words) if custom_words else 0
@@ -175,19 +176,6 @@ class AdaptivePersonalLM:
             for w_low, (cnt, disp, _) in self._unigrams.items():
                 if len(w_low) >= 4:
                     self._index_word_prefixes(w_low, disp, -4.5 + min(2.0, 0.35 * math.log1p(cnt)))
-
-            # 4. Seed high-frequency lexicon words (log_freq >= -7.4, length >= 5)
-            lex = bundle.lexicon
-            total = lex.word_count
-            for wid in range(1, total):
-                meta = lex.get_meta(wid)
-                if not meta.can_suggest or meta.log_freq < -7.4:
-                    continue
-                word = lex.get_word_by_id(wid)
-                if len(word) < 5 or not word.isalpha():
-                    continue
-                exact = lex.get_exact_casing(wid) or word
-                self._index_word_prefixes(word, exact, meta.log_freq)
 
             self._seeded_bundle_version = sig
 
@@ -317,6 +305,12 @@ class AdaptivePersonalLM:
                     raw_candidates.append(
                         (u_low, u_disp, -4.2 + min(2.2, 0.40 * math.log1p(u_cnt)))
                     )
+
+        # Query the mmap lexicon via O(log N) binary search for words starting with low_pref
+        for _wid, w_str, w_freq, w_exact in bundle.lexicon.find_word_ids_by_prefix(
+            low_pref, min_log_freq=-7.4, min_len=max(5, len(low_pref) + 2), limit=16
+        ):
+            raw_candidates.append((w_str, w_exact or w_str, w_freq))
 
         best_word_low = ""
         best_disp = ""

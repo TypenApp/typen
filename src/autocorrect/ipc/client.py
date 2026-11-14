@@ -113,5 +113,5 @@ class LocalIPCClient:
                     backoff *= 2.0
 
         raise IPCConnectionError(
-            f"Unable to connect to AutoCorrect background service in {self._data_dir}: {last_err}"
+            f"Unable to connect to Typen background service in {self._data_dir}: {last_err}"
         )

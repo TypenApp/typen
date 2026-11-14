@@ -1,5 +1,5 @@
 """
-IBus component descriptor for the AutoCorrect engine.
+IBus component descriptor for the Typen engine.
 
 `python -m autocorrect.adapters.linux.ibus_component --exec /usr/libexec/ibus-engine-autocorrect`
 prints the XML that must be installed to `/usr/share/ibus/component/autocorrect.xml`
@@ -55,7 +55,7 @@ def build_component_xml(exec_path: str, version: str = APP_VERSION) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Print the IBus component XML for AutoCorrect.")
+    parser = argparse.ArgumentParser(description="Print the IBus component XML for Typen.")
     parser.add_argument(
         "--exec", required=True, help="Path ibus-daemon should execute (gets `--ibus` appended)"
     )

@@ -10,8 +10,8 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
   const categories = Array.from(new Set(DOC_ARTICLES.map((d) => d.category)));
 
   return (
-    <div className="container-site pb-8 pt-12 sm:pt-16">
-      <div className="grid gap-12 lg:grid-cols-[220px_1fr]">
+    <div className="container-site pb-12 pt-10 sm:pt-14">
+      <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)] xl:gap-14">
         <aside className="hidden lg:block">
           <nav className="sticky top-24 text-sm" aria-label="Documentation">
             <Link

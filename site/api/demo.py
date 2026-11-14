@@ -1,5 +1,5 @@
 """
-Live demo backend: the real AutoCorrect engine as a Vercel Python function.
+Live demo backend: the real Typen engine as a Vercel Python function.
 
 Every keystroke in the website demo is sent here and processed by the same
 `InputSessionManager` + `AutocorrectEngine` the desktop daemon runs. Nothing is

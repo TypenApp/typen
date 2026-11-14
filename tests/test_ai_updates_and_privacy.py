@@ -199,7 +199,7 @@ def test_pro_snippets_and_domain_packs(tmp_path: Path) -> None:
 
 
 def test_independent_signed_resource_updates_delta_and_rollback(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """
     Verify Section 6 & 11 Independent Resource Updates:
@@ -209,6 +209,7 @@ def test_independent_signed_resource_updates_delta_and_rollback(
     - Expired update entitlement rejection while keeping existing local resources working.
     - Atomic hot-swap and rollback to `last_known_good`.
     """
+    monkeypatch.setenv("AUTOCORRECT_EXTERNAL_LEXICON", "0")
     priv_key = Ed25519PrivateKey.generate()
     pub_key = priv_key.public_key()
 

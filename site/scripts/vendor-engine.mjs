@@ -1,6 +1,6 @@
 /**
  * Copy the engine and its language resources into `api/_vendor/` so the
- * website's Python function (`api/demo.py`) can run the real AutoCorrect
+ * website's Python function (`api/demo.py`) can run the real Typen
  * engine on Vercel.
  *
  * Runs as part of the install step (see vercel.json). The copy is git-ignored:
