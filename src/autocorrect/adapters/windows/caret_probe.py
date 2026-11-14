@@ -229,38 +229,80 @@ class WindowsCaretProbe:
             pass
 
         mod = self._uia_mod
-        pattern = element.GetCurrentPattern(UIA_TextPattern2Id)
-        if pattern is None:
-            return None
-        text2 = pattern.QueryInterface(mod.IUIAutomationTextPattern2)
-        is_active = ctypes.c_int(0)
-        caret = text2.GetCaretRange(ctypes.byref(is_active))
-        if caret is None:
-            return None
         win_rect, dpi = self._read_win32_caret_rect()
-        caret_rect = win_rect
-        if caret_rect is None:
-            caret_rect = self._extract_uia_range_rect(caret)
-        # Walk the start of the range back N characters; the end stays at the caret.
-        caret.MoveEndpointByUnit(TextPatternRangeEndpoint_Start, TextUnit_Character, -self._n)
-        before = str(caret.GetText(self._n) or "")
-        if caret_rect is None:
-            caret_rect = self._extract_uia_range_rect(caret)
-        # Also check whether the whole document is empty (so the first word is a sentence start).
-        is_empty = False
+        pattern = element.GetCurrentPattern(UIA_TextPattern2Id)
+        if pattern is not None:
+            try:
+                text2 = pattern.QueryInterface(mod.IUIAutomationTextPattern2)
+                is_active = ctypes.c_int(0)
+                caret = text2.GetCaretRange(ctypes.byref(is_active))
+                if caret is not None:
+                    caret_rect = win_rect
+                    if caret_rect is None:
+                        caret_rect = self._extract_uia_range_rect(caret)
+                    # Walk the start of the range back N characters; the end stays at the caret.
+                    caret.MoveEndpointByUnit(
+                        TextPatternRangeEndpoint_Start, TextUnit_Character, -self._n
+                    )
+                    before = str(caret.GetText(self._n) or "")
+                    if caret_rect is None:
+                        caret_rect = self._extract_uia_range_rect(caret)
+                    # Also check whether the whole document is empty (so the first word is a sentence start).
+                    is_empty = False
+                    try:
+                        doc = text2.DocumentRange
+                        whole = str(doc.GetText(2) or "")
+                        is_empty = whole.strip() == ""
+                    except Exception:
+                        is_empty = before.strip() == ""
+                    return CaretContext(
+                        before.replace("\r\n", "\n"),
+                        is_empty_field=is_empty,
+                        source="uia",
+                        caret_rect=caret_rect,
+                        dpi=dpi,
+                    )
+            except Exception:
+                pass
+
+        # Fallback 2: UIA TextPattern (GetSelection / DocumentRange) for controls without TextPattern2
         try:
-            doc = text2.DocumentRange
-            whole = str(doc.GetText(2) or "")
-            is_empty = whole.strip() == ""
+            tp_pat = element.GetCurrentPattern(UIA_TextPatternId)
+            if tp_pat is not None:
+                tp = tp_pat.QueryInterface(mod.IUIAutomationTextPattern)
+                doc = tp.DocumentRange
+                if doc is not None:
+                    whole = str(doc.GetText(self._n) or "").replace("\r\n", "\n")
+                    is_empty = whole.strip() == ""
+                    return CaretContext(
+                        "" if is_empty else whole,
+                        is_empty_field=is_empty,
+                        source="uia-text1",
+                        caret_rect=win_rect,
+                        dpi=dpi,
+                    )
         except Exception:
-            is_empty = before.strip() == ""
-        return CaretContext(
-            before.replace("\r\n", "\n"),
-            is_empty_field=is_empty,
-            source="uia",
-            caret_rect=caret_rect,
-            dpi=dpi,
-        )
+            pass
+
+        # Fallback 3: UIA ValuePattern (single-line inputs, search bars, browser fields)
+        try:
+            val_pat = element.GetCurrentPattern(UIA_ValuePatternId)
+            if val_pat is not None:
+                vp = val_pat.QueryInterface(mod.IUIAutomationValuePattern)
+                val_str = str(vp.CurrentValue or "").replace("\r\n", "\n")
+                is_empty = val_str.strip() == ""
+                tail = val_str[-self._n :] if not is_empty else ""
+                return CaretContext(
+                    tail,
+                    is_empty_field=is_empty,
+                    source="uia-value",
+                    caret_rect=win_rect,
+                    dpi=dpi,
+                )
+        except Exception:
+            pass
+
+        return None
 
     @staticmethod
     def _extract_uia_range_rect(text_range: Any) -> tuple[int, int, int, int] | None:

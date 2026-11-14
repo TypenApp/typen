@@ -291,3 +291,50 @@ def test_layer2_local_model_manager_phonetic_safety_and_confusion_polish() -> No
     )
     assert sugg is not None
     assert sugg.suggested_sentence == "You're welcome to wait for an hour."
+
+
+def test_first_word_after_click_or_focus_is_never_ignored(
+    tmp_path: Path, resource_manager: ResourceManager
+) -> None:
+    """
+    Verify:
+    1. Clicking into a control when the OS caret probe returns None (e.g. control
+       lacks TextPattern2) keeps the buffer CLEAN (not TAINTED) so the very first
+       word typed is corrected (and capitalised on a fresh session).
+    2. In DemoHost (`route == 'caret'`), a click event with `text` resyncs from
+       the caret text rather than tainting the buffer, so the very first word
+       after clicking in the web demo is corrected and capitalised properly.
+    """
+    from autocorrect.demo_host import EngineHost
+
+    engine = AutocorrectEngine(resource_manager)
+    session = InputSessionManager(engine=engine)
+
+    # 1a. Click at the start of a fresh session where caret probe returned None
+    session.on_mouse_click_or_caret_move(caret_text_before=None, caret_probe_attempted=True)
+    assert session.word_buffer.state.value == "CLEAN"
+    assert session.capitaliser.is_sentence_start
+    assert _type_string(session, "recieved ") == "Received "
+
+    # 1b. Click mid-session where caret probe returned None -> buffer is STILL CLEAN
+    # so the first word typed after the click is corrected (even while caps are suppressed)
+    session.on_mouse_click_or_caret_move(caret_text_before=None, caret_probe_attempted=True)
+    assert session.word_buffer.state.value == "CLEAN"
+    assert not session.capitaliser.is_sentence_start
+    assert _type_string(session, "recieved ") == "received "
+
+    # 2. DemoHost 'caret' route with empty or sentence-end text leaves buffer CLEAN
+    host = EngineHost(work_dir=tmp_path / "demo_host", resource_manager=resource_manager)
+    sid = "web-firstwordclick001"
+    status, body = host.handle("POST", "caret", {"text": ""}, sid)
+    assert status == 200
+    assert body["buffer_state"] == "CLEAN"
+    assert body["sentence_state"] == "SENTENCE_START"
+
+    # Typing 'recieved ' as the very first word after clicking in the demo corrects AND capitalises
+    for ch in "recieved":
+        host.handle("POST", "key", {"key_name": ch, "char": ch, "text": ""}, sid)
+    _, space_res = host.handle("POST", "key", {"key_name": "Space", "char": " ", "text": "recieved"}, sid)
+    assert space_res["action"] == "SUPPRESS_AND_INJECT"
+    assert space_res["plan"]["target_full"] == "Received "
+

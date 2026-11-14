@@ -664,6 +664,12 @@ class AutoCorrectDaemon:
         if self.ghost_overlay is not None:
             self.ghost_overlay.hide()
         self._flush_adaptive_lm()
+        was_initial_focus = (
+            not self.session._focus_context.process_name
+            and not self.session._focus_context.control_id
+            and not self.session.word_buffer.current_word
+            and not self.session._last_completed_word
+        )
         caret_before = None
         probe_attempted = False
         if not (effective.is_password_or_secure or effective.is_excluded_app):
@@ -672,7 +678,7 @@ class AutoCorrectDaemon:
         self.session.on_focus_changed(
             effective,
             caret_text_before=caret_before,
-            caret_probe_attempted=probe_attempted,
+            caret_probe_attempted=(probe_attempted and not was_initial_focus),
         )
 
         if prof is not None and prof.enabled:
@@ -687,12 +693,13 @@ class AutoCorrectDaemon:
         probe = self.caret_probe
         if probe is None:
             return None
-        if with_settle:
-            time.sleep(0.02)
+        has_pending_keys = self.dispatcher.queue_depth > 0
+        if with_settle and not has_pending_keys:
+            time.sleep(0.015)
         try:
             ctx = probe.read()
-            if ctx is None and with_settle:
-                time.sleep(0.02)
+            if ctx is None and with_settle and not has_pending_keys:
+                time.sleep(0.015)
                 ctx = probe.read()
         except Exception:
             log.debug("caret probe raised", exc_info=True)
@@ -712,14 +719,19 @@ class AutoCorrectDaemon:
             self.ghost_overlay.hide()
         if self.session.is_paused:
             return
-        if self.caret_probe is not None:
-            # Give the target application a moment to place its caret before asking.
+        if self.caret_probe is not None and self.dispatcher.queue_depth == 0:
+            # Give the target application a moment to place its caret before asking,
+            # unless the user is already typing keys behind the click in the queue.
             time.sleep(CLICK_SETTLE_S)
         focus = self.focus_monitor.poll_once()
         if focus is not None:
             # poll_once already queued `_on_focus_changed`, which resyncs from the caret.
             return
-        self.session.on_mouse_click_or_caret_move(caret_text_before=self._read_caret_context())
+        probe_attempted = self.caret_probe is not None and not self._dry_run_hooks
+        self.session.on_mouse_click_or_caret_move(
+            caret_text_before=self._read_caret_context(),
+            caret_probe_attempted=probe_attempted,
+        )
 
     def global_features(self) -> CorrectionFeatures:
         """The user's global correction behaviour, straight from the (validated) settings store."""

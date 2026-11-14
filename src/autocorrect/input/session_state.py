@@ -265,7 +265,12 @@ class InputSessionManager:
         self._features = base.with_overrides(overrides)
         self._tx_ledger.set_undo_window_ms(self._features.undo_window_ms)
 
-    def on_mouse_click_or_caret_move(self, caret_text_before: str | None = None) -> None:
+    def on_mouse_click_or_caret_move(
+        self,
+        caret_text_before: str | None = None,
+        *,
+        caret_probe_attempted: bool = False,
+    ) -> None:
         """
         Invalidate word buffer, undo slot and sentence state after a mouse click
         or caret move.
@@ -273,10 +278,23 @@ class InputSessionManager:
         `caret_text_before`, when the platform can read it (Windows UI
         Automation probe), is the text immediately before the new caret
         position; the sentence state is then rebuilt from it so the first word
-        typed after a click is capitalised exactly when it should be. Without
-        it the capitaliser is suppressed (never wrongly capitalise mid-sentence).
+        typed after a click is capitalised exactly when it should be.
+
+        When `caret_probe_attempted=True` and `caret_text_before is None`
+        (the user clicked into a control whose caret text could not be probed),
+        the active word buffer is cleared to `CLEAN` rather than `TAINTED` so
+        the very first word the user types in the new field is still evaluated
+        for spelling, contractions and joined-word splitting!
         """
-        self._word_buffer.mark_tainted()
+        was_fresh_session = (
+            not self._word_buffer.current_word
+            and not self._last_completed_word
+            and self._capitaliser.is_sentence_start
+        )
+        if caret_probe_attempted and caret_text_before is None:
+            self._word_buffer.clear_clean()
+        else:
+            self._word_buffer.mark_tainted()
         self._tx_ledger.clear_active()
         self._tx_ledger.clear_suppression()
         self._preceded_by_space = False
@@ -289,7 +307,10 @@ class InputSessionManager:
         self._history_stack.clear()
         self._active_prediction = None
         if caret_text_before is None:
-            self._capitaliser.suppress()
+            if caret_probe_attempted and was_fresh_session:
+                self._capitaliser.reset_to_sentence_start()
+            else:
+                self._capitaliser.suppress()
         else:
             self.resync_from_caret(caret_text_before)
 

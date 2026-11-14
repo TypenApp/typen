@@ -325,9 +325,11 @@ class EngineHost:
                 return 200, self.telemetry(sess, session_new=created)
 
             if route == "caret":
-                if created:
-                    sess.prime_from_text(_clean_text(payload.get("text")))
-                sess.on_mouse_click_or_caret_move()
+                raw_text = payload.get("text")
+                if raw_text is not None:
+                    sess.resync_from_caret(_clean_text(raw_text))
+                else:
+                    sess.on_mouse_click_or_caret_move()
                 return 200, self.telemetry(sess, session_new=created)
 
             # route == "key": one key ({key_name, char}) or a batch ({keys: [...]}).
