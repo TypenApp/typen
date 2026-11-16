@@ -68,6 +68,7 @@ AnchorProbeFn = Callable[[str], tuple[tuple[int, int, int, int] | None, int, str
 _FONT_CACHE: dict[tuple[str, int], Any] = {}
 _TEXT_SCALE_CACHE: tuple[float, float] = (0.0, 1.0)  # (monotonic_ts, factor)
 _SYS_FONT_PX_CACHE: dict[tuple[int, float], int] = {}
+_APPS_DARK_CACHE: tuple[float, bool] = (0.0, False)  # (monotonic_ts, is_dark)
 
 
 def _read_windows_text_scale_factor() -> float:
@@ -229,40 +230,38 @@ def _load_ui_font(size_px: int, *, semibold: bool = False) -> Any:
     return font
 
 
-def _sample_field_is_dark(cx: int, cy: int, ch: int) -> bool:
+def resolve_overlay_is_dark(ui_theme: str = "system") -> bool:
     """
-    Sample 2 background pixels immediately left of the cursor (`cx - 3`, outside our
-    overlay surface) near the top and bottom of the caret line box to detect whether
-    the target text box is dark-themed or light-themed.
+    Deterministically resolve whether the overlay uses dark or light styling,
+    following the user's `ui_theme` preference (`"dark"` | `"light"` | `"system"` ->
+    Windows `AppsUseLightTheme`, cached for 5s). Never samples noisy screen pixels
+    near the caret, so the word pill never flips between light and dark while typing.
     """
-    if not w32.IS_WINDOWS or w32.user32 is None:
+    global _APPS_DARK_CACHE
+    choice = ui_theme.strip().lower()
+    if choice == "dark":
+        return True
+    if choice == "light":
         return False
-    try:
-        gdi32 = ctypes.WinDLL("gdi32")
-        hdc = w32.user32.GetDC(None)
-        if not hdc:
-            return False
+    now = time.monotonic()
+    cached_ts, cached_dark = _APPS_DARK_CACHE
+    if cached_ts > 0.0 and (now - cached_ts) < 5.0:
+        return cached_dark
+    is_dark = False
+    if sys.platform == "win32":
         try:
-            sx = max(1, int(cx - 3))
-            sy_top = max(1, int(cy + 1))
-            sy_bot = max(1, int(cy + max(2, ch - 2)))
-            c1 = int(gdi32.GetPixel(hdc, sx, sy_top))
-            c2 = int(gdi32.GetPixel(hdc, sx, sy_bot))
-        finally:
-            w32.user32.ReleaseDC(None, hdc)
+            import winreg
 
-        lums: list[float] = []
-        for cref in (c1, c2):
-            if cref >= 0 and cref != 0xFFFFFFFF:
-                r = cref & 0xFF
-                g = (cref >> 8) & 0xFF
-                b = (cref >> 16) & 0xFF
-                lums.append(0.299 * r + 0.587 * g + 0.114 * b)
-        if not lums:
-            return False
-        return (sum(lums) / len(lums)) < 132.0
-    except Exception:
-        return False
+            with winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            ) as key:
+                val, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                is_dark = int(val) == 0
+        except Exception:
+            is_dark = False
+    _APPS_DARK_CACHE = (now, is_dark)
+    return is_dark
 
 
 def render_inline_ghost_bgra(
@@ -275,40 +274,31 @@ def render_inline_ghost_bgra(
 ) -> tuple[bytes, int, int]:
     """
     Render **True In-Line Ghost Text**: pure frameless, borderless, backgroundless
-    32-bit premultiplied BGRA muted placeholder text right at the cursor, matching
-    the "Try it" experience inside the Typen app with zero color-key fringes.
+    32-bit premultiplied BGRA placeholder text at native 1x FreeType sharpness
+    (`semibold=True`, `alpha=255`) so glyph stems are solid, crisp, and legible
+    without any bilinear wash-out or translucency fade.
     """
     from PIL import Image, ImageDraw
 
-    ss = 2
     font_px = resolve_overlay_font_px(caret_h, dpi, exact_caret=True, font_scale=font_scale)
-    font = _load_ui_font(font_px * ss, semibold=False)
+    font = _load_ui_font(font_px, semibold=True)
 
     dummy = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
     dd = ImageDraw.Draw(dummy)
-    text_w_ss = int(round(dd.textlength(completion_text, font=font)))
+    text_w = int(round(dd.textlength(completion_text, font=font)))
 
-    line_h = max(caret_h, font_px + 4)
-    canvas_w_ss = max(16 * ss, text_w_ss + 6 * ss)
-    canvas_h_ss = max(14 * ss, line_h * ss)
+    out_w = max(12, text_w + 6)
+    out_h = max(14, max(caret_h, font_px + 4))
 
-    im = Image.new("RGBA", (canvas_w_ss, canvas_h_ss), (0, 0, 0, 0))
+    im = Image.new("RGBA", (out_w, out_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(im)
+    cy_mid = out_h // 2
 
-    # Adaptive muted placeholder ink (mirrors Theme.inkFaint in light & dark mode)
-    ink_rgba = (150, 158, 172, 194) if is_dark_bg else (122, 128, 140, 200)
-    draw.text(
-        (ss, canvas_h_ss // 2),
-        completion_text,
-        font=font,
-        fill=ink_rgba,
-        anchor="lm",
-    )
+    # 100% solid alpha slate ink: clearly distinct from black/white typed text, never faded
+    ink_rgba = (184, 192, 206, 255) if is_dark_bg else (74, 82, 96, 255)
+    draw.text((1, cy_mid), completion_text, font=font, fill=ink_rgba, anchor="lm")
 
-    out_w = max(8, canvas_w_ss // ss)
-    out_h = max(14, canvas_h_ss // ss)
-    final_im = im.resize((out_w, out_h), Image.Resampling.BILINEAR)
-    bgra = final_im.convert("RGBa").tobytes("raw", "BGRa")
+    bgra = im.convert("RGBa").tobytes("raw", "BGRa")
     return bgra, out_w, out_h
 
 
@@ -325,9 +315,10 @@ def render_pill_bgra(
     font_scale: float = 1.0,
 ) -> tuple[bytes, int, int]:
     """
-    Render a clean, minimal **Word-Only Inline Pill** (no `"Tab"` label, no dot)
-    sized to the Windows system / field font size so it blends naturally on the
-    typing line ~half an inch ahead of the cursor.
+    Render a crisp, solid **Word-Only Inline Pill** (no `"Tab"` label, no dot).
+    Supersamples only the rounded pill capsule at 2x for smooth corners, then
+    draws typography directly at native 1x FreeType resolution (`alpha=255`) so
+    letters inside the pill are razor-sharp and never faded or blurry.
     """
     from PIL import Image, ImageDraw
 
@@ -337,48 +328,49 @@ def render_pill_bgra(
     font_px = resolve_overlay_font_px(
         caret_h, dpi, exact_caret=exact_caret, font_scale=font_scale
     )
-    font_word = _load_ui_font(font_px * ss, semibold=False)
+    font_pref = _load_ui_font(font_px, semibold=False)
+    font_comp = _load_ui_font(font_px, semibold=True)
 
     dummy = Image.new("RGBA", (8, 8), (0, 0, 0, 0))
     dd = ImageDraw.Draw(dummy)
-    pref_w = int(round(dd.textlength(prefix_text, font=font_word))) if prefix_text else 0
-    comp_w = int(round(dd.textlength(completion_text, font=font_word)))
+    pref_w = int(round(dd.textlength(prefix_text, font=font_pref))) if prefix_text else 0
+    comp_w = int(round(dd.textlength(completion_text, font=font_comp)))
 
-    pad_x = int(round(8.5 * scale * ss))
-    pad_y = int(round(3.5 * scale * ss))
-    pill_h_ss = max(int(round(20 * scale * ss)), font_px * ss + pad_y * 2)
-    pill_w_ss = max(int(round(28 * scale * ss)), pad_x * 2 + pref_w + comp_w)
-    margin = int(round(1.5 * scale * ss))
-    canvas_w_ss = pill_w_ss + margin * 2
-    canvas_h_ss = pill_h_ss + margin * 2
+    pad_x = max(7, int(round(8.5 * scale)))
+    pad_y = max(3, int(round(3.5 * scale)))
+    margin = max(2, int(round(2.0 * scale)))
+    pill_h = max(int(round(20 * scale)), font_px + pad_y * 2)
+    pill_w = max(int(round(28 * scale)), pad_x * 2 + pref_w + comp_w)
+    out_w = pill_w + margin * 2
+    out_h = pill_h + margin * 2
 
-    im = Image.new("RGBA", (canvas_w_ss, canvas_h_ss), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(im)
-
-    rx0, ry0 = margin, margin
-    rx1, ry1 = rx0 + pill_w_ss - 1, ry0 + pill_h_ss - 1
-    radius = pill_h_ss // 2
+    # 1. Render smooth rounded capsule + soft shadow at 2x supersampling
+    im_ss = Image.new("RGBA", (out_w * ss, out_h * ss), (0, 0, 0, 0))
+    draw_ss = ImageDraw.Draw(im_ss)
+    rx0, ry0 = margin * ss, margin * ss
+    rx1, ry1 = rx0 + pill_w * ss - 1, ry0 + pill_h * ss - 1
+    radius = (pill_h * ss) // 2
 
     if is_dark_bg:
-        bg_fill = (32, 34, 40, 228)
-        rim_stroke = (255, 255, 255, 36)
-        pref_ink = (140, 147, 160, 210)
-        comp_ink = (218, 223, 232, 245)
-        shadow_fill = (0, 0, 0, 48)
+        bg_fill = (20, 22, 27, 253)
+        rim_stroke = (255, 255, 255, 68)
+        pref_ink = (176, 184, 198, 255)
+        comp_ink = (252, 253, 255, 255)
+        shadow_fill = (0, 0, 0, 60)
     else:
-        bg_fill = (244, 245, 248, 234)
-        rim_stroke = (15, 23, 42, 34)
-        pref_ink = (142, 148, 160, 210)
-        comp_ink = (68, 74, 86, 242)
-        shadow_fill = (15, 23, 42, 22)
+        bg_fill = (251, 252, 254, 253)
+        rim_stroke = (15, 23, 42, 64)
+        pref_ink = (94, 102, 116, 255)
+        comp_ink = (14, 17, 23, 255)
+        shadow_fill = (15, 23, 42, 28)
 
-    sh_off = max(1, int(round(1.0 * scale * ss)))
-    draw.rounded_rectangle(
+    sh_off = max(2, int(round(1.0 * scale * ss)))
+    draw_ss.rounded_rectangle(
         (rx0, ry0 + sh_off, rx1, ry1 + sh_off),
         radius=radius,
         fill=shadow_fill,
     )
-    draw.rounded_rectangle(
+    draw_ss.rounded_rectangle(
         (rx0, ry0, rx1, ry1),
         radius=radius,
         fill=bg_fill,
@@ -386,28 +378,29 @@ def render_pill_bgra(
         width=max(1, ss),
     )
 
-    text_x = rx0 + pad_x
-    cy_mid = ry0 + pill_h_ss // 2
+    final_im = im_ss.resize((out_w, out_h), Image.Resampling.BILINEAR)
+
+    # 2. Draw crisp native 1x FreeType text directly onto the downsampled capsule
+    draw_1x = ImageDraw.Draw(final_im)
+    text_x = margin + pad_x
+    cy_mid = margin + pill_h // 2
     if prefix_text:
-        draw.text(
+        draw_1x.text(
             (text_x, cy_mid),
             prefix_text,
-            font=font_word,
+            font=font_pref,
             fill=pref_ink,
             anchor="lm",
         )
         text_x += pref_w
-    draw.text(
+    draw_1x.text(
         (text_x, cy_mid),
         completion_text,
-        font=font_word,
+        font=font_comp,
         fill=comp_ink,
         anchor="lm",
     )
 
-    out_w = max(18, canvas_w_ss // ss)
-    out_h = max(16, canvas_h_ss // ss)
-    final_im = im.resize((out_w, out_h), Image.Resampling.BILINEAR)
     bgra = final_im.convert("RGBa").tobytes("raw", "BGRa")
     return bgra, out_w, out_h
 
@@ -427,6 +420,8 @@ class InlineGhostOverlay:
         self._req_accept_key: str = "both"
         self._req_display_style: str = "inline"
         self._req_font_scale: float = 1.0
+        self._req_offset_x: int = 0
+        self._req_ui_theme: str = "system"
         self._req_ai_tag: bool = False
         self._req_explicit_rect: tuple[int, int, int, int] | None = None
         self._req_dpi: int = 96
@@ -506,6 +501,8 @@ class InlineGhostOverlay:
         accept_key: str = "both",
         display_style: str = "inline",
         font_scale: float = 1.0,
+        offset_x: int = 0,
+        ui_theme: str = "system",
         ai_tag: bool = False,
     ) -> None:
         """
@@ -522,6 +519,8 @@ class InlineGhostOverlay:
             self._req_accept_key = accept_key
             self._req_display_style = display_style
             self._req_font_scale = font_scale
+            self._req_offset_x = int(offset_x)
+            self._req_ui_theme = ui_theme
             self._req_ai_tag = ai_tag
             self._req_explicit_rect = None
             self._want_visible = True
@@ -538,6 +537,8 @@ class InlineGhostOverlay:
         accept_key: str = "both",
         display_style: str = "inline",
         font_scale: float = 1.0,
+        offset_x: int = 0,
+        ui_theme: str = "system",
         ai_tag: bool = False,
     ) -> None:
         """Display `text` anchored at an explicit `caret_rect`."""
@@ -551,6 +552,8 @@ class InlineGhostOverlay:
             self._req_accept_key = accept_key
             self._req_display_style = display_style
             self._req_font_scale = font_scale
+            self._req_offset_x = int(offset_x)
+            self._req_ui_theme = ui_theme
             self._req_ai_tag = ai_tag
             self._req_explicit_rect = caret_rect
             self._req_dpi = max(72, dpi)
@@ -589,6 +592,8 @@ class InlineGhostOverlay:
                     accept_key = self._req_accept_key
                     display_style = self._req_display_style
                     font_scale = self._req_font_scale
+                    offset_x = self._req_offset_x
+                    ui_theme = self._req_ui_theme
                     ai_tag = self._req_ai_tag
                     explicit_rect = self._req_explicit_rect
                     dpi = self._req_dpi
@@ -624,8 +629,9 @@ class InlineGhostOverlay:
 
                 cx, cy, _cw, ch = rect
                 exact_caret = src in EXACT_CARET_SOURCES
-                is_dark = _sample_field_is_dark(cx, cy, ch)
+                is_dark = resolve_overlay_is_dark(ui_theme)
                 use_true_inline = display_style != "pill" and exact_caret and not ai_tag
+                scaled_offset_x = int(round(offset_x * (max(72, dpi) / 96.0)))
 
                 try:
                     if use_true_inline:
@@ -636,7 +642,7 @@ class InlineGhostOverlay:
                             is_dark_bg=is_dark,
                             font_scale=font_scale,
                         )
-                        px = int(cx + 1)
+                        px = int(cx + 2 + scaled_offset_x)
                         py = int(cy + (ch - ph) // 2)
                     else:
                         bgra, pw, ph = render_pill_bgra(
@@ -651,9 +657,9 @@ class InlineGhostOverlay:
                             font_scale=font_scale,
                         )
                         # Position ~half an inch (0.5 * dpi px) horizontally in front of the
-                        # cursor on the exact same typing line — never above the focus area!
+                        # cursor (+ user X-axis adjustment) on the exact same typing line!
                         half_inch_px = int(round(0.5 * max(72, dpi)))
-                        px = int(cx + half_inch_px)
+                        px = int(cx + half_inch_px + scaled_offset_x)
                         py = int(cy + (max(16, ch) - ph) // 2)
                 except Exception:
                     continue

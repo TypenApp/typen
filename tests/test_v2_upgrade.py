@@ -562,12 +562,29 @@ def test_v2_database_typo_unmasking_context_and_quantized_neural_ai(
     from autocorrect.adapters.windows.inline_ghost_overlay import (
         render_inline_ghost_bgra,
         resolve_overlay_font_px,
+        resolve_overlay_is_dark,
     )
+    from autocorrect.preferences import settings_schema
 
     ghost_bgra, gw, gh = render_inline_ghost_bgra("ershell", caret_h=20, dpi=120, is_dark_bg=False)
     assert len(ghost_bgra) == gw * gh * 4 and gw >= 16 and gh >= 16
     # Corner pixel of True In-Line Ghost must be 100% transparent (0, 0, 0, 0)
     assert ghost_bgra[:4] == b"\x00\x00\x00\x00"
+    # Native 1x FreeType stems must have crisp, unfaded alpha (>= 230), never washed out
+    max_ghost_alpha = max(ghost_bgra[3::4])
+    assert max_ghost_alpha >= 230
+
+    # Deterministic theme resolution (never flips randomly per keystroke)
+    assert resolve_overlay_is_dark("dark") is True
+    assert resolve_overlay_is_dark("light") is False
+
+    # X-axis horizontal placement adjuster setting (-60..+120 px)
+    assert settings_schema.default_for("predictive_offset_x") == 0
+    assert settings_schema.coerce("predictive_offset_x", 28) == 28
+    assert settings_schema.coerce("predictive_offset_x", -200) == -60
+    assert settings_schema.coerce("predictive_offset_x", 500) == 120
+    session.configure_features(predictive_offset_x=24)
+    assert session.features.predictive_offset_x == 24
 
     bgra, w, h = render_pill_bgra("pow", "ershell", dpi=120, is_dark_bg=True, caret_h=20, exact_caret=True)
     assert len(bgra) == w * h * 4 and w >= 28 and h >= 18

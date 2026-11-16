@@ -44,6 +44,15 @@ Page {
             description: "100% follows the Windows system and input field font size."
             formatter: function (v) { return Math.round(v * 100) + "%" }
         }
+        SliderRow {
+            key: "predictive_offset_x"; label: "Horizontal placement (X-axis)"; from: -60; to: 120; step: 2; indent: true
+            enabled: s.enable_predictive_tab === true
+            description: "Shift the inline ghost text or word pill left (−) or right (+) relative to the cursor."
+            formatter: function (v) {
+                var n = Math.round(v)
+                return n > 0 ? ("+" + n + " px") : (n + " px")
+            }
+        }
     }
 
     Card {

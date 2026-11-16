@@ -61,6 +61,7 @@ class CorrectionFeatures:
     predictive_display_style: str = "inline"  # inline | pill
     predictive_accept_key: str = "both"  # both | tab | right
     predictive_font_scale: float = 1.0
+    predictive_offset_x: int = 0
     local_ai_live_rescoring: bool = True
     # Spelling
     enable_spelling: bool = True

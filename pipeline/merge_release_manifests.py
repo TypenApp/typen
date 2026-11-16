@@ -193,7 +193,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--download-repo",
-        default=None,
+        default="TypenApp/typen",
         metavar="OWNER/NAME",
         help="GitHub repository whose Release hosts the files (recorded in the manifest for the site)",
     )

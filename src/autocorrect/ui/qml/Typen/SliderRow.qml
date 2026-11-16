@@ -11,7 +11,7 @@ SettingRow {
     property real step: 1
     property string suffix: ""
     property var formatter: null          // function(value) -> string
-    property real value: key !== "" ? Number(bridge.settings[key]) : from
+    property real value: (key !== "" && bridge.settings[key] !== undefined) ? Number(bridge.settings[key]) : from
 
     function display(v) {
         if (formatter) return formatter(v)
@@ -30,7 +30,11 @@ SettingRow {
             value: row.value
             enabled: row.enabled
             snapMode: Slider.SnapAlways
-            onMoved: valueLabel.text = row.display(value)
+            onMoved: {
+                valueLabel.text = row.display(value)
+                if (!pressed && row.key !== "" && Math.abs(value - row.value) > 1e-9)
+                    bridge.setSetting(row.key, row.step >= 1 ? Math.round(value) : value)
+            }
             onPressedChanged: {
                 if (!pressed && row.key !== "" && Math.abs(value - row.value) > 1e-9)
                     bridge.setSetting(row.key, row.step >= 1 ? Math.round(value) : value)

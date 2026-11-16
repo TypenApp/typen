@@ -136,14 +136,14 @@ Page {
             Text {
                 id: ghostHint
                 visible: page.tryGhostText !== "" && tryField.activeFocus && tryField.cursorPosition >= tryField.text.length
-                x: tryField.cursorRectangle.x + 2
+                x: tryField.cursorRectangle.x + 2 + Number(bridge.settings.predictive_offset_x || 0)
                 y: tryField.cursorRectangle.y
                 height: tryField.cursorRectangle.height
                 verticalAlignment: Text.AlignVCenter
                 text: page.tryGhostText
-                color: Theme.inkFaint
+                color: Theme.inkMuted
                 font.family: tryField.font.family
-                font.pixelSize: tryField.font.pixelSize
+                font.pixelSize: Math.max(10, Math.round(tryField.font.pixelSize * Number(bridge.settings.predictive_font_scale || 1.0)))
             }
         }
         Timer {

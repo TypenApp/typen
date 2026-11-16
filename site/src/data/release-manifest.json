@@ -4,7 +4,7 @@
   "channel": "beta.1",
   "full_version": "2.1.0-beta.1",
   "release_tag": "v2.1.0-beta.1",
-  "built_at": "2026-11-16T01:47:43Z",
+  "built_at": "2026-11-16T02:31:55Z",
   "resources": {
     "bundle_version": "2.0.0",
     "schema_version": 2,
@@ -80,7 +80,7 @@
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-16T01:47:43Z",
+      "built_at": "2026-11-16T02:31:55Z",
       "full_version": "2.1.0",
       "channel": "stable",
       "code_signed": false,
@@ -88,32 +88,33 @@
         {
           "kind": "portable",
           "file": "Typen-2.1.0-win64-portable.zip",
-          "size_bytes": 86055129,
-          "sha256": "062680e37dff356c4564f8e7888c637f804c96ce67fe7b89e789dc6d2b2f41ac"
+          "size_bytes": 86056088,
+          "sha256": "2ee1bde1ff00850cc9e9fbdc3bf17e12c71a9949eb39815b8adf669c889283ee"
         },
         {
           "kind": "installer",
           "file": "Typen-2.1.0-win64-setup.exe",
-          "size_bytes": 58041989,
-          "sha256": "0a0131067c93250eb4defd8c03eba048259135b5382073bca9fa15af0532fbb0"
+          "size_bytes": 58054168,
+          "sha256": "b080823d9f8f2ad8d62785cec3e16b5414ad34174f2658ff8d8cd89754d9646e"
         }
       ]
     }
   },
+  "download_repo": "TypenApp/typen",
   "platform": "win64",
   "code_signed": false,
   "artifacts": [
     {
       "kind": "portable",
       "file": "Typen-2.1.0-win64-portable.zip",
-      "size_bytes": 86055129,
-      "sha256": "062680e37dff356c4564f8e7888c637f804c96ce67fe7b89e789dc6d2b2f41ac"
+      "size_bytes": 86056088,
+      "sha256": "2ee1bde1ff00850cc9e9fbdc3bf17e12c71a9949eb39815b8adf669c889283ee"
     },
     {
       "kind": "installer",
       "file": "Typen-2.1.0-win64-setup.exe",
-      "size_bytes": 58041989,
-      "sha256": "0a0131067c93250eb4defd8c03eba048259135b5382073bca9fa15af0532fbb0"
+      "size_bytes": 58054168,
+      "sha256": "b080823d9f8f2ad8d62785cec3e16b5414ad34174f2658ff8d8cd89754d9646e"
     }
   ]
 }

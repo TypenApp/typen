@@ -186,6 +186,16 @@ SETTINGS_SCHEMA: Final[tuple[SettingSpec, ...]] = (
         1.4,
         po=True,
     ),
+    _i(
+        "predictive_offset_x",
+        0,
+        "correction",
+        "Horizontal placement (X-axis)",
+        "Horizontal pixel offset from the default inline or word-pill cursor anchor.",
+        -60,
+        120,
+        po=True,
+    ),
     _b(
         "local_ai_live_rescoring",
         True,

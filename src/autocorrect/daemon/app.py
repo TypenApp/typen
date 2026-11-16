@@ -1218,12 +1218,15 @@ class AutoCorrectDaemon:
             return
         f = self.session.features
         prefix = self.session.word_buffer.current_word if pred.mode == "SUFFIX" else ""
+        ui_theme = str(self.preference_store.get_typed("ui_theme"))
         self.ghost_overlay.request_prediction(
             prefix,
             pred.display_text,
             accept_key=f.predictive_accept_key,
             display_style=f.predictive_display_style,
             font_scale=f.predictive_font_scale,
+            offset_x=f.predictive_offset_x,
+            ui_theme=ui_theme,
             ai_tag=(pred.mode == "AI_REWRITE"),
         )
 

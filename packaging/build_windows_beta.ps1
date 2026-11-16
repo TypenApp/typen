@@ -225,7 +225,7 @@ $manifest.artifacts | ForEach-Object { Write-Host ("    {0,-60} {1,10:N0} bytes 
 # 7. Refresh the manifest the site reads (binaries stay in dist/installer; the
 #    release workflow attaches them to the GitHub Release the site links to).
 if (-not $SkipPublish) {
-    python -m pipeline.merge_release_manifests --downloads $OutDir
+    python -m pipeline.merge_release_manifests --downloads $OutDir --download-repo TypenApp/typen
     if ($LASTEXITCODE -ne 0) { throw "merge_release_manifests failed" }
     Write-Host "==> Artifacts in $OutDir; site manifest updated." -ForegroundColor Green
     Write-Host "    To publish: git tag $ReleaseTag && git push origin $ReleaseTag" -ForegroundColor Green
