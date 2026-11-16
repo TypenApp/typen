@@ -4,7 +4,7 @@
   "channel": "beta.1",
   "full_version": "2.1.0-beta.1",
   "release_tag": "v2.1.0-beta.1",
-  "built_at": "2026-11-16T02:31:55Z",
+  "built_at": "2026-11-16T02:50:58Z",
   "resources": {
     "bundle_version": "2.0.0",
     "schema_version": 2,
@@ -80,7 +80,7 @@
   ],
   "platforms": {
     "win64": {
-      "built_at": "2026-11-16T02:31:55Z",
+      "built_at": "2026-11-16T02:50:58Z",
       "full_version": "2.1.0",
       "channel": "stable",
       "code_signed": false,
@@ -88,16 +88,219 @@
         {
           "kind": "portable",
           "file": "Typen-2.1.0-win64-portable.zip",
-          "size_bytes": 86056088,
-          "sha256": "2ee1bde1ff00850cc9e9fbdc3bf17e12c71a9949eb39815b8adf669c889283ee"
+          "size_bytes": 92169405,
+          "sha256": "e8ad8165e141741becbbdbdf7824bd51c4a821d464436ca3ce91d47938a549e3"
         },
         {
           "kind": "installer",
           "file": "Typen-2.1.0-win64-setup.exe",
-          "size_bytes": 58054168,
-          "sha256": "b080823d9f8f2ad8d62785cec3e16b5414ad34174f2658ff8d8cd89754d9646e"
+          "size_bytes": 59567416,
+          "sha256": "786fbaf30f69d312494b00b82cdd280c1a85db197aa39345bfcc7ec1ad238ec2"
         }
-      ]
+      ],
+      "app_updates": {
+        "portable": {
+          "descriptor": {
+            "version": "2.1.0",
+            "platform_sku_suffix": "WIN",
+            "released_at": "2026-11-16T02:50:58Z",
+            "installer_sha256": "e8ad8165e141741becbbdbdf7824bd51c4a821d464436ca3ce91d47938a549e3",
+            "installer_size": 92169405,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-win64-portable.zip",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "portable",
+            "artifact_file": "Typen-2.1.0-win64-portable.zip"
+          },
+          "signature_b64": "ejLyz1KQSmak5GzF9CljHfgKIuErCnxcRkAk50XMPek1s1CmC7NFXzoZN0UmQiHlrqJLoUISz6cg6CNFdfp4DQ=="
+        },
+        "installer": {
+          "descriptor": {
+            "version": "2.1.0",
+            "platform_sku_suffix": "WIN",
+            "released_at": "2026-11-16T02:50:58Z",
+            "installer_sha256": "786fbaf30f69d312494b00b82cdd280c1a85db197aa39345bfcc7ec1ad238ec2",
+            "installer_size": 59567416,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-win64-setup.exe",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "installer",
+            "artifact_file": "Typen-2.1.0-win64-setup.exe"
+          },
+          "signature_b64": "tjV6IRFgTVwv7umVZEC/WdJ9URuBk5EtLu4WO0gXBfpJKTtj4YPuBwbVFtL2DBGmwHlc2lN4TzxdaALeL0OFBw=="
+        }
+      },
+      "app_update": {
+        "descriptor": {
+          "version": "2.1.0",
+          "platform_sku_suffix": "WIN",
+          "released_at": "2026-11-16T02:50:58Z",
+          "installer_sha256": "786fbaf30f69d312494b00b82cdd280c1a85db197aa39345bfcc7ec1ad238ec2",
+          "installer_size": 59567416,
+          "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-win64-setup.exe",
+          "is_security_patch": false,
+          "target_branch_prefix": "2.1.",
+          "artifact_kind": "installer",
+          "artifact_file": "Typen-2.1.0-win64-setup.exe"
+        },
+        "signature_b64": "tjV6IRFgTVwv7umVZEC/WdJ9URuBk5EtLu4WO0gXBfpJKTtj4YPuBwbVFtL2DBGmwHlc2lN4TzxdaALeL0OFBw=="
+      }
+    },
+    "macos-arm64": {
+      "built_at": "2026-11-16T02:49:36Z",
+      "full_version": "2.1.0-beta.1",
+      "channel": "beta.1",
+      "code_signed": false,
+      "artifacts": [
+        {
+          "kind": "installer",
+          "file": "Typen-2.1.0-beta.1-macos-arm64.dmg",
+          "size_bytes": 87359144,
+          "sha256": "6610fc9dfeb8d546930a081fbda8c3bc5fd1ee5a05acf8329142769ea8db532b"
+        },
+        {
+          "kind": "portable",
+          "file": "Typen-2.1.0-beta.1-macos-arm64.zip",
+          "size_bytes": 72435774,
+          "sha256": "440aade11ddf31b2e2a5b306cd5cd7be0903d9b17aecc15590fa7085bab4e995"
+        }
+      ],
+      "notarized": false,
+      "app_updates": {
+        "installer": {
+          "descriptor": {
+            "version": "2.1.0-beta.1",
+            "platform_sku_suffix": "MAC",
+            "released_at": "2026-11-16T02:49:36Z",
+            "installer_sha256": "6610fc9dfeb8d546930a081fbda8c3bc5fd1ee5a05acf8329142769ea8db532b",
+            "installer_size": 87359144,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-macos-arm64.dmg",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "installer",
+            "artifact_file": "Typen-2.1.0-beta.1-macos-arm64.dmg"
+          },
+          "signature_b64": "IRkSyjIcYNe/Mlg8GZdWu0Nnah6jBFqUEObM0BHVptbiCHDUrFDx9O+AvST7qYewZL7ZETBM3mUKADwQbWY9Dg=="
+        },
+        "portable": {
+          "descriptor": {
+            "version": "2.1.0-beta.1",
+            "platform_sku_suffix": "MAC",
+            "released_at": "2026-11-16T02:49:36Z",
+            "installer_sha256": "440aade11ddf31b2e2a5b306cd5cd7be0903d9b17aecc15590fa7085bab4e995",
+            "installer_size": 72435774,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-macos-arm64.zip",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "portable",
+            "artifact_file": "Typen-2.1.0-beta.1-macos-arm64.zip"
+          },
+          "signature_b64": "v6hnacMczD66PCKYj0wgkzQTMJQLbkRybha+pF1xiJ3AhpzpMu56PH1Q90QEIy/ir9/vAHWFHYJ45h83xzPKAw=="
+        }
+      },
+      "app_update": {
+        "descriptor": {
+          "version": "2.1.0-beta.1",
+          "platform_sku_suffix": "MAC",
+          "released_at": "2026-11-16T02:49:36Z",
+          "installer_sha256": "440aade11ddf31b2e2a5b306cd5cd7be0903d9b17aecc15590fa7085bab4e995",
+          "installer_size": 72435774,
+          "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-macos-arm64.zip",
+          "is_security_patch": false,
+          "target_branch_prefix": "2.1.",
+          "artifact_kind": "portable",
+          "artifact_file": "Typen-2.1.0-beta.1-macos-arm64.zip"
+        },
+        "signature_b64": "v6hnacMczD66PCKYj0wgkzQTMJQLbkRybha+pF1xiJ3AhpzpMu56PH1Q90QEIy/ir9/vAHWFHYJ45h83xzPKAw=="
+      }
+    },
+    "linux-x86_64": {
+      "built_at": "2026-11-16T02:49:40Z",
+      "full_version": "2.1.0-beta.1",
+      "channel": "beta.1",
+      "code_signed": false,
+      "artifacts": [
+        {
+          "kind": "portable",
+          "file": "Typen-2.1.0-beta.1-linux-x86_64-portable.tar.gz",
+          "size_bytes": 133671230,
+          "sha256": "63f6f8443b42a7017e2c0592c19246a6d413c258ee7a39027f2d436612bf4f30"
+        },
+        {
+          "kind": "appimage",
+          "file": "Typen-2.1.0-beta.1-linux-x86_64.AppImage",
+          "size_bytes": 121874936,
+          "sha256": "d714aa459d014ba482f8a7a0645983b38aba9d175669ce0c8662d53eeb6da9a4"
+        },
+        {
+          "kind": "deb",
+          "file": "autocorrect-desktop_2.1.0-beta.1_amd64.deb",
+          "size_bytes": 103401532,
+          "sha256": "d7619c27039b87eb5a122c9b2765fefdd0182fca6be7641e83733c906ea7ef07"
+        }
+      ],
+      "app_updates": {
+        "portable": {
+          "descriptor": {
+            "version": "2.1.0-beta.1",
+            "platform_sku_suffix": "LINUX",
+            "released_at": "2026-11-16T02:49:40Z",
+            "installer_sha256": "63f6f8443b42a7017e2c0592c19246a6d413c258ee7a39027f2d436612bf4f30",
+            "installer_size": 133671230,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-linux-x86_64-portable.tar.gz",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "portable",
+            "artifact_file": "Typen-2.1.0-beta.1-linux-x86_64-portable.tar.gz"
+          },
+          "signature_b64": "Wgy7Z/BgNYCpKFfHYpoWZ/D19VmVw7agJX2lxc6MSyf1kgeI91OCKRiIztJAOknVxzGxLVGljI7gHxke5aQeDw=="
+        },
+        "appimage": {
+          "descriptor": {
+            "version": "2.1.0-beta.1",
+            "platform_sku_suffix": "LINUX",
+            "released_at": "2026-11-16T02:49:40Z",
+            "installer_sha256": "d714aa459d014ba482f8a7a0645983b38aba9d175669ce0c8662d53eeb6da9a4",
+            "installer_size": 121874936,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-linux-x86_64.AppImage",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "appimage",
+            "artifact_file": "Typen-2.1.0-beta.1-linux-x86_64.AppImage"
+          },
+          "signature_b64": "Mwpn9gNUD/YV/l9rtrc/TSNIpudV54n5tPwSuGNblMqcjdkuxBOMI/5/FZJqiNpkAbGalO5hJy2eELl4ey83BQ=="
+        },
+        "deb": {
+          "descriptor": {
+            "version": "2.1.0-beta.1",
+            "platform_sku_suffix": "LINUX",
+            "released_at": "2026-11-16T02:49:40Z",
+            "installer_sha256": "d7619c27039b87eb5a122c9b2765fefdd0182fca6be7641e83733c906ea7ef07",
+            "installer_size": 103401532,
+            "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/autocorrect-desktop_2.1.0-beta.1_amd64.deb",
+            "is_security_patch": false,
+            "target_branch_prefix": "2.1.",
+            "artifact_kind": "deb",
+            "artifact_file": "autocorrect-desktop_2.1.0-beta.1_amd64.deb"
+          },
+          "signature_b64": "kgFx07eoqL87fP44d29W5OZKTfkbUmIyEoabqNyD5q0kD0Z8VCcw/65eIrR/P2DUQggYud0tVHgFv+z1UEToBA=="
+        }
+      },
+      "app_update": {
+        "descriptor": {
+          "version": "2.1.0-beta.1",
+          "platform_sku_suffix": "LINUX",
+          "released_at": "2026-11-16T02:49:40Z",
+          "installer_sha256": "d714aa459d014ba482f8a7a0645983b38aba9d175669ce0c8662d53eeb6da9a4",
+          "installer_size": 121874936,
+          "download_url": "https://github.com/TypenApp/typen/releases/download/v2.1.0-beta.1/Typen-2.1.0-beta.1-linux-x86_64.AppImage",
+          "is_security_patch": false,
+          "target_branch_prefix": "2.1.",
+          "artifact_kind": "appimage",
+          "artifact_file": "Typen-2.1.0-beta.1-linux-x86_64.AppImage"
+        },
+        "signature_b64": "Mwpn9gNUD/YV/l9rtrc/TSNIpudV54n5tPwSuGNblMqcjdkuxBOMI/5/FZJqiNpkAbGalO5hJy2eELl4ey83BQ=="
+      }
     }
   },
   "download_repo": "TypenApp/typen",
@@ -107,14 +310,14 @@
     {
       "kind": "portable",
       "file": "Typen-2.1.0-win64-portable.zip",
-      "size_bytes": 86056088,
-      "sha256": "2ee1bde1ff00850cc9e9fbdc3bf17e12c71a9949eb39815b8adf669c889283ee"
+      "size_bytes": 92169405,
+      "sha256": "e8ad8165e141741becbbdbdf7824bd51c4a821d464436ca3ce91d47938a549e3"
     },
     {
       "kind": "installer",
       "file": "Typen-2.1.0-win64-setup.exe",
-      "size_bytes": 58054168,
-      "sha256": "b080823d9f8f2ad8d62785cec3e16b5414ad34174f2658ff8d8cd89754d9646e"
+      "size_bytes": 59567416,
+      "sha256": "786fbaf30f69d312494b00b82cdd280c1a85db197aa39345bfcc7ec1ad238ec2"
     }
   ]
 }
