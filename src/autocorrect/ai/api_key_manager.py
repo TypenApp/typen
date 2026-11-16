@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Final
-
-import keyring
+from typing import Any, Final
 
 KEYRING_SERVICE_NAME: Final[str] = "AutoCorrect.Desktop.BYOK"
+
+
+def _get_keyring() -> Any:
+    import keyring
+
+    return keyring
 
 # Regex matching OpenAI, Anthropic, Google Gemini, and Bachs secret keys for log redaction
 SECRET_KEY_PATTERNS: Final[re.Pattern[str]] = re.compile(
@@ -63,7 +67,7 @@ class ApiKeyManager:
             self._memory_vault[norm_provider] = cleaned
             return
         try:
-            keyring.set_password(KEYRING_SERVICE_NAME, norm_provider, cleaned)
+            _get_keyring().set_password(KEYRING_SERVICE_NAME, norm_provider, cleaned)
         except Exception:
             self._memory_vault[norm_provider] = cleaned
 
@@ -72,9 +76,9 @@ class ApiKeyManager:
         if self._use_memory:
             return self._memory_vault.get(norm_provider)
         try:
-            val = keyring.get_password(KEYRING_SERVICE_NAME, norm_provider)
+            val = _get_keyring().get_password(KEYRING_SERVICE_NAME, norm_provider)
             if val is not None:
-                return val
+                return str(val)
         except Exception:
             pass
         return self._memory_vault.get(norm_provider)
@@ -84,7 +88,7 @@ class ApiKeyManager:
         self._memory_vault.pop(norm_provider, None)
         if not self._use_memory:
             try:
-                keyring.delete_password(KEYRING_SERVICE_NAME, norm_provider)
+                _get_keyring().delete_password(KEYRING_SERVICE_NAME, norm_provider)
             except Exception:
                 pass
 
