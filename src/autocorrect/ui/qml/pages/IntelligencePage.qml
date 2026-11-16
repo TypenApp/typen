@@ -22,11 +22,11 @@ Page {
     PageHeader {
         number: "08"
         title: "Intelligence"
-        lead: "Everything on the other pages runs locally with no model at all. These are the optional extras."
+        lead: "On-device contextual scoring and clause grammar run locally on your machine. Cloud providers remain strictly opt-in."
     }
 
     Card {
-        SectionTitle { title: "On-device model"; description: "A small language model for context-aware rewrites. It runs entirely on this computer." }
+        SectionTitle { title: "On-device model"; description: "Quantized int8 contextual rescoring and long-range clause grammar analysis, running 100% offline." }
         RowLayout {
             Layout.fillWidth: true
             spacing: 28
@@ -35,7 +35,7 @@ Page {
                     { k: "CPU cores", v: String(local.cpu_cores || "—") },
                     { k: "Memory", v: local.total_ram_mb ? Math.round(local.total_ram_mb / 1024) + " GB" : "—" },
                     { k: "Accelerator", v: String(local.accelerator || "cpu") },
-                    { k: "Recommended", v: String(local.recommended_model_id || "—") }
+                    { k: "Context engine", v: local.neural_context_loaded ? "int8 neural + rules" : String(local.recommended_model_id || "—") }
                 ]
                 ColumnLayout {
                     spacing: 2
@@ -46,20 +46,25 @@ Page {
             Item { Layout.fillWidth: true }
             Pill { label: local.model_loaded ? "loaded" : "not loaded"; tone: local.model_loaded ? "ok" : "muted" }
         }
+        ToggleRow {
+            key: "local_ai_live_rescoring"
+            label: "Live contextual candidate rescoring"
+            description: "Disambiguate close spelling candidates, homophones and subject-verb agreement using the on-device neural context model."
+        }
+        SettingRow {
+            label: "Clause suggestions on pause"
+            description: "When you pause briefly after a multi-word clause, surface non-intrusive grammar fixes in-line."
+            Toggle { checked: local.pause_pill_enabled === true; onToggled: page.updateAi({ pause_pill_enabled: checked }) }
+        }
         RowLayout {
             Layout.fillWidth: true
-            SettingRow { label: "Rewrite shortcut"; description: "Select text and press it to rewrite with the model."; Layout.fillWidth: true; HotkeyField { key: "rewrite_hotkey" } }
+            SettingRow { label: "Rewrite shortcut"; description: "Rewrite the active clause or last sentence on demand."; Layout.fillWidth: true; HotkeyField { key: "rewrite_hotkey" } }
         }
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
             SecondaryButton { visible: !local.model_loaded; text: "Load model"; onClicked: page.updateAi({ load_local_model: true }) }
             GhostButton { visible: local.model_loaded === true; text: "Unload"; onClicked: page.updateAi({ unload_local_model: true }) }
-        }
-        SettingRow {
-            label: "Pause pill"
-            description: "A small floating pill while the model is thinking so you know why text is changing."
-            Toggle { checked: local.pause_pill_enabled === true; onToggled: page.updateAi({ pause_pill_enabled: checked }) }
         }
     }
 

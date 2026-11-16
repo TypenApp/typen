@@ -15,9 +15,11 @@ from typing import Final
 from autocorrect.adapters.windows import win32_api as w32
 from autocorrect.input.ports import FocusContext
 
-# Default password managers, RDP/SSH clients, and games where autocorrect must auto-suspend
+# Default password managers, RDP/SSH clients, Typen's own Settings UI, and games where global hooks auto-suspend
 DEFAULT_EXCLUDED_PROCESSES: Final[frozenset[str]] = frozenset(
     {
+        "typen.exe",
+        "autocorrectdesktop.exe",
         "1password.exe",
         "bitwarden.exe",
         "keepass.exe",
@@ -111,7 +113,13 @@ class Win32FocusInspector:
         ):
             is_password = True
 
-        is_excluded = proc_low in DEFAULT_EXCLUDED_PROCESSES or proc_low in self._user_excluded
+        is_self_ui = title_low in ("typen", "typen — settings") and proc_low in (
+            "python.exe",
+            "pythonw.exe",
+            "typen",
+            "typen-settings",
+        )
+        is_excluded = is_self_ui or proc_low in DEFAULT_EXCLUDED_PROCESSES or proc_low in self._user_excluded
         is_terminal = proc_low in DEFAULT_TERMINAL_PROCESSES or proc_low in self._user_code
 
         return FocusContext(

@@ -106,11 +106,17 @@ class InputDispatcher:
     def queue_depth(self) -> int:
         return self._depth
 
+    def reset_overload(self) -> None:
+        """Clear any prior overload state when the user explicitly resumes hooks."""
+        self._overloaded = False
+        self.stats._slow_timestamps.clear()
+
     def start(self) -> None:
         if self.is_running:
             return
         self._running = True
         self._overloaded = False
+        self.stats._slow_timestamps.clear()
         self._thread = threading.Thread(target=self._run, name="autocorrect-input-dispatcher", daemon=True)
         self._thread.start()
 
@@ -221,16 +227,27 @@ class InputDispatcher:
             elif kind == "call":
                 self._safe(payload)
             return
-        with self._depth_lock:
-            if self._depth >= self._max_depth:
-                self.stats.dropped += 1
-                self._trip_overload(f"input queue exceeded {self._max_depth} pending events")
-                return
-            self._depth += 1
-            if self._depth > self.stats.max_queue_depth:
-                self.stats.max_queue_depth = self._depth
-        self.stats.posted += 1
-        self._enqueue((kind, payload))
+        with self._cv:
+            # Coalesce back-to-back focus or mouse notifications waiting at the tail
+            # so window-transition bursts never flood the queue ahead of keystrokes.
+            if kind in ("focus", "mouse") and self._queue:
+                tail = self._queue[-1]
+                if tail is not None and tail[0] == kind:
+                    self._queue[-1] = (kind, payload)
+                    self.stats.posted += 1
+                    self._cv.notify()
+                    return
+            with self._depth_lock:
+                if self._depth >= self._max_depth:
+                    self.stats.dropped += 1
+                    self._trip_overload(f"input queue exceeded {self._max_depth} pending events")
+                    return
+                self._depth += 1
+                if self._depth > self.stats.max_queue_depth:
+                    self.stats.max_queue_depth = self._depth
+            self.stats.posted += 1
+            self._queue.append((kind, payload))
+            self._cv.notify()
 
     # ----------------------------------------------------------------- worker
 
@@ -256,11 +273,11 @@ class InputDispatcher:
             except Exception:
                 log.exception("input handler (%s) raised", kind)
             finally:
-                self._record(started)
+                self._record(started, kind)
             if not self._running:
                 break
 
-    def _record(self, started: float) -> None:
+    def _record(self, started: float, kind: str = "key") -> None:
         elapsed_ms = (self._clock() - started) * 1000.0
         st = self.stats
         st.handled += 1
@@ -269,15 +286,16 @@ class InputDispatcher:
             st.max_handler_ms = elapsed_ms
         if elapsed_ms > self._budget_ms:
             st.slow_handlers += 1
-            now = self._clock()
-            st._slow_timestamps.append(now)
-            st._slow_timestamps = [t for t in st._slow_timestamps if now - t <= SLOW_WINDOW_S]
-            log.warning("input handler took %.1f ms (budget %.0f ms)", elapsed_ms, self._budget_ms)
-            if len(st._slow_timestamps) >= self._slow_limit:
-                self._trip_overload(
-                    f"{len(st._slow_timestamps)} handlers exceeded {self._budget_ms:.0f} ms "
-                    f"within {SLOW_WINDOW_S:.0f} s"
-                )
+            log.warning("input handler (%s) took %.1f ms (budget %.0f ms)", kind, elapsed_ms, self._budget_ms)
+            if kind == "key":
+                now = self._clock()
+                st._slow_timestamps.append(now)
+                st._slow_timestamps = [t for t in st._slow_timestamps if now - t <= SLOW_WINDOW_S]
+                if len(st._slow_timestamps) >= self._slow_limit:
+                    self._trip_overload(
+                        f"{len(st._slow_timestamps)} handlers exceeded {self._budget_ms:.0f} ms "
+                        f"within {SLOW_WINDOW_S:.0f} s"
+                    )
 
     def _trip_overload(self, reason: str) -> None:
         if self._overloaded:

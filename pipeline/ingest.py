@@ -2393,11 +2393,29 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         ("nigerian", CasingFlag.TITLE_ONLY, None),
         ("nigeria", CasingFlag.TITLE_ONLY, None),
         ("london", CasingFlag.TITLE_ONLY, None),
-        ("microsoft", CasingFlag.TITLE_ONLY, None),
-        ("google", CasingFlag.TITLE_ONLY, None),
+        ("microsoft", CasingFlag.TITLE_ONLY, "Microsoft"),
+        ("google", CasingFlag.TITLE_ONLY, "Google"),
+        ("spotify", CasingFlag.TITLE_ONLY, "Spotify"),
+        ("netflix", CasingFlag.TITLE_ONLY, "Netflix"),
+        ("instagram", CasingFlag.TITLE_ONLY, "Instagram"),
+        ("reddit", CasingFlag.TITLE_ONLY, "Reddit"),
+        ("amazon", CasingFlag.TITLE_ONLY, "Amazon"),
+        ("samsung", CasingFlag.TITLE_ONLY, "Samsung"),
+        ("bluetooth", CasingFlag.TITLE_ONLY, "Bluetooth"),
+        ("android", CasingFlag.TITLE_ONLY, "Android"),
+        ("macos", CasingFlag.EXACT_MIXED, "macOS"),
         ("iphone", CasingFlag.EXACT_MIXED, "iPhone"),
         ("ipad", CasingFlag.EXACT_MIXED, "iPad"),
-        ("macos", CasingFlag.EXACT_MIXED, "macOS"),
+        ("airpods", CasingFlag.EXACT_MIXED, "AirPods"),
+        ("macbook", CasingFlag.EXACT_MIXED, "MacBook"),
+        ("imac", CasingFlag.EXACT_MIXED, "iMac"),
+        ("icloud", CasingFlag.EXACT_MIXED, "iCloud"),
+        ("playstation", CasingFlag.EXACT_MIXED, "PlayStation"),
+        ("onedrive", CasingFlag.EXACT_MIXED, "OneDrive"),
+        ("sharepoint", CasingFlag.EXACT_MIXED, "SharePoint"),
+        ("powerpoint", CasingFlag.EXACT_MIXED, "PowerPoint"),
+        ("wordpress", CasingFlag.EXACT_MIXED, "WordPress"),
+        ("cloudflare", CasingFlag.TITLE_ONLY, "Cloudflare"),
         ("javascript", CasingFlag.EXACT_MIXED, "JavaScript"),
         ("typescript", CasingFlag.EXACT_MIXED, "TypeScript"),
         ("github", CasingFlag.EXACT_MIXED, "GitHub"),
@@ -2634,6 +2652,12 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "subcription": ("subscription", 8.5),
         "subcriptions": ("subscriptions", 8.5),
         "suscription": ("subscription", 8.0),
+        "fomr": ("from", 8.2),
+        "manged": ("managed", 8.2),
+        "letterin": ("lettering", 8.0),
+        "shool": ("school", 8.0),
+        "stroy": ("story", 8.0),
+        "issus": ("issues", 8.0),
     }
     for typo, (target, boost) in curated_typos.items():
         if target not in ds.words:
@@ -2684,6 +2708,67 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         ("they", "were", -1.3),
         ("you", "were", -1.3),
         ("there", "were", -1.4),
+        ("there", "is", -1.1),
+        ("there", "are", -1.1),
+        ("there", "was", -1.2),
+        ("there", "will", -1.3),
+        ("they're", "going", -1.1),
+        ("they're", "not", -1.2),
+        ("they're", "doing", -1.3),
+        ("they're", "coming", -1.3),
+        ("they're", "still", -1.3),
+        ("they're", "always", -1.4),
+        ("you're", "welcome", -1.0),
+        ("you're", "right", -1.1),
+        ("you're", "not", -1.1),
+        ("you're", "going", -1.1),
+        ("you're", "doing", -1.2),
+        ("it's", "not", -1.1),
+        ("it's", "been", -1.1),
+        ("it's", "going", -1.2),
+        ("it's", "very", -1.3),
+        ("it's", "still", -1.3),
+        ("it's", "time", -1.3),
+        ("it's", "a", -1.1),
+        ("it's", "the", -1.2),
+        ("let", "me", -1.2),
+        ("me", "know", -1.1),
+        ("make", "sure", -1.1),
+        ("looking", "forward", -1.1),
+        ("forward", "to", -1.1),
+        ("thank", "you", -1.0),
+        ("would", "like", -1.1),
+        ("like", "to", -1.1),
+        ("supposed", "to", -1.2),
+        ("trying", "to", -1.1),
+        ("decided", "to", -1.2),
+        ("forgot", "to", -1.2),
+        ("managed", "to", -1.2),
+        ("should", "be", -1.1),
+        ("should", "have", -1.2),
+        ("could", "be", -1.2),
+        ("could", "have", -1.2),
+        ("would", "be", -1.1),
+        ("would", "have", -1.2),
+        ("must", "be", -1.2),
+        ("must", "have", -1.3),
+        ("a", "lot", -1.1),
+        ("lot", "of", -1.1),
+        ("kind", "of", -1.2),
+        ("sort", "of", -1.2),
+        ("instead", "of", -1.1),
+        ("because", "of", -1.2),
+        ("out", "of", -1.2),
+        ("such", "as", -1.2),
+        ("as", "well", -1.2),
+        ("at", "least", -1.2),
+        ("in", "the", -1.0),
+        ("on", "the", -1.0),
+        ("of", "the", -1.0),
+        ("to", "the", -1.0),
+        ("for", "the", -1.1),
+        ("with", "the", -1.1),
+        ("from", "the", -1.1),
     ]
     ds.trigrams = [
         ("i", "went", "to", -0.8),
@@ -2692,7 +2777,19 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         ("received", "your", "message", -0.8),
         ("better", "than", "the", -0.9),
         ("more", "than", "one", -0.9),
+        ("let", "me", "know", -0.7),
+        ("looking", "forward", "to", -0.7),
+        ("as", "soon", "as", -0.8),
+        ("in", "order", "to", -0.8),
+        ("a", "lot", "of", -0.8),
+        ("i", "would", "like", -0.9),
+        ("would", "like", "to", -0.8),
+        ("i", "managed", "to", -0.9),
+        ("we", "need", "to", -0.8),
     ]
+    from pipeline.context_corpus import build_expanded_ngrams
+
+    ds.bigrams, ds.trigrams = build_expanded_ngrams(ds.bigrams, ds.trigrams)
 
     # 8. Abbreviations (also registered as valid lexicon words so they are never "corrected")
     ds.abbreviations = {
@@ -2805,7 +2902,8 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "tree-shaking hydration SSR CSR ISR webhook webhooks websocket websockets protobuf "
         "gRPC GraphQL RESTful OAuth OIDC PKCE JWT SAML RBAC ABAC zero-trust sandboxing "
         "vectorization quantization embeddings tokenizer fine-tuning inference latency "
-        "throughput sharding replication failover quorum consensus raft paxos"
+        "throughput sharding replication failover quorum consensus raft paxos "
+        "pandas gemini tailwind cursor"
     ).split()
     prog_brands: dict[str, tuple[CasingFlag, str]] = {
         "kubernetes": (CasingFlag.TITLE_ONLY, "Kubernetes"),
@@ -2814,7 +2912,6 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "fastapi": (CasingFlag.EXACT_MIXED, "FastAPI"),
         "numpy": (CasingFlag.EXACT_MIXED, "NumPy"),
         "scipy": (CasingFlag.EXACT_MIXED, "SciPy"),
-        "pandas": (CasingFlag.TITLE_ONLY, "Pandas"),
         "graphql": (CasingFlag.EXACT_MIXED, "GraphQL"),
         "typescript": (CasingFlag.EXACT_MIXED, "TypeScript"),
         "javascript": (CasingFlag.EXACT_MIXED, "JavaScript"),
@@ -2831,7 +2928,6 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "anthropic": (CasingFlag.TITLE_ONLY, "Anthropic"),
         "chatgpt": (CasingFlag.EXACT_MIXED, "ChatGPT"),
         "claude": (CasingFlag.TITLE_ONLY, "Claude"),
-        "gemini": (CasingFlag.TITLE_ONLY, "Gemini"),
         "deepmind": (CasingFlag.EXACT_MIXED, "DeepMind"),
         "nvidia": (CasingFlag.TITLE_ONLY, "Nvidia"),
         "github": (CasingFlag.EXACT_MIXED, "GitHub"),
@@ -2844,13 +2940,11 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "nodejs": (CasingFlag.EXACT_MIXED, "NodeJS"),
         "reactjs": (CasingFlag.EXACT_MIXED, "ReactJS"),
         "svelte": (CasingFlag.TITLE_ONLY, "Svelte"),
-        "tailwind": (CasingFlag.TITLE_ONLY, "Tailwind"),
         "vscode": (CasingFlag.EXACT_MIXED, "VSCode"),
         "intellij": (CasingFlag.EXACT_MIXED, "IntelliJ"),
         "pycharm": (CasingFlag.EXACT_MIXED, "PyCharm"),
         "neovim": (CasingFlag.TITLE_ONLY, "Neovim"),
         "raycast": (CasingFlag.TITLE_ONLY, "Raycast"),
-        "cursor": (CasingFlag.TITLE_ONLY, "Cursor"),
         "pyside": (CasingFlag.EXACT_MIXED, "PySide"),
         "nuitka": (CasingFlag.TITLE_ONLY, "Nuitka"),
     }
@@ -2858,23 +2952,18 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
     bus_lower = (
         "deliverable deliverables stakeholder stakeholders onboarding offboarding "
         "monetisation monetization productization go-to-market omnichannel touchpoint "
-        "touchpoints headcountworkstream workstreams deliverable KPIs OKRs SaaS PaaS IaaS "
+        "touchpoints headcount workstream workstreams deliverable KPIs OKRs SaaS PaaS IaaS "
         "B2B B2C D2C churn retention upsell cross-sell pipeline enablement alignment "
-        "synergy procurement SLA SLAs RFP RFPs RFQ KPI OKR"
+        "synergy procurement SLA SLAs RFP RFPs RFQ KPI OKR "
+        "notion linear stripe slack zoom confluence"
     ).split()
     bus_brands: dict[str, tuple[CasingFlag, str]] = {
         "typen": (CasingFlag.TITLE_ONLY, "Typen"),
         "figma": (CasingFlag.TITLE_ONLY, "Figma"),
-        "notion": (CasingFlag.TITLE_ONLY, "Notion"),
-        "linear": (CasingFlag.TITLE_ONLY, "Linear"),
-        "stripe": (CasingFlag.TITLE_ONLY, "Stripe"),
         "shopify": (CasingFlag.TITLE_ONLY, "Shopify"),
-        "slack": (CasingFlag.TITLE_ONLY, "Slack"),
         "discord": (CasingFlag.TITLE_ONLY, "Discord"),
-        "zoom": (CasingFlag.TITLE_ONLY, "Zoom"),
         "asana": (CasingFlag.TITLE_ONLY, "Asana"),
         "jira": (CasingFlag.TITLE_ONLY, "Jira"),
-        "confluence": (CasingFlag.TITLE_ONLY, "Confluence"),
         "atlassian": (CasingFlag.TITLE_ONLY, "Atlassian"),
         "hubspot": (CasingFlag.EXACT_MIXED, "HubSpot"),
         "salesforce": (CasingFlag.TITLE_ONLY, "Salesforce"),
@@ -2920,7 +3009,7 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "tortfeasor estoppel promissory certiorari mandamus habeas corpus voir dire "
         "deposition depositions interrogatories discovery adjudicate adjudication "
         "arbitration mediation severability force majeure liquidated damages injunction "
-        "injunctive declaratoryappellant appellee petitioner respondent plaintiff "
+        "injunctive declaratory appellant appellee petitioner respondent plaintiff "
         "defendant amicus curiae stare decisis mens rea actus reus prima facie "
         "res judicata collateral Consequential"
     ).split()
@@ -3047,12 +3136,14 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
     # from SCOWL level 80..95 or raw JSON dictionary wordlists as a valid word.
     from pipeline.external_sources import (
         corpus_log_frequency,
+        load_all_misspelling_headwords,
         load_common_misspellings,
         load_comprehensive_json_dictionary,
         load_external_lexicon,
     )
 
     external_typos = load_common_misspellings()
+    all_wiki_misspellings = load_all_misspelling_headwords()
     known_misspellings = set(ds.direct_typos.keys()) | set(external_typos.keys()) | {
         "woking",
         "arythmia",
@@ -3061,9 +3152,37 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
     }
 
     external_words = load_external_lexicon()
+
+    # Build a 1-edit typo-shadowing guard from high-frequency core English headwords
+    # (curated words + SCOWL <= 60 words with corpus log_freq >= -6.45, ~top 25k words).
+    # Unvetted JSON dictionary words and obscure SCOWL 80..95 entries ('langauge',
+    # 'beleve', 'differen', 'probabl', 'theer', 'toher', 'wheer', 'manged', 'letterin',
+    # 'positon', 'tinking', 'thoght', 'mysel', 'yoursel') must never mask 1-edit
+    # transpositions or dropped-letter typos of everyday English words!
+    core_anchors: set[str] = set(ds.words.keys())
+    for ext_a in external_words.values():
+        if ext_a.level <= 60 and ext_a.log_freq >= -6.45 and ext_a.word.isalpha():
+            core_anchors.add(ext_a.word)
+
+    typo_shadow_set: set[str] = set()
+    for anchor in core_anchors:
+        alen = len(anchor)
+        if alen >= 4:
+            for i in range(alen - 1):
+                if anchor[i] != anchor[i + 1]:
+                    typo_shadow_set.add(anchor[:i] + anchor[i + 1] + anchor[i] + anchor[i + 2 :])
+        if alen >= 6:
+            for i in range(alen):
+                typo_shadow_set.add(anchor[:i] + anchor[i + 1 :])
+
     for ext in external_words.values():
         if ext.word in ds.words or ext.word in known_misspellings:
             continue
+        if ext.level >= 80:
+            if ext.word in all_wiki_misspellings:
+                continue
+            if ext.word in typo_shadow_set and ext.log_freq < -6.95:
+                continue
         ds.words[ext.word] = RawWordEntry(
             word=ext.word,
             log_freq=ext.log_freq,
@@ -3076,7 +3195,13 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
     # 11a-bis. Merge comprehensive English dictionary JSON (~370k words) for niche/uncommon words
     json_dict_words = load_comprehensive_json_dictionary()
     for j_ext in json_dict_words.values():
-        if j_ext.word in ds.words or j_ext.word in known_misspellings:
+        if (
+            j_ext.word in ds.words
+            or j_ext.word in known_misspellings
+            or j_ext.word in all_wiki_misspellings
+        ):
+            continue
+        if j_ext.word in typo_shadow_set and j_ext.log_freq < -6.95:
             continue
         ds.words[j_ext.word] = RawWordEntry(
             word=j_ext.word,
@@ -3148,7 +3273,7 @@ def build_master_english_dataset(version: str = "2.0.0") -> RawCorpusDataset:
         "saas ecommerce fintech edtech startup startups scaleup Ghosting ghosted gaslight "
         "gaslighting vibe vibes vibing banger bangers lowkey highkey deadass bestie besties "
         "fomo jomo goat goated salty cringe cringey sus yeet boujee wholesome doomscrolling "
-        "bingeable adulting ghostedghosting"
+        "bingeable adulting"
     ).lower().split()
     for mod_word in suggestible_modern_and_slang:
         if mod_word not in ds.words and mod_word not in ds.direct_typos:

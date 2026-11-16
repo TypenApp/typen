@@ -30,6 +30,9 @@ def _carbon_is_secure_event_input_enabled() -> Any:
 
 MACOS_EXCLUDED_BUNDLES: Final[frozenset[str]] = frozenset(
     {
+        "org.typen.desktop",
+        "com.omnii.typen",
+        "com.omnii.autocorrect",
         "com.1password.1password",
         "com.agilebits.onepassword7",
         "com.bitwarden.desktop",
@@ -99,7 +102,11 @@ class MacAXFocusInspector:
         is_password = (
             secure_event_input_enabled or ax_subrole == "AXSecureTextField" or ax_role == "AXSecureTextField"
         )
-        is_excluded = b_low in MACOS_EXCLUDED_BUNDLES or b_low in self._user_excluded
+        is_excluded = (
+            b_low in MACOS_EXCLUDED_BUNDLES
+            or b_low in self._user_excluded
+            or app_name.strip().lower() == "typen"
+        )
         is_terminal = b_low in MACOS_TERMINAL_BUNDLES
 
         return FocusContext(

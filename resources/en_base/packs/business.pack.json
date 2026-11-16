@@ -68,7 +68,12 @@
       "casing_flag": 0,
       "exact_casing": null
     },
-    "headcountworkstream": {
+    "headcount": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "workstream": {
       "log_freq": -5.8,
       "casing_flag": 0,
       "exact_casing": null
@@ -198,6 +203,36 @@
       "casing_flag": 0,
       "exact_casing": null
     },
+    "notion": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "linear": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "stripe": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "slack": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "zoom": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "confluence": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
     "typen": {
       "log_freq": -5.6,
       "casing_flag": 1,
@@ -208,40 +243,15 @@
       "casing_flag": 1,
       "exact_casing": "Figma"
     },
-    "notion": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Notion"
-    },
-    "linear": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Linear"
-    },
-    "stripe": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Stripe"
-    },
     "shopify": {
       "log_freq": -5.6,
       "casing_flag": 1,
       "exact_casing": "Shopify"
     },
-    "slack": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Slack"
-    },
     "discord": {
       "log_freq": -5.6,
       "casing_flag": 1,
       "exact_casing": "Discord"
-    },
-    "zoom": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Zoom"
     },
     "asana": {
       "log_freq": -5.6,
@@ -252,11 +262,6 @@
       "log_freq": -5.6,
       "casing_flag": 1,
       "exact_casing": "Jira"
-    },
-    "confluence": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Confluence"
     },
     "atlassian": {
       "log_freq": -5.6,

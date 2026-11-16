@@ -10,7 +10,7 @@ trials or licence keys: every feature is available to everyone.
 - Organisation: <https://github.com/TypenApp>
 - Downloads: GitHub Releases (<https://github.com/TypenApp/typen/releases>)
 - Donate: <https://github.com/sponsors/TypenApp>
-- Current version: `2.0.0` / `v2.0.0-beta.1` (see `site/src/data/release-manifest.json`)
+- Current version: `2.1.0` / `v2.1.0-beta.1` (see `site/src/data/release-manifest.json`)
 
 ## Official `TypenApp` repositories
 
@@ -85,23 +85,23 @@ machine (`~/.typen_signing/`, never in this repository).
 ## Building release artifacts
 
 ```powershell
-pwsh packaging/build_windows_beta.ps1 -Channel beta.1     # Typen-2.0.0-win64-setup.exe + portable .zip
+pwsh packaging/build_windows_beta.ps1 -Channel beta.1     # Typen-2.1.0-win64-setup.exe + portable .zip
 ```
 ```bash
-packaging/build_macos_beta.sh --channel beta.1            # Typen-2.0.0-beta.1-macos-*.dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
+packaging/build_macos_beta.sh --channel beta.1            # Typen-2.1.0-beta.1-macos-*.dmg + .zip (signs/notarises if AC_SIGN_IDENTITY / AC_NOTARY_* set)
 packaging/build_linux_beta.sh --channel beta.1            # tar.gz + AppImage + .deb (minisign if AC_MINISIGN_KEY set)
 ```
 
-The channel names the GitHub Release (`v2.0.0-beta.1`) that hosts every
+The channel names the GitHub Release (`v2.1.0-beta.1`) that hosts every
 platform's files. Windows is the stable platform, so its files and version are
-plain `2.0.0`; the macOS and Linux betas are `2.0.0-beta.1`. Each script leaves
+plain `2.1.0`; the macOS and Linux betas are `2.1.0-beta.1`. Each script leaves
 its artifacts in `dist/installer/` with a `release-manifest-<platform>.json`, and
 runs `pipeline/merge_release_manifests.py` to refresh
 `site/src/data/release-manifest.json`. **Binaries are never committed.**
 To publish, push a tag:
 
 ```bash
-git tag v2.0.0-beta.1 && git push origin v2.0.0-beta.1
+git tag v2.1.0-beta.1 && git push origin v2.1.0-beta.1
 ```
 
 `.github/workflows/release.yml` then builds all three platforms, attaches the

@@ -22,7 +22,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-import zstandard as zstd
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pipeline.sign_release import verify_manifest_signature
 
@@ -118,6 +117,9 @@ class LanguageResourceUpdater:
         Verify signature, eligibility, and SHA-256 digest; apply delta or full archive
         into staging; validate binary integrity; and atomically hot-swap the active bundle.
         """
+        import zstandard as zstd
+
+
         eligibility = self.check_eligibility(descriptor, signature_b64, updates_expire_at=updates_expire_at)
         if not eligibility.eligible:
             raise PermissionError(f"Resource update rejected: {eligibility.reason}")

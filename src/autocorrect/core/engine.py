@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from autocorrect.core.candidates import CandidateGenerator, PreferenceLookupPort
+from autocorrect.core.candidates import CandidateGenerator, LocalAIScorerPort, PreferenceLookupPort
 from autocorrect.core.casing import apply_casing_transfer
 from autocorrect.core.confusion_sets import WORD_TO_CONFUSION_GROUP
 from autocorrect.core.grammar import evaluate_contextual_grammar
@@ -43,9 +43,11 @@ class AutocorrectEngine:
         self,
         resource_manager: ResourceManager,
         preferences: PreferenceLookupPort | None = None,
+        local_ai: LocalAIScorerPort | None = None,
     ) -> None:
         self._resources = resource_manager
         self._preferences = preferences
+        self._local_ai = local_ai
         self._candidate_gen = CandidateGenerator()
 
     @property
@@ -58,6 +60,9 @@ class AutocorrectEngine:
 
     def set_preferences(self, preferences: PreferenceLookupPort | None) -> None:
         self._preferences = preferences
+
+    def set_local_ai(self, local_ai: LocalAIScorerPort | None) -> None:
+        self._local_ai = local_ai
 
     def resolve_word_id(self, word: str) -> int:
         """Resolve a completed word to its integer lexicon word_id (0 if OOV)."""
@@ -352,6 +357,7 @@ class AutocorrectEngine:
             context=ctx,
             preferences=self._preferences,
             include_confusion_peers=False,
+            local_ai=self._local_ai,
         )
 
         if not ranked:
@@ -361,9 +367,13 @@ class AutocorrectEngine:
         second_score = ranked[1].composite_score if len(ranked) > 1 else (best.composite_score - 5.0)
         margin = best.composite_score - second_score
 
-        # Adjust thresholds by user aggressiveness profile
-        score_threshold = DEFAULT_OOV_SCORE_THRESHOLD / max(0.5, ctx.aggressiveness)
-        min_margin = DEFAULT_OOV_MIN_MARGIN / max(0.5, ctx.aggressiveness)
+        # Adjust thresholds by user aggressiveness profile.
+        # Note: DEFAULT_OOV_SCORE_THRESHOLD is negative (-13.2), so higher
+        # aggressiveness (> 1.0) must multiply to lower (more permissive) log-prob,
+        # while lower aggressiveness (< 1.0) raises it closer to 0.
+        aggr = max(0.5, min(2.0, ctx.aggressiveness))
+        score_threshold = DEFAULT_OOV_SCORE_THRESHOLD * aggr
+        min_margin = max(0.35, DEFAULT_OOV_MIN_MARGIN / aggr)
 
         # Strict variant enforcement: a known word in the wrong variant ('color'
         # under UK English) is always moved to its regional spelling when that
@@ -512,6 +522,7 @@ class AutocorrectEngine:
             context=ctx,
             preferences=self._preferences,
             include_confusion_peers=True,
+            local_ai=self._local_ai,
         )
         if not ranked:
             return None

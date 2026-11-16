@@ -407,6 +407,9 @@ class LocalIPCServer:
 
         if method == "general.privacy_wipe":
             prefs.clear_all_preferences()
+            d.adaptive_lm.clear_all()
+            d.sync_domain_pack_overrides()
+            d.set_user_domain_packs(set())
             d.insights.reset()
             d.apply_global_correction_settings()
             return {"wiped": True, "custom_word_count": 0}
@@ -487,24 +490,18 @@ class LocalIPCServer:
             packs_info: list[dict[str, Any]] = []
             for meta in AVAILABLE_DOMAIN_PACK_METADATA:
                 pid = meta["id"]
-                word_cnt = 0
-                typo_cnt = 0
-                pfile = packs_dir / f"{pid}.pack.json"
-                if pfile.exists():
-                    try:
-                        raw = json.loads(pfile.read_text(encoding="utf-8"))
-                        word_cnt = len(raw.get("words", {}))
-                        typo_cnt = len(raw.get("direct_typos", {}))
-                    except Exception:
-                        pass
+                details = d.resource_manager.inspect_domain_pack(pid)
                 packs_info.append(
                     {
                         "id": pid,
                         "name": meta["name"],
                         "description": meta["description"],
                         "enabled": pid in active_packs,
-                        "word_count": word_cnt,
-                        "typo_count": typo_cnt,
+                        "word_count": details["word_count"],
+                        "typo_count": details["typo_count"],
+                        "custom_count": details["custom_count"],
+                        "removed_count": details["removed_count"],
+                        "has_overrides": details["has_overrides"],
                     }
                 )
 
@@ -569,6 +566,80 @@ class LocalIPCServer:
             d.apply_settings({"enabled_domain_packs": sorted(pack_set)})
             return self._dispatch("languages.get_state", {})
 
+        if method == "languages.get_domain_pack":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            if not pid:
+                raise ValueError("pack_id is required")
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.add_domain_pack_word":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            word = str(params.get("word", "")).strip()
+            if not pid or not word:
+                raise ValueError("pack_id and word are required")
+            prefs.upsert_domain_pack_word(pid, word)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.edit_domain_pack_word":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            old_w = str(params.get("old_word", "")).strip()
+            new_w = str(params.get("new_word", "")).strip()
+            if not pid or not old_w or not new_w:
+                raise ValueError("pack_id, old_word, and new_word are required")
+            inspected = d.resource_manager.inspect_domain_pack(pid)
+            old_is_builtin = any(
+                item["lower"] == old_w.lower() and item["is_builtin"] for item in inspected["words"]
+            )
+            prefs.edit_domain_pack_word(pid, old_w, new_w, old_is_builtin=old_is_builtin)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.delete_domain_pack_word":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            word = str(params.get("word", "")).strip()
+            if not pid or not word:
+                raise ValueError("pack_id and word are required")
+            inspected = d.resource_manager.inspect_domain_pack(pid)
+            is_builtin = any(
+                item["lower"] == word.lower() and item["is_builtin"] for item in inspected["words"]
+            )
+            prefs.remove_domain_pack_word(pid, word, is_builtin=is_builtin)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.upsert_domain_pack_typo":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            typo = str(params.get("typo", "")).strip()
+            target = str(params.get("target", "")).strip()
+            if not pid or not typo or not target:
+                raise ValueError("pack_id, typo, and target are required")
+            prefs.upsert_domain_pack_typo(pid, typo, target)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.delete_domain_pack_typo":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            typo = str(params.get("typo", "")).strip()
+            if not pid or not typo:
+                raise ValueError("pack_id and typo are required")
+            inspected = d.resource_manager.inspect_domain_pack(pid)
+            is_builtin = any(
+                item["typo"] == typo.lower() and item["is_builtin"]
+                for item in inspected["direct_typos"]
+            )
+            prefs.remove_domain_pack_typo(pid, typo, is_builtin=is_builtin)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
+        if method == "languages.reset_domain_pack":
+            pid = str(params.get("pack_id", "")).strip().lower()
+            if not pid:
+                raise ValueError("pack_id is required")
+            prefs.reset_domain_pack_overrides(pid)
+            d.sync_domain_pack_overrides()
+            return d.resource_manager.inspect_domain_pack(pid)
+
         # --- 5. Corrections, Sensitivity, Rejected & Preferred Variants ------
         if method == "corrections.get_state":
             state = prefs.get_all_typed("correction")
@@ -625,11 +696,15 @@ class LocalIPCServer:
                 "pro_enabled": d.entitlement_manager.is_pro_enabled(),
                 "local_ai": {
                     "model_loaded": d.local_ai.is_model_loaded,
+                    "active_model_id": d.local_ai.active_model_id or hw.recommended_model_id,
+                    "neural_context_loaded": d.local_ai.has_neural_context,
+                    "onnx_loaded": d.local_ai.has_onnx_session,
                     "cpu_cores": hw.cpu_cores,
                     "total_ram_mb": hw.total_ram_mb,
                     "accelerator": hw.accelerator,
                     "recommended_model_id": hw.recommended_model_id,
                     "pause_pill_enabled": prefs.get_setting("pause_pill_enabled", "true") == "true",
+                    "live_rescoring_enabled": bool(prefs.get_typed("local_ai_live_rescoring")),
                 },
                 "byok": {
                     "local_only_mode": d.spending_controller.local_only_mode,

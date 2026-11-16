@@ -178,6 +178,9 @@ class InputSessionManager:
         # ('Hello.  ' must never become 'Hello.. ').
         self._double_space_eligible: bool = False
         self._just_deleted_trailing_space: bool = False
+        self._select_all_armed: bool = False
+        self._empty_backspace_streak: int = 0
+        self._pending_revert_pair: tuple[str, str] | None = None
         self._current_sentence_tokens: list[str] = []
         # While True, `prime_from_text` is replaying text that is already in the
         # field: the state machine advances (context ring, sentence state, last
@@ -321,6 +324,9 @@ class InputSessionManager:
         self._preceded_by_space = False
         self._double_space_eligible = False
         self._just_deleted_trailing_space = False
+        self._select_all_armed = False
+        self._empty_backspace_streak = 0
+        self._pending_revert_pair = None
         self._last_completed_word = ""
         self._last_boundary_delimiter = ""
         self._current_sentence_tokens.clear()
@@ -364,6 +370,98 @@ class InputSessionManager:
         self._word_buffer.mark_tainted()
         self._capitaliser.suppress()
 
+    def apply_async_caret_context(self, text_before: str) -> None:
+        """
+        Apply a caret-context string resolved asynchronously off the input worker.
+
+        - If the user has not typed anything yet since focus/click, behaves like
+          `resync_from_caret(text_before)`.
+        - If the user already started typing the very first word while UIA was
+          probing (`_word_buffer` is clean & non-empty and no word boundary has
+          fired yet), strips any already-landed prefix of that in-progress word
+          from `text_before`, rebuilds sentence/context state from what preceded
+          it, and restores the in-progress word buffer intact!
+        """
+        if self._last_completed_word or self._history_stack:
+            return
+        if not self._word_buffer.current_word:
+            self.resync_from_caret(text_before)
+            self._update_prediction_state()
+            return
+        if not self._word_buffer.is_clean_and_nonempty:
+            return
+
+        saved_prefix = self._word_buffer.leading_prefix
+        saved_word = self._word_buffer.current_word
+        typed_so_far = f"{saved_prefix}{saved_word}"
+
+        prefix_before = text_before
+        for k in range(len(typed_so_far), 0, -1):
+            if prefix_before.endswith(typed_so_far[:k]):
+                prefix_before = prefix_before[:-k]
+                break
+
+        self.resync_from_caret(prefix_before)
+        if self._word_buffer.state.value == "CLEAN":
+            for s_ch in saved_prefix:
+                self._word_buffer.append_prefix_symbol(s_ch, 0.0)
+            for w_ch in saved_word:
+                self._word_buffer.append_char(w_ch, 0.0)
+            self._update_prediction_state()
+
+    def active_clause_for_ai(self) -> str:
+        """
+        Return the active multi-word clause eligible for an asynchronous Layer-2
+        Pause Pill check (only when idle right after a space with >= 2 words),
+        or `""` if none.
+        """
+        if (
+            self._paused
+            or self._priming
+            or self._focus_context.is_password_or_secure
+            or self._focus_context.is_excluded_app
+            or self._focus_context.is_terminal_or_code
+            or self._word_buffer.current_word
+            or not self._preceded_by_space
+            or len(self._current_sentence_tokens) < 2
+        ):
+            return ""
+        return " ".join(self._current_sentence_tokens)
+
+    def arm_ai_clause_suggestion(self, original_clause: str, suggested_clause: str) -> bool:
+        """
+        Arm a non-intrusive Layer-2 On-Device AI clause suggestion in `_active_prediction`
+        if the session still holds `original_clause` followed by a space.
+        """
+        current_clause = self.active_clause_for_ai()
+        if not current_clause or current_clause != original_clause:
+            return False
+        if suggested_clause == original_clause or not suggested_clause.strip():
+            return False
+
+        orig_toks = original_clause.split(" ")
+        sugg_toks = suggested_clause.split(" ")
+        common_idx = 0
+        limit = min(len(orig_toks), len(sugg_toks))
+        while common_idx < limit and orig_toks[common_idx] == sugg_toks[common_idx]:
+            common_idx += 1
+        # Include 1 word of left context in the pill display when helpful so the user sees what changes
+        ctx_idx = max(0, common_idx - 1)
+        orig_tail_words = " ".join(orig_toks[common_idx:])
+        sugg_tail_words = " ".join(sugg_toks[common_idx:])
+        display_words = " ".join(sugg_toks[ctx_idx:])
+        if not orig_tail_words or not sugg_tail_words:
+            return False
+
+        self._active_prediction = PredictionCandidate(
+            mode="AI_REWRITE",
+            display_text=display_words,
+            full_word=f"{sugg_tail_words} ",
+            confidence=9.5,
+            original_tail=f"{orig_tail_words} ",
+        )
+        return True
+
     def on_focus_changed(
         self,
         focus: FocusContext,
@@ -394,6 +492,9 @@ class InputSessionManager:
         self._preceded_by_space = False
         self._double_space_eligible = False
         self._just_deleted_trailing_space = False
+        self._select_all_armed = False
+        self._empty_backspace_streak = 0
+        self._pending_revert_pair = None
         self._current_sentence_tokens.clear()
         self._auto_space_pending = False
         self._history_stack.clear()
@@ -414,6 +515,39 @@ class InputSessionManager:
         if pred is None or not self._features.enable_predictive_tab:
             self.on_mouse_click_or_caret_move()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
+        if pred.mode == "AI_REWRITE" and pred.original_tail:
+            screen_orig = pred.original_tail if tab_was_suppressed else f"{pred.original_tail}\t"
+            plan = SuffixDiffPlanner.plan(
+                original_full=screen_orig,
+                target_full=pred.full_word,
+                delimiter_was_suppressed=False,
+            )
+            orig_bare = pred.original_tail.rstrip(" ")
+            sugg_bare = pred.full_word.rstrip(" ")
+            orig_parts = orig_bare.split(" ") if orig_bare else []
+            sugg_parts = sugg_bare.split(" ") if sugg_bare else []
+            if orig_parts and len(self._current_sentence_tokens) >= len(orig_parts):
+                del self._current_sentence_tokens[-len(orig_parts) :]
+            self._current_sentence_tokens.extend(sugg_parts)
+            if sugg_parts:
+                self._last_completed_word = sugg_parts[-1]
+            self._preceded_by_space = True
+            self._tx_ledger.record_correction(
+                original_token=orig_bare,
+                corrected_token=sugg_bare,
+                delimiter=" ",
+                reason=CorrectionReason.GRAMMAR_AGREEMENT,
+                timestamp_ms=timestamp_ms,
+            )
+            if self._injector is not None and not plan.is_noop:
+                self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+            self._update_prediction_state()
+            return SessionEventOutcome(
+                action=KeyAction.SUPPRESS_AND_INJECT if tab_was_suppressed else KeyAction.PASS_THROUGH,
+                replacement_plan=plan,
+                reason_tag="PREDICTIVE_TAB",
+            )
 
         inject_text = f"{pred.display_text} "
         backspaces = 0 if tab_was_suppressed else 1
@@ -504,11 +638,13 @@ class InputSessionManager:
         if self._word_buffer.is_clean_and_nonempty and not self._word_buffer.leading_prefix:
             curr = self._word_buffer.current_word
             prefs = self._engine.preferences
-            custom_map = (
-                prefs.list_custom_words_map()
-                if prefs is not None and hasattr(prefs, "list_custom_words_map")
-                else None
-            )
+            custom_rev: int | None = None
+            custom_map: dict[str, str] | None = None
+            if prefs is not None:
+                if hasattr(prefs, "get_custom_words_view"):
+                    custom_rev, custom_map = prefs.get_custom_words_view()
+                elif hasattr(prefs, "list_custom_words_map"):
+                    custom_map = prefs.list_custom_words_map()
             self._active_prediction = self._adaptive_lm.predict_suffix(
                 partial_token=curr,
                 bundle=self._engine.resource_manager.active_bundle,
@@ -516,6 +652,7 @@ class InputSessionManager:
                 prev1_lower=p1_str,
                 prev2_lower=p2_str,
                 is_sentence_start=self._capitaliser.is_sentence_start,
+                custom_revision=custom_rev,
             )
         elif self._preceded_by_space and not self._word_buffer.current_word:
             self._active_prediction = self._adaptive_lm.predict_next_word(
@@ -655,22 +792,43 @@ class InputSessionManager:
 
         # 4. Any Ctrl, Alt, or Meta/Win/Cmd shortcut invalidates the active buffer
         if event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
+            is_select_all = (
+                event.ctrl_pressed
+                and not event.alt_pressed
+                and not event.meta_pressed
+                and event.key_name.lower() == "a"
+            )
             self.on_mouse_click_or_caret_move()
+            self._select_all_armed = is_select_all
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # 5. Cursor navigation keys invalidate the active buffer (except Tab/Right when accepting an active prediction).
         if event.key_name in NAVIGATION_KEYS:
+            self._select_all_armed = False
             if self.is_prediction_accept_key(event):
                 return self.accept_active_prediction(
                     event.timestamp_ms,
                     tab_was_suppressed=suppress_delimiter_on_replace,
                 )
+            if event.key_name == "Delete" and self._word_buffer.state.value == "TAINTED":
+                pass
             self.on_mouse_click_or_caret_move()
             if event.key_name == "Tab":
                 # Passing Tab through leaves the word buffer CLEAN (ready for the next word)
                 # while keeping sentence capitalisation suppressed unless caret resync overrides it.
                 self._word_buffer.clear_clean()
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
+
+        # 5a. If Ctrl+A was just pressed, deleting or typing over the selection starts a fresh empty field!
+        if self._select_all_armed:
+            self._select_all_armed = False
+            if event.key_name in ("Backspace", "Delete"):
+                self.reset_all_state()
+                return SessionEventOutcome(
+                    action=KeyAction.PASS_THROUGH, reason_tag="SELECT_ALL_CLEARED"
+                )
+            if event.char and event.char.isprintable():
+                self.reset_all_state()
 
         # 5b. A space the session inserted after a sentence terminator is pending.
         if self._auto_space_pending:
@@ -688,6 +846,9 @@ class InputSessionManager:
         # interrupted gesture (e.g. Backspace + Space + Backspace, or
         # Space + Space + Backspace) can NEVER trigger a botched revert.
         if event.key_name == "Backspace":
+            _bs_pre_buf = self._word_buffer.current_word
+            _bs_pre_cap = self._capitaliser._state.name
+            _bs_branch = "other"
             self._double_space_eligible = False
             if self._features.undo_enabled and self._tx_ledger.register_backspace(event.timestamp_ms):
                 reversal = self._tx_ledger.consume_for_reversal(backspace_was_suppressed=False)
@@ -698,6 +859,7 @@ class InputSessionManager:
                     # active buffer (two-word retroactive transactions contain a
                     # space; the earlier word is no longer being edited).
                     restored_word = tx.original_token.rsplit(" ", 1)[-1]
+                    self._pending_revert_pair = (tx.original_token, tx.corrected_token)
                     if self._current_sentence_tokens:
                         self._current_sentence_tokens.pop()
                     if self._history_stack:
@@ -707,6 +869,8 @@ class InputSessionManager:
                     for ch in restored_word:
                         self._word_buffer.append_char(ch, event.timestamp_ms)
                     self._preceded_by_space = False
+                    self._just_deleted_trailing_space = False
+                    self._empty_backspace_streak = 0
                     if self._injector is not None and not plan.is_noop:
                         self._injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
                     return SessionEventOutcome(
@@ -721,14 +885,17 @@ class InputSessionManager:
 
             if self._preceded_by_space and not self._word_buffer.current_word:
                 # Deleting the single trailing space after a completed word leaves
-                # the caret at the end of `_last_completed_word`; do not taint the
-                # buffer yet so a subsequent Space + Space can still insert a period.
+                # the caret at the end of `_last_completed_word`; keep `_capitaliser`
+                # at MID_SENTENCE while waiting so a new word is never falsely
+                # capitalised mid-sentence, and only reopen `_history_stack[-1]` if
+                # the user steps back again OR types characters onto that word!
+                _bs_branch = "delete_trailing_space"
                 self._preceded_by_space = False
                 self._just_deleted_trailing_space = True
-                if self._history_stack and self._history_stack[-1].delimiter == " ":
-                    self._capitaliser.set_state(self._history_stack[-1].pre_cap_state)
+                self._empty_backspace_streak = 0
             elif not self._word_buffer.current_word and self._history_stack:
                 # Deleting a non-space delimiter or stepping back into the just-completed word
+                _bs_branch = "pop_history"
                 entry = self._history_stack.pop()
                 self._capitaliser.set_state(entry.pre_cap_state)
                 self._context_ring.pop_last()
@@ -745,18 +912,36 @@ class InputSessionManager:
                     self._word_buffer.handle_backspace(event.timestamp_ms)
                 self._preceded_by_space = False
                 self._just_deleted_trailing_space = False
+                self._empty_backspace_streak = 0
                 self._last_completed_word = self._history_stack[-1].word if self._history_stack else ""
                 self._last_boundary_delimiter = (
                     self._history_stack[-1].delimiter if self._history_stack else ""
                 )
             else:
+                _bs_branch = "buffer_bs"
+                if self._pending_revert_pair is not None:
+                    orig_rev, corr_rev = self._pending_revert_pair
+                    self._pending_revert_pair = None
+                    self._cancel_reverted_edit(orig_rev, corr_rev)
                 self._word_buffer.handle_backspace(event.timestamp_ms)
                 self._preceded_by_space = False
                 self._just_deleted_trailing_space = False
+                if not _bs_pre_buf:
+                    self._empty_backspace_streak += 1
+                    if self._empty_backspace_streak >= 2 and not self._history_stack:
+                        # Repeated Backspaces on an empty buffer mean the user cleared
+                        # the input box: mark CLEAN so the next word is evaluated!
+                        self._word_buffer.clear_clean()
+                        if self._empty_backspace_streak >= 3:
+                            self._capitaliser.reset_to_sentence_start()
+                else:
+                    self._empty_backspace_streak = 0
             return SessionEventOutcome(action=KeyAction.PASS_THROUGH)
 
         # Any non-Backspace key interrupts and cancels any armed double-Backspace undo!
         self._tx_ledger.clear_active()
+        self._empty_backspace_streak = 0
+        self._pending_revert_pair = None
 
         # 7. Return / Enter key: evaluate completed word + reset sentence state to SENTENCE_START
         if event.key_name in ("Return", "Enter") or event.char == "\n":
@@ -959,6 +1144,50 @@ class InputSessionManager:
                         replacement_plan=plan,
                         reason_tag=adj.reason_tag,
                     )
+            if (
+                self._just_deleted_trailing_space
+                and not self._word_buffer.current_word
+                and self._history_stack
+                and self._history_stack[-1].delimiter == " "
+            ):
+                # User deleted a single trailing space ('Hello ' -> 'Hello|') and is
+                # now typing characters onto the end of that word ('Hello|s' or 'The|re')!
+                entry = self._history_stack.pop()
+                self._capitaliser.set_state(entry.pre_cap_state)
+                self._context_ring.pop_last()
+                if self._current_sentence_tokens:
+                    self._current_sentence_tokens.pop()
+                self._word_buffer.clear_clean()
+                for s_ch in entry.leading_prefix:
+                    self._word_buffer.append_prefix_symbol(s_ch, event.timestamp_ms)
+                for w_ch in entry.word:
+                    self._word_buffer.append_char(w_ch, event.timestamp_ms)
+                self._last_completed_word = self._history_stack[-1].word if self._history_stack else ""
+                self._last_boundary_delimiter = (
+                    self._history_stack[-1].delimiter if self._history_stack else ""
+                )
+            if (
+                self._just_deleted_trailing_space
+                and not self._word_buffer.current_word
+                and self._history_stack
+                and self._history_stack[-1].delimiter == " "
+            ):
+                # User deleted a single trailing space ('Hello ' -> 'Hello|') and is
+                # now typing characters onto the end of that word ('Hello|s' or 'The|re')!
+                entry = self._history_stack.pop()
+                self._capitaliser.set_state(entry.pre_cap_state)
+                self._context_ring.pop_last()
+                if self._current_sentence_tokens:
+                    self._current_sentence_tokens.pop()
+                self._word_buffer.clear_clean()
+                for s_ch in entry.leading_prefix:
+                    self._word_buffer.append_prefix_symbol(s_ch, event.timestamp_ms)
+                for w_ch in entry.word:
+                    self._word_buffer.append_char(w_ch, event.timestamp_ms)
+                self._last_completed_word = self._history_stack[-1].word if self._history_stack else ""
+                self._last_boundary_delimiter = (
+                    self._history_stack[-1].delimiter if self._history_stack else ""
+                )
             self._just_deleted_trailing_space = False
             self._tx_ledger.on_subsequent_char_typed()
             if not self._word_buffer.current_word and event.char in PREFIX_SYMBOLS:
@@ -986,6 +1215,26 @@ class InputSessionManager:
             prefs.note_reverted_word(original, corrected)
         if mode == "always" and " " not in original and hasattr(prefs, "add_rejected_correction"):
             prefs.add_rejected_correction(original, corrected)
+
+    def _cancel_reverted_edit(self, original: str, corrected: str) -> None:
+        """
+        The user kept pressing Backspace into the restored token right after a
+        double-Backspace undo: they are erasing/editing the word rather than
+        keeping `original` as a desired word! Roll back `_remember_undo`.
+        """
+        if self._features.undo_remembers == "never":
+            return
+        prefs = self._engine.preferences
+        if prefs is None:
+            return
+        if hasattr(prefs, "decrement_reverted_word"):
+            prefs.decrement_reverted_word(original)
+        if (
+            self._features.undo_remembers == "always"
+            and " " not in original
+            and hasattr(prefs, "remove_rejected_correction")
+        ):
+            prefs.remove_rejected_correction(original, corrected)
 
     # ------------------------------------------------------------ auto-space
 

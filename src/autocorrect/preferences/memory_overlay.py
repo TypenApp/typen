@@ -41,6 +41,8 @@ class PreferenceMemoryOverlay:
         self._revert_sink: Callable[[str, str], None] | None = None
         self._personal_lm_scorer: Callable[[str, str | None, str | None], float] | None = None
         self._active_region = active_region
+        self._custom_revision: int = 0
+        self._custom_words_snapshot: dict[str, str] | None = None
 
     def set_revert_sink(self, sink: Callable[[str, str], None] | None) -> None:
         with self._lock:
@@ -101,6 +103,8 @@ class PreferenceMemoryOverlay:
             with self._lock:
                 low = cleaned.lower()
                 self._custom_words[low] = cleaned
+                self._custom_revision += 1
+                self._custom_words_snapshot = None
                 self._suggested_words.pop(low, None)
                 for del_str in generate_delete_strings(low, max_distance=2):
                     self._custom_delete_index.setdefault(del_str, set()).add(low)
@@ -108,7 +112,10 @@ class PreferenceMemoryOverlay:
     def remove_custom_word(self, word: str) -> None:
         with self._lock:
             low = word.strip().lower()
-            self._custom_words.pop(low, None)
+            if low in self._custom_words:
+                self._custom_words.pop(low, None)
+                self._custom_revision += 1
+                self._custom_words_snapshot = None
             for del_str in generate_delete_strings(low, max_distance=2):
                 bucket = self._custom_delete_index.get(del_str)
                 if bucket is not None:
@@ -144,6 +151,13 @@ class PreferenceMemoryOverlay:
         """Return a copy of `{word_lower: display_word}`."""
         with self._lock:
             return dict(self._custom_words)
+
+    def get_custom_words_view(self) -> tuple[int, dict[str, str]]:
+        """Return `(revision, cached_snapshot)` with zero per-keystroke dict copies."""
+        with self._lock:
+            if self._custom_words_snapshot is None:
+                self._custom_words_snapshot = dict(self._custom_words)
+            return self._custom_revision, self._custom_words_snapshot
 
     def note_reverted_word(self, word: str, corrected_to: str = "", *, _from_store: bool = False) -> None:
         """
@@ -191,6 +205,22 @@ class PreferenceMemoryOverlay:
         with self._lock:
             self._suggested_words.pop(word.strip().lower(), None)
 
+    def decrement_reverted_word(self, word: str) -> int:
+        """Decrement revert count when a user kept backspacing through a reverted word."""
+        low = word.strip().lower()
+        if not low:
+            return 0
+        with self._lock:
+            existing = self._suggested_words.get(low)
+            if existing is None:
+                return 0
+            new_cnt = int(str(existing.get("revert_count", 1))) - 1
+            if new_cnt <= 0:
+                self._suggested_words.pop(low, None)
+                return 0
+            existing["revert_count"] = new_cnt
+            return new_cnt
+
     def list_suggested_words(self) -> list[dict[str, object]]:
         with self._lock:
             return [dict(v) for v in self._suggested_words.values()]
@@ -228,6 +258,8 @@ class PreferenceMemoryOverlay:
     def clear_all(self) -> None:
         with self._lock:
             self._custom_words.clear()
+            self._custom_revision += 1
+            self._custom_words_snapshot = None
             self._custom_delete_index.clear()
             self._rejected_pairs.clear()
             self._preferred_variants.clear()

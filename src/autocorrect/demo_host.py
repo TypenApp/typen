@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any
 
 from autocorrect import __version__
+from autocorrect.ai.local_model_manager import LocalModelManager
 from autocorrect.core.engine import AutocorrectEngine
 from autocorrect.input.ports import KeyEvent
 from autocorrect.input.session_state import EntitlementCheckPort, InputSessionManager
@@ -110,6 +111,8 @@ class SessionPool:
         self._resources = resource_manager
         self._snippets = snippet_engine
         self._gate = entitlement_gate
+        self._local_ai = LocalModelManager(is_pro_entitled=True, resource_manager=resource_manager)
+        self._local_ai.load_model()
         self._dir = work_dir / "web_sessions"
         self._dir.mkdir(parents=True, exist_ok=True)
         self._max = max_sessions
@@ -136,7 +139,11 @@ class SessionPool:
             store = SQLitePreferenceStore(db_path)
             adaptive_lm = AdaptivePersonalLM()
             store.overlay.set_personal_lm_scorer(adaptive_lm.score_boost)
-            engine = AutocorrectEngine(resource_manager=self._resources, preferences=store.overlay)
+            engine = AutocorrectEngine(
+                resource_manager=self._resources,
+                preferences=store.overlay,
+                local_ai=self._local_ai,
+            )
             session = InputSessionManager(
                 engine=engine,
                 injector=None,

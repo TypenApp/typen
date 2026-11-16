@@ -456,3 +456,26 @@ def load_common_misspellings(cache_dir: Path = EXTERNAL_DATA_DIR) -> dict[str, s
         return parse_misspellings(path.read_text(encoding="utf-8", errors="replace"))
     except Exception:
         return {}
+
+
+def load_all_misspelling_headwords(cache_dir: Path = EXTERNAL_DATA_DIR) -> set[str]:
+    """
+    Return every misspelling headword (including multi-target lines like 'adress->address, dress')
+    so uncurated external wordlists never admit known misspellings as valid lexicon entries.
+    """
+    if not external_data_enabled():
+        return set()
+    try:
+        path = ensure_misspellings_downloaded(cache_dir)
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except Exception:
+        return set()
+    out: set[str] = set()
+    for raw in text.splitlines():
+        m = _MISSPELLING_LINE_RE.match(raw)
+        if not m:
+            continue
+        typo = m.group(1).strip().lower()
+        if len(typo) >= 3 and _WORD_RE.match(typo):
+            out.add(typo)
+    return out

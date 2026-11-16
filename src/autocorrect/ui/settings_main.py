@@ -163,6 +163,7 @@ class SettingsController:
         return self._offline_try_text(text)
 
     def _offline_try_text(self, text: str) -> dict[str, str]:
+        from autocorrect.ai.local_model_manager import LocalModelManager
         from autocorrect.core.engine import AutocorrectEngine
         from autocorrect.core.models import CorrectionFeatures
         from autocorrect.input.ports import KeyAction, KeyEvent
@@ -173,9 +174,13 @@ class SettingsController:
         self._prefs.reload_into_overlay()
         rm = ResourceManager(bundled_dir=DEFAULT_BUNDLED_DIR)
         try:
+            rm.set_domain_pack_overrides(self._prefs.load_domain_pack_overrides())
+            rm.set_enabled_domain_packs(set(self._prefs.get_typed("enabled_domain_packs")))
             adaptive = AdaptivePersonalLM()
+            local_ai = LocalModelManager(is_pro_entitled=True, resource_manager=rm)
+            local_ai.load_model()
             self._prefs.overlay.set_personal_lm_scorer(adaptive.score_boost)
-            engine = AutocorrectEngine(rm, preferences=self._prefs.overlay)
+            engine = AutocorrectEngine(rm, preferences=self._prefs.overlay, local_ai=local_ai)
             session = InputSessionManager(
                 engine=engine,
                 active_region=self._prefs.overlay.active_region,
@@ -490,6 +495,22 @@ class SettingsController:
         enabled_set = set(lang["enabled_domain_packs"])
         stored = self._prefs.stored_region_name()
         system_region = detect_english_region().name
+        packs_info: list[dict[str, Any]] = []
+        for m in AVAILABLE_DOMAIN_PACK_METADATA:
+            details = self._offline_inspect_domain_pack(m["id"])
+            packs_info.append(
+                {
+                    "id": m["id"],
+                    "name": m["name"],
+                    "description": m["description"],
+                    "enabled": m["id"] in enabled_set,
+                    "word_count": details["word_count"],
+                    "typo_count": details["typo_count"],
+                    "custom_count": details["custom_count"],
+                    "removed_count": details["removed_count"],
+                    "has_overrides": details["has_overrides"],
+                }
+            )
         return {
             "region_setting": stored,
             "active_region": system_region if stored == "AUTO" else stored,
@@ -505,17 +526,101 @@ class SettingsController:
                 {"code": "EN_AU", "name": "Australian English (AU)"},
                 {"code": "UNIVERSAL", "name": "Universal English"},
             ],
-            "domain_packs": [
-                {
-                    "id": m["id"],
-                    "name": m["name"],
-                    "description": m["description"],
-                    "enabled": m["id"] in enabled_set,
-                }
-                for m in AVAILABLE_DOMAIN_PACK_METADATA
-            ],
+            "domain_packs": packs_info,
             "pro_enabled": self._offline_pro_enabled(),
         }
+
+    def _offline_inspect_domain_pack(self, pack_id: str) -> dict[str, Any]:
+        from autocorrect.intelligence.resource_manager import DEFAULT_BUNDLED_DIR, ResourceManager
+
+        rm = ResourceManager(bundled_dir=DEFAULT_BUNDLED_DIR)
+        try:
+            rm.set_domain_pack_overrides(self._prefs.load_domain_pack_overrides())
+            return rm.inspect_domain_pack(pack_id)
+        finally:
+            rm.close()
+
+    def get_domain_pack_details(self, pack_id: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online("languages.get_domain_pack", {"pack_id": pid})
+        if ipc_res is not None:
+            return ipc_res
+        return self._offline_inspect_domain_pack(pid)
+
+    def add_domain_pack_word(self, pack_id: str, word: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online(
+            "languages.add_domain_pack_word", {"pack_id": pid, "word": word}
+        )
+        if ipc_res is not None:
+            return ipc_res
+        self._prefs.upsert_domain_pack_word(pid, word)
+        return self._offline_inspect_domain_pack(pid)
+
+    def edit_domain_pack_word(self, pack_id: str, old_word: str, new_word: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online(
+            "languages.edit_domain_pack_word",
+            {"pack_id": pid, "old_word": old_word, "new_word": new_word},
+        )
+        if ipc_res is not None:
+            return ipc_res
+        inspected = self._offline_inspect_domain_pack(pid)
+        old_is_builtin = any(
+            item["lower"] == old_word.strip().lower() and item["is_builtin"]
+            for item in inspected["words"]
+        )
+        self._prefs.edit_domain_pack_word(pid, old_word, new_word, old_is_builtin=old_is_builtin)
+        return self._offline_inspect_domain_pack(pid)
+
+    def delete_domain_pack_word(self, pack_id: str, word: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online(
+            "languages.delete_domain_pack_word", {"pack_id": pid, "word": word}
+        )
+        if ipc_res is not None:
+            return ipc_res
+        inspected = self._offline_inspect_domain_pack(pid)
+        is_builtin = any(
+            item["lower"] == word.strip().lower() and item["is_builtin"]
+            for item in inspected["words"]
+        )
+        self._prefs.remove_domain_pack_word(pid, word, is_builtin=is_builtin)
+        return self._offline_inspect_domain_pack(pid)
+
+    def upsert_domain_pack_typo(self, pack_id: str, typo: str, target: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online(
+            "languages.upsert_domain_pack_typo",
+            {"pack_id": pid, "typo": typo, "target": target},
+        )
+        if ipc_res is not None:
+            return ipc_res
+        self._prefs.upsert_domain_pack_typo(pid, typo, target)
+        return self._offline_inspect_domain_pack(pid)
+
+    def delete_domain_pack_typo(self, pack_id: str, typo: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online(
+            "languages.delete_domain_pack_typo", {"pack_id": pid, "typo": typo}
+        )
+        if ipc_res is not None:
+            return ipc_res
+        inspected = self._offline_inspect_domain_pack(pid)
+        is_builtin = any(
+            item["typo"] == typo.strip().lower() and item["is_builtin"]
+            for item in inspected["direct_typos"]
+        )
+        self._prefs.remove_domain_pack_typo(pid, typo, is_builtin=is_builtin)
+        return self._offline_inspect_domain_pack(pid)
+
+    def reset_domain_pack(self, pack_id: str) -> dict[str, Any]:
+        pid = pack_id.strip().lower()
+        ipc_res = self._call_ipc_if_online("languages.reset_domain_pack", {"pack_id": pid})
+        if ipc_res is not None:
+            return ipc_res
+        self._prefs.reset_domain_pack_overrides(pid)
+        return self._offline_inspect_domain_pack(pid)
 
     def set_region(self, region_code: str) -> dict[str, Any]:
         ipc_res = self._call_ipc_if_online("languages.set_region", {"region": region_code})
@@ -621,11 +726,15 @@ class SettingsController:
             "pro_enabled": self._offline_pro_enabled(),
             "local_ai": {
                 "model_loaded": self._local_ai.is_model_loaded,
+                "active_model_id": self._local_ai.active_model_id or hw.recommended_model_id,
+                "neural_context_loaded": self._local_ai.has_neural_context,
+                "onnx_loaded": self._local_ai.has_onnx_session,
                 "cpu_cores": hw.cpu_cores,
                 "total_ram_mb": hw.total_ram_mb,
                 "accelerator": hw.accelerator,
                 "recommended_model_id": hw.recommended_model_id,
                 "pause_pill_enabled": self._prefs.get_setting("pause_pill_enabled", "true") == "true",
+                "live_rescoring_enabled": bool(self._prefs.get_typed("local_ai_live_rescoring")),
             },
             "byok": {
                 "local_only_mode": self._prefs.get_setting("local_only_mode", "false") == "true",

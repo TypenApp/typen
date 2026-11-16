@@ -16,11 +16,12 @@ import platform
 import re
 import sys
 from dataclasses import asdict, dataclass, field
-from typing import Any, Final, Literal
-
-import httpx
+from typing import TYPE_CHECKING, Any, Final, Literal
 
 from autocorrect.version import APP_VERSION
+
+if TYPE_CHECKING:
+    import httpx
 
 FEEDBACK_URL: Final[str] = "https://typen.org/api/feedback"
 FEEDBACK_PAGE_URL: Final[str] = "https://typen.org/feedback"
@@ -130,6 +131,9 @@ def submit(
     problem = validate(kind, alias, email, note)
     if problem:
         return FeedbackResult(ok=False, message=problem)
+    import httpx
+
+
     payload = build_payload(kind, alias, email, note, diagnostics, steps=steps)
     own_client = client is None
     http = client or httpx.Client(timeout=TIMEOUT_S, headers={"User-Agent": f"Typen/{APP_VERSION}"})

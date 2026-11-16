@@ -323,6 +323,26 @@
       "casing_flag": 0,
       "exact_casing": null
     },
+    "pandas": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "gemini": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "tailwind": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
+    "cursor": {
+      "log_freq": -5.8,
+      "casing_flag": 0,
+      "exact_casing": null
+    },
     "kubernetes": {
       "log_freq": -5.6,
       "casing_flag": 1,
@@ -352,11 +372,6 @@
       "log_freq": -5.6,
       "casing_flag": 4,
       "exact_casing": "SciPy"
-    },
-    "pandas": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Pandas"
     },
     "typescript": {
       "log_freq": -5.6,
@@ -433,11 +448,6 @@
       "casing_flag": 1,
       "exact_casing": "Claude"
     },
-    "gemini": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Gemini"
-    },
     "deepmind": {
       "log_freq": -5.6,
       "casing_flag": 4,
@@ -498,11 +508,6 @@
       "casing_flag": 1,
       "exact_casing": "Svelte"
     },
-    "tailwind": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Tailwind"
-    },
     "vscode": {
       "log_freq": -5.6,
       "casing_flag": 4,
@@ -527,11 +532,6 @@
       "log_freq": -5.6,
       "casing_flag": 1,
       "exact_casing": "Raycast"
-    },
-    "cursor": {
-      "log_freq": -5.6,
-      "casing_flag": 1,
-      "exact_casing": "Cursor"
     },
     "pyside": {
       "log_freq": -5.6,

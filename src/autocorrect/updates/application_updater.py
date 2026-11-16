@@ -11,14 +11,16 @@ import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
-import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from pipeline.sign_release import verify_manifest_signature
 
 from autocorrect.updates.update_policy import UpdateEligibilityResult, UpdatePolicyEngine
 from autocorrect.version import APP_VERSION
+
+if TYPE_CHECKING:
+    import httpx
 
 APP_RELEASES_REPO = "TypenApp/typen"
 DEFAULT_APP_RELEASES_URL = f"https://github.com/{APP_RELEASES_REPO}/releases"
@@ -126,6 +128,9 @@ class ApplicationUpdater:
         eligibility = self.evaluate_release(descriptor, signature_b64, updates_expire_at, current_app_version)
         if not eligibility.eligible:
             raise PermissionError(f"Application update not eligible: {eligibility.reason}")
+
+        import httpx
+
 
         http = client or httpx.Client(
             timeout=timeout,

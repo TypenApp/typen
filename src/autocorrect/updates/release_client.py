@@ -6,14 +6,27 @@ for the running platform / install layout / update channel.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
-
-import httpx
+from typing import TYPE_CHECKING, Any, Callable
 
 from autocorrect.updates.application_updater import ApplicationReleaseDescriptor
 from autocorrect.updates.install_layout import InstallLayout, preferred_artifact_kind
 from autocorrect.updates.update_policy import UpdatePolicyEngine
 from autocorrect.version import APP_VERSION
+
+if TYPE_CHECKING:
+    import httpx as _httpx_types
+
+
+class _LazyHttpxProxy:
+    """Lazy proxy for `httpx` so daemon startup skips importing SSL/httpcore until needed."""
+
+    def __getattr__(self, name: str) -> Any:
+        import httpx as _real_httpx
+
+        return getattr(_real_httpx, name)
+
+
+httpx: Any = _LazyHttpxProxy()
 
 DEFAULT_MANIFEST_URL = "https://typen.org/release-manifest.json"
 GITHUB_API_RELEASES = "https://api.github.com/repos/{repo}/releases"
@@ -34,7 +47,7 @@ class SelectedAppUpdate:
 def fetch_manifest(
     url: str = DEFAULT_MANIFEST_URL,
     *,
-    client: httpx.Client | None = None,
+    client: _httpx_types.Client | None = None,
     timeout: float = 20.0,
 ) -> dict[str, Any]:
     http = client or httpx.Client(
@@ -65,7 +78,7 @@ def fetch_manifest_with_fallback(
     primary_url: str = DEFAULT_MANIFEST_URL,
     download_repo: str = "TypenApp/typen",
     channel: str = "stable",
-    client: httpx.Client | None = None,
+    client: _httpx_types.Client | None = None,
 ) -> dict[str, Any]:
     """Try typen.org first; on failure, resolve a GitHub Release asset URL."""
     try:
@@ -81,7 +94,7 @@ def _resolve_github_release_tag(
     repo: str,
     *,
     channel: str,
-    client: httpx.Client | None = None,
+    client: _httpx_types.Client | None = None,
 ) -> str:
     http = client or httpx.Client(
         timeout=20.0,

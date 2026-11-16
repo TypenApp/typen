@@ -192,20 +192,24 @@ POSSESSIVE_HEAD_NOUNS: Final[frozenset[str]] = frozenset(
         "phone",
         "email",
         "message",
+        "messages",
         "account",
         "password",
         "time",
         "life",
         "way",
+        "ways",
         "own",
         "best",
         "fault",
         "turn",
         "idea",
+        "ideas",
         "opinion",
         "place",
         "room",
         "book",
+        "books",
         "dog",
         "cat",
         "hand",
@@ -218,9 +222,140 @@ POSSESSIVE_HEAD_NOUNS: Final[frozenset[str]] = frozenset(
         "app",
         "system",
         "value",
+        "values",
         "color",
         "colour",
         "size",
+        "effect",
+        "effects",
+        "impact",
+        "performance",
+        "behavior",
+        "behaviour",
+        "state",
+        "status",
+        "structure",
+        "schema",
+        "purpose",
+        "meaning",
+        "role",
+        "power",
+        "battery",
+        "design",
+        "feature",
+        "features",
+        "version",
+        "nature",
+        "ability",
+        "capacity",
+        "price",
+        "cost",
+        "content",
+        "contents",
+        "result",
+        "results",
+        "origin",
+        "source",
+        "cause",
+        "history",
+        "future",
+        "owner",
+        "author",
+        "creator",
+        "tail",
+        "wings",
+        "doors",
+    }
+)
+
+ITS_POSSESSIVE_NOUNS: Final[frozenset[str]] = frozenset(
+    {
+        "own",
+        "name",
+        "color",
+        "colour",
+        "size",
+        "value",
+        "values",
+        "place",
+        "way",
+        "head",
+        "tail",
+        "wings",
+        "eyes",
+        "doors",
+        "effect",
+        "effects",
+        "impact",
+        "performance",
+        "behavior",
+        "behaviour",
+        "status",
+        "structure",
+        "schema",
+        "purpose",
+        "meaning",
+        "role",
+        "battery",
+        "capacity",
+        "contents",
+        "results",
+        "features",
+        "origin",
+        "creator",
+        "owner",
+        "author",
+    }
+)
+
+ITS_POSSESSIVE_PREV2_TRIGGERS: Final[frozenset[str]] = frozenset(
+    {
+        "in",
+        "on",
+        "at",
+        "by",
+        "for",
+        "with",
+        "from",
+        "into",
+        "of",
+        "about",
+        "without",
+        "despite",
+        "during",
+        "through",
+        "under",
+        "over",
+        "see",
+        "saw",
+        "seen",
+        "seeing",
+        "feel",
+        "felt",
+        "feeling",
+        "lose",
+        "lost",
+        "losing",
+        "keep",
+        "kept",
+        "keeping",
+        "change",
+        "changed",
+        "changing",
+        "check",
+        "checked",
+        "checking",
+        "fix",
+        "fixed",
+        "fixing",
+        "find",
+        "found",
+        "update",
+        "updated",
+        "test",
+        "tested",
+        "measure",
+        "measured",
     }
 )
 
@@ -572,25 +707,151 @@ def evaluate_retroactive_two_word_confusion(
     if p_low == "you're" and c_low in POSSESSIVE_HEAD_NOUNS:
         return "your"
 
-    if p_low == "its" and c_low in ITS_CONTRACTION_FOLLOWERS:
+    if p_low == "its" and (
+        c_low in ITS_CONTRACTION_FOLLOWERS
+        or (
+            len(c_low) >= 6
+            and c_low.endswith(("able", "ible"))
+            and c_low not in ("table", "cable", "fable", "stable", "syllable", "variable", "vegetable")
+        )
+    ):
         return "it's"
 
-    if p_low == "it's" and c_low in (
-        "own",
-        "name",
-        "color",
-        "colour",
-        "size",
-        "value",
-        "place",
-        "way",
-        "head",
-        "tail",
-        "wings",
-        "eyes",
-        "doors",
+    if p_low == "it's" and (
+        c_low in ITS_POSSESSIVE_NOUNS
+        or (c_low in POSSESSIVE_HEAD_NOUNS and p2_low in ITS_POSSESSIVE_PREV2_TRIGGERS)
     ):
         return "its"
+
+    if (
+        p_low == "have"
+        and c_low == "course"
+        and p2_low in ("should", "could", "would", "must", "might", "may")
+    ):
+        return "of"
+
+    # Real-word transposition 'form' -> 'from' in unambiguous ablative/source contexts
+    # ('message form GitHub' -> 'message from GitHub', 'came form the' -> 'came from the')
+    if (
+        p_low == "form"
+        and p2_low
+        in (
+            "away",
+            "apart",
+            "aside",
+            "far",
+            "back",
+            "straight",
+            "different",
+            "differ",
+            "differs",
+            "came",
+            "come",
+            "comes",
+            "coming",
+            "received",
+            "receive",
+            "message",
+            "messages",
+            "email",
+            "emails",
+            "letter",
+            "reply",
+            "response",
+            "download",
+            "downloaded",
+            "copied",
+            "imported",
+            "removed",
+            "deleted",
+            "prevent",
+            "prevented",
+            "escape",
+            "escaped",
+            "recover",
+            "recovered",
+        )
+        and (
+            c_low
+            in (
+                "the",
+                "a",
+                "an",
+                "this",
+                "that",
+                "these",
+                "those",
+                "my",
+                "your",
+                "our",
+                "their",
+                "his",
+                "her",
+                "its",
+                "me",
+                "you",
+                "us",
+                "them",
+                "him",
+                "here",
+                "there",
+            )
+            or (len(current_word) > 1 and current_word[0].isupper())
+        )
+    ):
+        return "from"
+
+    # 'loose' -> 'lose' after infinitive/modal/negation before direct object
+    if (
+        p_low == "loose"
+        and p2_low
+        in (
+            "to",
+            "will",
+            "would",
+            "could",
+            "should",
+            "might",
+            "must",
+            "can",
+            "can't",
+            "cannot",
+            "won't",
+            "don't",
+            "doesn't",
+            "didn't",
+            "never",
+            "gonna",
+        )
+        and c_low
+        in (
+            "it",
+            "them",
+            "my",
+            "your",
+            "our",
+            "their",
+            "his",
+            "her",
+            "its",
+            "the",
+            "weight",
+            "control",
+            "track",
+            "sight",
+            "hope",
+            "faith",
+            "sleep",
+            "money",
+            "power",
+            "focus",
+            "interest",
+            "patience",
+            "time",
+            "data",
+        )
+    ):
+        return "lose"
 
     if p_low in ("their", "they're") and c_low in EXISTENTIAL_VERBS_AFTER_THERE:
         return "there"

@@ -13,6 +13,7 @@ from autocorrect.core.models import CorrectionCandidate, EvaluationContext
 from autocorrect.core.punctuation import lookup_contraction_restoration
 from autocorrect.core.scorer import compute_composite_score, weighted_error_channel_log_prob
 from autocorrect.intelligence.resource_manager import ResourceBundle
+from autocorrect.intelligence.schema import MorphFlag
 
 SPLIT_LEFT_FUNCTION_WORDS: Final[frozenset[str]] = frozenset(
     {
@@ -117,6 +118,25 @@ class PreferenceLookupPort(Protocol):
     ) -> float: ...
 
 
+class LocalAIScorerPort(Protocol):
+    """Protocol for Layer-2 On-Device Neural Context candidate rescoring."""
+
+    @property
+    def is_ready_for_scoring(self) -> bool: ...
+
+    def score_candidates(
+        self,
+        candidates: list[str],
+        prev1_word: str | None = None,
+        prev2_word: str | None = None,
+        *,
+        prev1_word_id: int | None = None,
+        prev2_word_id: int | None = None,
+        cand_word_ids: dict[str, int] | None = None,
+        clause_tokens: tuple[str, ...] = (),
+    ) -> dict[str, float]: ...
+
+
 class CandidateGenerator:
     """
     Generates and ranks candidate corrections from memory-mapped resources
@@ -130,6 +150,7 @@ class CandidateGenerator:
         context: EvaluationContext,
         preferences: PreferenceLookupPort | None = None,
         include_confusion_peers: bool = False,
+        local_ai: LocalAIScorerPort | None = None,
     ) -> list[CorrectionCandidate]:
         """
         Generate all candidate corrections within Damerau-Levenshtein distance <= 2
@@ -266,12 +287,17 @@ class CandidateGenerator:
                 cand_word = bundle.lexicon.get_word_by_id(wid)
                 if abs(len(cand_word) - len(word_lower)) > max_dist:
                     continue
+                adj_freq = (
+                    meta.log_freq - 1.0
+                    if (meta.morph_mask & MorphFlag.ABBREVIATION) and context.trailing_delimiter != "."
+                    else meta.log_freq
+                )
                 self._add_scored_candidate(
                     candidates_map=candidates_map,
                     word_lower=word_lower,
                     cand_word=cand_word,
                     cand_wid=wid,
-                    unigram_log_freq=meta.log_freq,
+                    unigram_log_freq=adj_freq,
                     bundle=bundle,
                     context=context,
                     preferences=preferences,
@@ -329,6 +355,45 @@ class CandidateGenerator:
                 )
 
         ranked = sorted(candidates_map.values(), key=lambda c: c.composite_score, reverse=True)
+        if (
+            local_ai is not None
+            and context.features.local_ai_live_rescoring
+            and local_ai.is_ready_for_scoring
+            and len(ranked) >= 2
+            and (context.prev1_word or context.clause_tokens)
+        ):
+            top_slice = [c for c in ranked[:8] if " " not in c.word]
+            if len(top_slice) >= 2:
+                cand_wids = {c.word: c.word_id for c in top_slice}
+                ai_adj = local_ai.score_candidates(
+                    [c.word for c in top_slice],
+                    prev1_word=context.prev1_word,
+                    prev2_word=context.prev2_word,
+                    prev1_word_id=context.prev1_word_id,
+                    prev2_word_id=context.prev2_word_id,
+                    cand_word_ids=cand_wids,
+                    clause_tokens=context.clause_tokens,
+                )
+                if ai_adj:
+                    updated: list[CorrectionCandidate] = []
+                    for c in ranked:
+                        delta = ai_adj.get(c.word, 0.0) if " " not in c.word else 0.0
+                        if delta != 0.0:
+                            updated.append(
+                                CorrectionCandidate(
+                                    word=c.word,
+                                    word_id=c.word_id,
+                                    edit_distance=c.edit_distance,
+                                    weighted_error_cost=c.weighted_error_cost,
+                                    lm_log_prob=c.lm_log_prob + delta,
+                                    confusion_boost=c.confusion_boost,
+                                    composite_score=c.composite_score + delta,
+                                    is_direct_typo=c.is_direct_typo,
+                                )
+                            )
+                        else:
+                            updated.append(c)
+                    ranked = sorted(updated, key=lambda c: c.composite_score, reverse=True)
         return ranked
 
     def _generate_split_candidates(

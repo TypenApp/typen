@@ -28,6 +28,12 @@ VK_INSERT: Final[int] = 0x2D
 VK_DELETE: Final[int] = 0x2E
 VK_LWIN: Final[int] = 0x5B
 VK_RWIN: Final[int] = 0x5C
+VK_LSHIFT: Final[int] = 0xA0
+VK_RSHIFT: Final[int] = 0xA1
+VK_LCONTROL: Final[int] = 0xA2
+VK_RCONTROL: Final[int] = 0xA3
+VK_LMENU: Final[int] = 0xA4
+VK_RMENU: Final[int] = 0xA5
 
 VK_TO_KEY_NAME: Final[dict[int, str]] = {
     VK_BACK: "Backspace",

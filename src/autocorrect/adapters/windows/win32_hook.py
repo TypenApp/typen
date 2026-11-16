@@ -40,8 +40,14 @@ from autocorrect.adapters.windows.win32_injector import AUTOCORRECT_EXTRA_INFO_T
 from autocorrect.adapters.windows.win_keymap import (
     VK_CAPITAL,
     VK_CONTROL,
+    VK_LCONTROL,
+    VK_LMENU,
+    VK_LSHIFT,
     VK_LWIN,
     VK_MENU,
+    VK_RCONTROL,
+    VK_RMENU,
+    VK_RSHIFT,
     VK_RWIN,
     VK_SHIFT,
     VK_TO_KEY_NAME,
@@ -63,7 +69,21 @@ HOOK_START_TIMEOUT_S: Final[float] = 5.0
 DEFAULT_CALLBACK_BUDGET_MS: Final[float] = 20.0
 DEFAULT_SLOW_CALLBACK_LIMIT: Final[int] = 20
 SLOW_WINDOW_S: Final[float] = 10.0
-_MODIFIER_VKS: Final[frozenset[int]] = frozenset({VK_SHIFT, VK_CONTROL, VK_MENU, VK_LWIN, VK_RWIN})
+_MODIFIER_VKS: Final[frozenset[int]] = frozenset(
+    {
+        VK_SHIFT,
+        VK_LSHIFT,
+        VK_RSHIFT,
+        VK_CONTROL,
+        VK_LCONTROL,
+        VK_RCONTROL,
+        VK_MENU,
+        VK_LMENU,
+        VK_RMENU,
+        VK_LWIN,
+        VK_RWIN,
+    }
+)
 
 _NAMED_VK: Final[dict[str, int]] = {name: vk for vk, name in VK_TO_KEY_NAME.items()}
 _PUNCT_VK: Final[dict[str, int]] = {
@@ -424,8 +444,11 @@ class Win32KeyboardMouseHook:
 
         key_name = VK_TO_KEY_NAME.get(vk, "")
         char_str = self._translate_vk(vk, scan_code, shift) if not (ctrl or alt or win) else ""
-        if not key_name and char_str:
-            key_name = char_str
+        if not key_name:
+            if char_str:
+                key_name = char_str
+            elif 0x41 <= vk <= 0x5A:
+                key_name = chr(vk + 32)
         return KeyEvent(
             key_name=key_name,
             char=char_str,

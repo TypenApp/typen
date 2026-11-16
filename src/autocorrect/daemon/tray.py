@@ -99,6 +99,9 @@ class SystemTrayController:
         self._pulsing = False
         self._hold_remaining: float | None = None
         self._lock = threading.Lock()
+        self._icon_cache: dict[tuple[bool, Any, bool], Image.Image] = {}
+        self._render_event = threading.Event()
+        self._render_thread: threading.Thread | None = None
 
     @staticmethod
     def create_tray_icon_image(
@@ -106,6 +109,30 @@ class SystemTrayController:
     ) -> Image.Image:
         """Render the 64x64 tray icon from the shared brand drawing (no external image assets)."""
         return branding.draw_mark(64, theme=theme or branding.tray_theme(), active=active, accent=accent)
+
+    def _cached_icon(self, active: bool, theme: Any, accent: bool) -> Image.Image:
+        key = (active, theme, accent)
+        img = self._icon_cache.get(key)
+        if img is None:
+            img = self.create_tray_icon_image(active=active, theme=theme, accent=accent)
+            self._icon_cache[key] = img
+        return img
+
+    def _ensure_render_worker(self) -> None:
+        if self._render_thread is not None and self._render_thread.is_alive():
+            return
+        self._render_thread = threading.Thread(
+            target=self._render_worker_loop, name="typen-tray-render", daemon=True
+        )
+        self._render_thread.start()
+
+    def _render_worker_loop(self) -> None:
+        while True:
+            self._render_event.wait()
+            self._render_event.clear()
+            if self._icon is None:
+                return
+            self._render_icon_sync()
 
     def launch_settings_subprocess(self, screen: str | None = None) -> subprocess.Popen[bytes] | None:
         """Spawn the out-of-process Settings UI so daemon RSS stays < 30MB."""
@@ -220,18 +247,22 @@ class SystemTrayController:
             hold_remaining=self._hold_remaining,
         )[:TOOLTIP_LIMIT]
 
-    def _render_icon(self) -> None:
-        if self._icon is None:
+    def _render_icon_sync(self) -> None:
+        icon = self._icon
+        if icon is None:
             return
         try:
             paused = self._is_paused() or self._needs_attention()
-            self._icon.icon = self.create_tray_icon_image(
-                active=not paused,
-                theme=self._theme,
-                accent=(self._pulsing or self._hold_remaining is not None) and not paused,
-            )
+            accent = (self._pulsing or self._hold_remaining is not None) and not paused
+            icon.icon = self._cached_icon(not paused, self._theme, accent)
         except Exception:
             log.exception("tray icon render failed")
+
+    def _render_icon(self) -> None:
+        if self._icon is None:
+            return
+        self._ensure_render_worker()
+        self._render_event.set()
 
     def refresh(self) -> None:
         """Re-render icon, tooltip and menu after a state change (thread-safe enough for pystray)."""
@@ -286,3 +317,4 @@ class SystemTrayController:
             except Exception:
                 pass
             self._icon = None
+        self._render_event.set()

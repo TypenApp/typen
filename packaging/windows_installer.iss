@@ -3,7 +3,7 @@
 ; MyChannel "stable" (the Windows build) yields plain 1.3.0; anything else is a
 ; pre-release suffix (beta.1 -> 1.3.0-beta.1).
 #ifndef MyAppVersion
-  #define MyAppVersion "2.0.1"
+  #define MyAppVersion "2.1.0"
 #endif
 #ifndef MyChannel
   #define MyChannel "stable"

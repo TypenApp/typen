@@ -6,8 +6,8 @@ Typen processes system-wide keyboard input on your machine. Because of that priv
 
 | Version | Supported |
 | --- | --- |
-| `2.0.x` | Yes |
-| `< 2.0.0` | No (upgrade to latest `2.0.x` release) |
+| `2.1.x` | Yes |
+| `< 2.1.0` | No (upgrade to latest `2.1.x` release) |
 
 ## Security & Privacy Guarantees
 

@@ -51,7 +51,7 @@ PLATFORM_ORDER = ["win64", "macos-arm64", "macos-x64", "linux-x86_64", "linux-aa
 
 
 def _load(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8-sig"))
+    return dict(json.loads(path.read_text(encoding="utf-8-sig")))
 
 
 def _channel_of(full_version: str, version: str) -> str:

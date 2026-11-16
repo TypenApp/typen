@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "typen"
-version = "2.0.1"
+version = "2.1.0"
 description = "Typen: offline-first, system-wide desktop autocorrect and writing assistant"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -82,13 +82,11 @@ typen-daemon = "autocorrect.daemon.app:main"
 typen-settings = "autocorrect.ui.settings_main:main"
 typen-sandbox = "autocorrect.sandbox:main"
 typen-pipeline = "pipeline.cli:main"
-typen-issue-licence = "pipeline.issue_licence:main"
 autocorrect-desktop = "autocorrect.launcher:main"
 autocorrect-daemon = "autocorrect.daemon.app:main"
 autocorrect-settings = "autocorrect.ui.settings_main:main"
 autocorrect-sandbox = "autocorrect.sandbox:main"
 autocorrect-pipeline = "pipeline.cli:main"
-autocorrect-issue-licence = "pipeline.issue_licence:main"
 
 [tool.setuptools.packages.find]
 where = ["src", "."]

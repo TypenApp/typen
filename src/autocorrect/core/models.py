@@ -58,7 +58,10 @@ class CorrectionFeatures:
 
     # Predictive typing
     enable_predictive_tab: bool = True
+    predictive_display_style: str = "inline"  # inline | pill
     predictive_accept_key: str = "both"  # both | tab | right
+    predictive_font_scale: float = 1.0
+    local_ai_live_rescoring: bool = True
     # Spelling
     enable_spelling: bool = True
     aggressiveness: float = 1.0  # 1.0 = standard conservative; <1.0 stricter; >1.0 more assertive

@@ -173,6 +173,11 @@ def weighted_error_channel_log_prob(typo: str, candidate: str) -> tuple[int, flo
             typo == candidate + "s" or (candidate.endswith("e") and typo == candidate + "d")
         ):
             return 1, -5.5
+        # Guard against truncating a 3-letter typo into a 2-letter function word
+        # ('mes' -> 'me', 'hes' -> 'he', 'wes' -> 'we', 'tos' -> 'to') when an
+        # omitted double-letter completion ('mes' -> 'mess') or 3-letter word exists.
+        if len(typo) == 3 and len(candidate) == 2 and typo.startswith(candidate):
+            return 1, -1.45
 
         longer, shorter = (candidate, typo) if len(candidate) > len(typo) else (typo, candidate)
         # Check if the inserted/deleted char is a duplicate of an adjacent char
@@ -182,7 +187,11 @@ def weighted_error_channel_log_prob(typo: str, candidate: str) -> tuple[int, flo
                 if longer[:i] + longer[i + 1 :] == shorter:
                     is_double_letter_slip = True
                     break
-        cost = 0.50 if is_double_letter_slip else 0.85
+        if is_double_letter_slip and len(candidate) == len(typo) + 1 and candidate[-1] == candidate[-2]:
+            # Omitted word-final doubled consonant ('mes' -> 'mess', 'wel' -> 'well', 'wil' -> 'will')
+            cost = 0.38
+        else:
+            cost = 0.50 if is_double_letter_slip else 0.85
         if typo[0] != candidate[0]:
             cost += 0.30
         return 1, -cost

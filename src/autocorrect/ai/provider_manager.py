@@ -14,12 +14,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import Enum
-
-import httpx
+from typing import TYPE_CHECKING
 
 from autocorrect.ai.api_key_manager import ApiKeyManager, redact_secrets
 from autocorrect.ai.spending_controls import SpendingController
 from autocorrect.ai.usage_tracker import UsageTracker
+
+if TYPE_CHECKING:
+    import httpx
 
 
 class AIProviderId(str, Enum):
@@ -111,6 +113,8 @@ class BYOKProviderManager:
             raise PermissionError(f"Missing or invalid API key for provider '{request.provider.value}'.")
 
         try:
+            import httpx
+
             with httpx.Client(transport=self._transport, timeout=15.0) as client:
                 if request.provider in (AIProviderId.OPENAI, AIProviderId.CUSTOM_OPENAI):
                     rewritten, p_tok, c_tok = self._call_openai(client, api_key, request)

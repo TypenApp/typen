@@ -26,6 +26,8 @@ from autocorrect.intelligence.schema import (
 )
 
 UNK_WORD_ID: Final[int] = 0
+_DO_NOT_SUGGEST_BIT: Final[int] = int(MorphFlag.DO_NOT_SUGGEST)
+_PREFIX_CACHE_MAX: Final[int] = 512
 
 
 class MmapLexicon:
@@ -70,6 +72,9 @@ class MmapLexicon:
         if exact_casing_path is not None and exact_casing_path.exists():
             raw = json.loads(exact_casing_path.read_text(encoding="utf-8"))
             self._exact_casing = {int(k): str(v) for k, v in raw.items()}
+        self._prefix_cache: dict[
+            tuple[str, float, int, int], list[tuple[int, str, float, str | None]]
+        ] = {}
 
     @property
     def word_count(self) -> int:
@@ -97,15 +102,23 @@ class MmapLexicon:
         Returns word_id or None if out-of-vocabulary.
         """
         target = word_lower.encode("utf-8")
+        lex_view = self._lex_view
+        lex_mmap = self._lex_mmap
+        idx_base = self._index_base
+        blob_base = self._blob_base
+        idx_size = LEX_INDEX_STRUCT.size
+        unpack_idx = LEX_INDEX_STRUCT.unpack_from
+
         lo = 0
         hi = self._count - 1
         while lo <= hi:
             mid = (lo + hi) >> 1
-            mid_bytes = self._word_bytes_at(mid)
-            # Compare memoryview directly against bytes without decoding to str
+            utf8_offset, utf8_len, _ = unpack_idx(lex_view, idx_base + mid * idx_size)
+            start = blob_base + utf8_offset
+            mid_bytes = lex_mmap[start : start + utf8_len]
             if mid_bytes == target:
                 return mid
-            if bytes(mid_bytes) < target:
+            if mid_bytes < target:
                 lo = mid + 1
             else:
                 hi = mid - 1
@@ -126,7 +139,25 @@ class MmapLexicon:
         """
         if not prefix_lower:
             return []
+        cache_key = (prefix_lower, min_log_freq, min_len, limit)
+        cached = self._prefix_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         pref_bytes = prefix_lower.encode("utf-8")
+        pref_len = len(pref_bytes)
+        min_q_freq = int(round(min_log_freq * 1000.0))
+
+        lex_view = self._lex_view
+        lex_mmap = self._lex_mmap
+        meta_view = self._meta_view
+        idx_base = self._index_base
+        blob_base = self._blob_base
+        meta_base = self._meta_base
+        idx_size = LEX_INDEX_STRUCT.size
+        meta_size = LEX_META_STRUCT.size
+        unpack_idx = LEX_INDEX_STRUCT.unpack_from
+        unpack_meta = LEX_META_STRUCT.unpack_from
 
         # Find lower bound (first entry >= pref_bytes)
         lo = 1
@@ -134,7 +165,9 @@ class MmapLexicon:
         start_idx = self._count
         while lo <= hi:
             mid = (lo + hi) >> 1
-            mb = bytes(self._word_bytes_at(mid))
+            utf8_offset, utf8_len, _ = unpack_idx(lex_view, idx_base + mid * idx_size)
+            start = blob_base + utf8_offset
+            mb = lex_mmap[start : start + utf8_len]
             if mb >= pref_bytes:
                 start_idx = mid
                 hi = mid - 1
@@ -142,24 +175,30 @@ class MmapLexicon:
                 lo = mid + 1
 
         matches: list[tuple[int, str, float, str | None]] = []
-        # Scan at most 512 entries starting with pref_bytes
+        exact_map = self._exact_casing
+        # Scan at most 512 entries starting with pref_bytes using raw integer checks
         end_scan = min(self._count, start_idx + 512)
         for wid in range(start_idx, end_scan):
-            wb = bytes(self._word_bytes_at(wid))
-            if not wb.startswith(pref_bytes):
+            utf8_offset, utf8_len, _ = unpack_idx(lex_view, idx_base + wid * idx_size)
+            start = blob_base + utf8_offset
+            if utf8_len < pref_len or lex_mmap[start : start + pref_len] != pref_bytes:
                 break
-            if len(wb) < min_len:
+            if utf8_len < min_len:
                 continue
-            meta = self.get_meta(wid)
-            if not meta.can_suggest or meta.log_freq < min_log_freq:
+            q_freq, _reg, _casing, morph, _conf = unpack_meta(meta_view, meta_base + wid * meta_size)
+            if (morph & _DO_NOT_SUGGEST_BIT) or q_freq < min_q_freq:
                 continue
-            word_str = wb.decode("utf-8")
+            word_str = lex_mmap[start : start + utf8_len].decode("utf-8")
             if not word_str.isalpha():
                 continue
-            matches.append((wid, word_str, meta.log_freq, self._exact_casing.get(wid)))
+            matches.append((wid, word_str, q_freq / 1000.0, exact_map.get(wid)))
 
         matches.sort(key=lambda item: item[2], reverse=True)
-        return matches[:limit]
+        result = matches[:limit]
+        if len(self._prefix_cache) >= _PREFIX_CACHE_MAX:
+            self._prefix_cache.clear()
+        self._prefix_cache[cache_key] = result
+        return result
 
     def get_meta(self, word_id: int) -> LexiconMeta:
         """Unpack the 8-byte metadata struct for word_id."""
@@ -185,6 +224,7 @@ class MmapLexicon:
 
     def close(self) -> None:
         """Release memoryviews, mmaps, and file descriptors cleanly."""
+        self._prefix_cache.clear()
         if hasattr(self, "_lex_view"):
             self._lex_view.release()
         if hasattr(self, "_meta_view"):

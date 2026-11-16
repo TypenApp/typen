@@ -27,6 +27,9 @@ from autocorrect.input.ports import FocusContext
 
 LINUX_EXCLUDED_WM_CLASSES: Final[frozenset[str]] = frozenset(
     {
+        "typen",
+        "typen-settings",
+        "autocorrect-desktop",
         "1password",
         "bitwarden",
         "keepassxc",

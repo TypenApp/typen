@@ -13,7 +13,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from autocorrect.intelligence.mmap_lexicon import MmapAbbreviationSet, MmapLexicon
 from autocorrect.intelligence.mmap_ngram import MmapNGramModel
@@ -23,6 +23,7 @@ from autocorrect.intelligence.mmap_symspell import (
     generate_delete_strings,
 )
 from autocorrect.intelligence.schema import BINARY_SCHEMA_VERSION, CasingFlag
+from autocorrect.preferences.memory_overlay import infer_custom_word_casing
 
 
 def _resolve_bundled_resources_dir() -> Path:
@@ -128,6 +129,7 @@ class ResourceManager:
         self._lock = threading.RLock()
         self._active_bundle: ResourceBundle | None = None
         self._enabled_packs: set[str] = set()
+        self._pack_overrides: dict[str, dict[str, Any]] = {}
 
     @property
     def active_bundle(self) -> ResourceBundle:
@@ -199,36 +201,87 @@ class ResourceManager:
         self._load_enabled_domain_packs(bundle, directory)
         return bundle
 
-    def _load_enabled_domain_packs(self, bundle: ResourceBundle, base_dir: Path) -> None:
-        packs_dir = base_dir / "packs"
-        if not packs_dir.exists():
-            packs_dir = self._bundled_dir / "packs"
-        if not packs_dir.exists():
-            return
+    def _resolve_packs_dir(self, base_dir: Path | None = None) -> Path | None:
+        if base_dir is not None and (base_dir / "packs").exists():
+            return base_dir / "packs"
+        if self._active_bundle is not None and (self._active_bundle.bundle_dir / "packs").exists():
+            return self._active_bundle.bundle_dir / "packs"
+        if (self._bundled_dir / "packs").exists():
+            return self._bundled_dir / "packs"
+        return None
 
-        for pack_id in self._enabled_packs:
+    def _load_raw_pack_json(self, pack_id: str, base_dir: Path | None = None) -> dict[str, Any]:
+        packs_dir = self._resolve_packs_dir(base_dir)
+        if packs_dir is not None:
             pack_file = packs_dir / f"{pack_id}.pack.json"
             if pack_file.exists():
-                raw = json.loads(pack_file.read_text(encoding="utf-8"))
-                words: dict[str, tuple[float, CasingFlag, str | None]] = {}
-                delete_index: dict[str, set[str]] = {}
-                for w_lower, w_info in raw.get("words", {}).items():
-                    low_clean = w_lower.strip().lower()
-                    words[low_clean] = (
-                        float(w_info.get("log_freq", -6.0)),
-                        CasingFlag(int(w_info.get("casing_flag", 0))),
-                        w_info.get("exact_casing"),
-                    )
-                    for del_str in generate_delete_strings(low_clean, max_distance=2):
-                        delete_index.setdefault(del_str, set()).add(low_clean)
-                bundle.domain_packs[pack_id] = DomainPackOverlay(
-                    pack_id=pack_id,
-                    version=str(raw.get("version", "1.0.0")),
-                    released_at=str(raw.get("released_at", bundle.released_at)),
-                    words=words,
-                    direct_typos=dict(raw.get("direct_typos", {})),
-                    delete_index=delete_index,
-                )
+                try:
+                    return dict(json.loads(pack_file.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
+        return {"pack_id": pack_id, "version": "1.0.0", "words": {}, "direct_typos": {}}
+
+    def _build_merged_pack_overlay(
+        self, pack_id: str, base_dir: Path, default_released_at: str
+    ) -> DomainPackOverlay | None:
+        raw = self._load_raw_pack_json(pack_id, base_dir)
+        ov = self._pack_overrides.get(pack_id, {})
+        has_raw = bool(raw.get("words") or raw.get("direct_typos"))
+        if not has_raw and not ov:
+            return None
+
+        removed_words: set[str] = set(ov.get("removed_words", ()))
+        added_words: dict[str, str] = dict(ov.get("added_words", {}))
+        removed_typos: set[str] = set(ov.get("removed_typos", ()))
+        added_typos: dict[str, str] = dict(ov.get("added_typos", {}))
+
+        words: dict[str, tuple[float, CasingFlag, str | None]] = {}
+        for w_lower, w_info in raw.get("words", {}).items():
+            low_clean = str(w_lower).strip().lower()
+            if not low_clean or low_clean in removed_words:
+                continue
+            words[low_clean] = (
+                float(w_info.get("log_freq", -6.0)),
+                CasingFlag(int(w_info.get("casing_flag", 0))),
+                w_info.get("exact_casing"),
+            )
+
+        for low_add, disp_add in added_words.items():
+            low_clean = str(low_add).strip().lower()
+            if not low_clean:
+                continue
+            c_flag, c_exact = infer_custom_word_casing(disp_add)
+            words[low_clean] = (-5.4, c_flag, c_exact)
+
+        direct_typos: dict[str, str] = {}
+        for t_low, tgt in raw.get("direct_typos", {}).items():
+            tl = str(t_low).strip().lower()
+            if tl and tl not in removed_typos:
+                direct_typos[tl] = str(tgt)
+        for t_low, tgt in added_typos.items():
+            tl = str(t_low).strip().lower()
+            if tl and str(tgt).strip():
+                direct_typos[tl] = str(tgt).strip()
+
+        delete_index: dict[str, set[str]] = {}
+        for low_clean in words:
+            for del_str in generate_delete_strings(low_clean, max_distance=2):
+                delete_index.setdefault(del_str, set()).add(low_clean)
+
+        return DomainPackOverlay(
+            pack_id=pack_id,
+            version=str(raw.get("version", "2.0.0")),
+            released_at=str(raw.get("released_at", default_released_at)),
+            words=words,
+            direct_typos=direct_typos,
+            delete_index=delete_index,
+        )
+
+    def _load_enabled_domain_packs(self, bundle: ResourceBundle, base_dir: Path) -> None:
+        for pack_id in self._enabled_packs:
+            overlay = self._build_merged_pack_overlay(pack_id, base_dir, bundle.released_at)
+            if overlay is not None:
+                bundle.domain_packs[pack_id] = overlay
 
     def set_enabled_domain_packs(self, pack_ids: set[str]) -> None:
         """Enable or disable Pro domain-specific vocabulary packs dynamically."""
@@ -237,6 +290,96 @@ class ResourceManager:
             if self._active_bundle is not None:
                 self._active_bundle.domain_packs.clear()
                 self._load_enabled_domain_packs(self._active_bundle, self._active_bundle.bundle_dir)
+
+    def set_domain_pack_overrides(self, overrides: dict[str, dict[str, Any]]) -> None:
+        """Apply local user additions, edits, and removals across domain packs and reload live."""
+        with self._lock:
+            self._pack_overrides = {str(k).strip().lower(): dict(v) for k, v in overrides.items()}
+            if self._active_bundle is not None:
+                self._active_bundle.domain_packs.clear()
+                self._load_enabled_domain_packs(self._active_bundle, self._active_bundle.bundle_dir)
+
+    def inspect_domain_pack(self, pack_id: str) -> dict[str, Any]:
+        """
+        Return the merged effective vocabulary & direct-typo table for `pack_id`
+        along with per-entry provenance (`builtin` | `custom` | `edited`) so the
+        desktop UI can browse, filter, add, edit, or delete words on this machine.
+        """
+        pid = pack_id.strip().lower()
+        with self._lock:
+            base_dir = self._active_bundle.bundle_dir if self._active_bundle is not None else self._bundled_dir
+            raw = self._load_raw_pack_json(pid, base_dir)
+            ov = self._pack_overrides.get(pid, {})
+
+        builtin_words: dict[str, str] = {}
+        for w_low, w_info in raw.get("words", {}).items():
+            low = str(w_low).strip().lower()
+            if low:
+                exact = w_info.get("exact_casing")
+                builtin_words[low] = str(exact) if exact else low
+
+        builtin_typos: dict[str, str] = {
+            str(k).strip().lower(): str(v) for k, v in raw.get("direct_typos", {}).items() if str(k).strip()
+        }
+
+        removed_words: set[str] = set(ov.get("removed_words", ()))
+        added_words: dict[str, str] = dict(ov.get("added_words", {}))
+        removed_typos: set[str] = set(ov.get("removed_typos", ()))
+        added_typos: dict[str, str] = dict(ov.get("added_typos", {}))
+
+        effective_words: list[dict[str, Any]] = []
+        all_word_keys = sorted((set(builtin_words) - removed_words) | set(added_words))
+        for low in all_word_keys:
+            in_builtin = low in builtin_words
+            if low in added_words:
+                disp = added_words[low]
+                src = "edited" if in_builtin else "custom"
+            else:
+                disp = builtin_words[low]
+                src = "builtin"
+            effective_words.append(
+                {
+                    "word": disp,
+                    "lower": low,
+                    "source": src,
+                    "is_builtin": in_builtin,
+                }
+            )
+        # Put custom & edited entries first so user changes are immediately visible at the top
+        effective_words.sort(key=lambda item: (0 if item["source"] != "builtin" else 1, item["lower"]))
+
+        effective_typos: list[dict[str, Any]] = []
+        all_typo_keys = sorted((set(builtin_typos) - removed_typos) | set(added_typos))
+        for tl in all_typo_keys:
+            in_builtin_t = tl in builtin_typos
+            if tl in added_typos:
+                tgt = added_typos[tl]
+                src_t = "edited" if in_builtin_t else "custom"
+            else:
+                tgt = builtin_typos[tl]
+                src_t = "builtin"
+            effective_typos.append(
+                {
+                    "typo": tl,
+                    "target": tgt,
+                    "source": src_t,
+                    "is_builtin": in_builtin_t,
+                }
+            )
+        effective_typos.sort(key=lambda item: (0 if item["source"] != "builtin" else 1, item["typo"]))
+
+        custom_cnt = len(added_words) + len(added_typos)
+        removed_cnt = len(removed_words & set(builtin_words)) + len(removed_typos & set(builtin_typos))
+        return {
+            "id": pid,
+            "words": effective_words,
+            "direct_typos": effective_typos,
+            "word_count": len(effective_words),
+            "typo_count": len(effective_typos),
+            "custom_count": custom_cnt,
+            "removed_count": removed_cnt,
+            "has_overrides": bool(added_words or removed_words or added_typos or removed_typos),
+        }
 
     def load_best_available(self, max_entitled_date: datetime | None = None) -> ResourceBundle:
         """

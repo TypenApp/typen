@@ -11,6 +11,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sqlite3
 import time
 from collections.abc import Iterator
@@ -46,6 +47,9 @@ class SQLitePreferenceStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._overlay = overlay or PreferenceMemoryOverlay()
         self._overlay.set_revert_sink(self._persist_reverted_word)
+        self._settings_cache: dict[str, str] = {}
+        self._settings_mtime_ns: int = -1
+        self._settings_stat_ts: float = 0.0
         self._init_schema()
         self.reload_into_overlay()
 
@@ -62,15 +66,40 @@ class SQLitePreferenceStore:
         """
         conn = sqlite3.connect(str(self._db_path))
         try:
-            conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
+            conn.execute("PRAGMA busy_timeout=2000;")
             with conn:
                 yield conn
         finally:
             conn.close()
 
+    def _note_db_mtime(self) -> None:
+        try:
+            self._settings_mtime_ns = self._db_path.stat().st_mtime_ns
+        except OSError:
+            self._settings_mtime_ns = -1
+        self._settings_stat_ts = time.monotonic()
+
+    def _sync_settings_cache_if_stale(self) -> None:
+        now = time.monotonic()
+        if self._settings_mtime_ns >= 0 and (now - self._settings_stat_ts) < 0.25:
+            return
+        self._settings_stat_ts = now
+        try:
+            cur_mtime = self._db_path.stat().st_mtime_ns
+        except OSError:
+            return
+        if cur_mtime == self._settings_mtime_ns:
+            return
+        with self._connect() as conn:
+            self._settings_cache = {
+                str(k): str(v) for k, v in conn.execute("SELECT key, value FROM user_settings")
+            }
+        self._settings_mtime_ns = cur_mtime
+
     def _init_schema(self) -> None:
         with self._connect() as conn:
+            conn.execute("PRAGMA journal_mode=WAL;")
             conn.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS custom_words (
@@ -129,6 +158,22 @@ class SQLitePreferenceStore:
                     updated_at REAL NOT NULL,
                     PRIMARY KEY (prev2_lower, prev1_lower, word_lower)
                 );
+                CREATE TABLE IF NOT EXISTS domain_pack_words (
+                    pack_id TEXT NOT NULL,
+                    word_lower TEXT NOT NULL,
+                    display_word TEXT NOT NULL,
+                    action TEXT NOT NULL DEFAULT 'add',
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (pack_id, word_lower)
+                );
+                CREATE TABLE IF NOT EXISTS domain_pack_typos (
+                    pack_id TEXT NOT NULL,
+                    typo_lower TEXT NOT NULL,
+                    target_word TEXT NOT NULL,
+                    action TEXT NOT NULL DEFAULT 'add',
+                    updated_at REAL NOT NULL,
+                    PRIMARY KEY (pack_id, typo_lower)
+                );
                 """
             )
             # Older databases: columns added after 1.2.
@@ -164,9 +209,13 @@ class SQLitePreferenceStore:
             ):
                 self._overlay.set_preferred_variant(src_low, pref_low)
 
-            row = conn.execute("SELECT value FROM user_settings WHERE key = 'region'").fetchone()
-            if row and row[0] in REGION_NAME_TO_FLAG:
-                self._overlay.set_active_region(REGION_NAME_TO_FLAG[row[0]])
+            self._settings_cache = {
+                str(k): str(v) for k, v in conn.execute("SELECT key, value FROM user_settings")
+            }
+            reg_val = self._settings_cache.get("region")
+            if reg_val and reg_val in REGION_NAME_TO_FLAG:
+                self._overlay.set_active_region(REGION_NAME_TO_FLAG[reg_val])
+        self._note_db_mtime()
 
     def add_custom_word(
         self, word: str, category: str = "user", *, keep_suggestion: bool = False
@@ -351,6 +400,8 @@ class SQLitePreferenceStore:
                 "INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)",
                 (key, value),
             )
+        self._settings_cache[key] = str(value)
+        self._note_db_mtime()
 
     @overload
     def get_setting(self, key: str, default: str = "") -> str: ...
@@ -359,9 +410,9 @@ class SQLitePreferenceStore:
     def get_setting(self, key: str, default: None) -> str | None: ...
 
     def get_setting(self, key: str, default: str | None = "") -> str | None:
-        with self._connect() as conn:
-            row = conn.execute("SELECT value FROM user_settings WHERE key = ?", (key,)).fetchone()
-        return str(row[0]) if row else default
+        self._sync_settings_cache_if_stale()
+        val = self._settings_cache.get(key)
+        return val if val is not None else default
 
     # Typed, schema-validated access -------------------------------------
 
@@ -382,8 +433,8 @@ class SQLitePreferenceStore:
         return self.get_typed(key)
 
     def get_all_typed(self, group: str | None = None) -> dict[str, Any]:
-        with self._connect() as conn:
-            rows = dict(conn.execute("SELECT key, value FROM user_settings").fetchall())
+        self._sync_settings_cache_if_stale()
+        rows = self._settings_cache
         out: dict[str, Any] = {}
         for spec in settings_schema.SETTINGS_SCHEMA:
             if group is not None and spec.group != group:
@@ -416,8 +467,12 @@ class SQLitePreferenceStore:
                 DELETE FROM insights_daily;
                 DELETE FROM user_adaptive_unigrams;
                 DELETE FROM user_adaptive_ngrams;
+                DELETE FROM domain_pack_words;
+                DELETE FROM domain_pack_typos;
                 """
             )
+        self._settings_cache.clear()
+        self._note_db_mtime()
         self._overlay.clear_all()
 
     def export_json(self) -> str:
@@ -670,3 +725,185 @@ class SQLitePreferenceStore:
                     """,
                     [(p2, p1, w_low, cnt, ts) for (p2, p1, w_low), (cnt, ts) in ngrams.items()],
                 )
+
+    # Local Domain Vocabulary Pack Customization --------------------------
+
+    def load_domain_pack_overrides(self) -> dict[str, dict[str, Any]]:
+        """
+        Return all local user modifications to domain packs:
+        `{pack_id: {"added_words": {low: disp}, "removed_words": set(), "added_typos": {t: target}, "removed_typos": set()}}`.
+        """
+        out: dict[str, dict[str, Any]] = {}
+
+        def _entry(pid: str) -> dict[str, Any]:
+            if pid not in out:
+                out[pid] = {
+                    "added_words": {},
+                    "removed_words": set(),
+                    "added_typos": {},
+                    "removed_typos": set(),
+                }
+            return out[pid]
+
+        with self._connect() as conn:
+            w_rows = conn.execute(
+                "SELECT pack_id, word_lower, display_word, action FROM domain_pack_words"
+            ).fetchall()
+            t_rows = conn.execute(
+                "SELECT pack_id, typo_lower, target_word, action FROM domain_pack_typos"
+            ).fetchall()
+
+        for pid_raw, w_low, disp, action in w_rows:
+            b = _entry(str(pid_raw).strip().lower())
+            if str(action) == "remove":
+                b["removed_words"].add(str(w_low))
+            else:
+                b["added_words"][str(w_low)] = str(disp)
+
+        for pid_raw, t_low, target, action in t_rows:
+            b = _entry(str(pid_raw).strip().lower())
+            if str(action) == "remove":
+                b["removed_typos"].add(str(t_low))
+            else:
+                b["added_typos"][str(t_low)] = str(target)
+
+        return out
+
+    def upsert_domain_pack_word(self, pack_id: str, word_or_words: str) -> list[str]:
+        """
+        Add or update one or more words (comma/semicolon/newline separated) in `pack_id`,
+        preserving exact casing (e.g. `FastHTML`, `GraphQL`, `mRNA`).
+        """
+        pid = pack_id.strip().lower()
+        if not pid:
+            return []
+        tokens = [t.strip() for t in re.split(r"[,;\r\n]+", word_or_words) if t.strip()]
+        if not tokens:
+            return []
+        now = time.time()
+        added: list[str] = []
+        with self._connect() as conn:
+            for tok in tokens:
+                # Allow whitespace-separated batch if multiple plain tokens were pasted
+                parts = tok.split() if " " in tok else [tok]
+                for p in parts:
+                    clean = p.strip()
+                    if not clean:
+                        continue
+                    conn.execute(
+                        """
+                        INSERT INTO domain_pack_words (pack_id, word_lower, display_word, action, updated_at)
+                        VALUES (?, ?, ?, 'add', ?)
+                        ON CONFLICT(pack_id, word_lower) DO UPDATE SET
+                            display_word = excluded.display_word,
+                            action = 'add',
+                            updated_at = excluded.updated_at
+                        """,
+                        (pid, clean.lower(), clean, now),
+                    )
+                    added.append(clean)
+        self._note_db_mtime()
+        return added
+
+    def remove_domain_pack_word(
+        self, pack_id: str, word: str, *, is_builtin: bool = True
+    ) -> None:
+        """Remove a word from `pack_id` (deletes custom row or suppresses built-in entry)."""
+        pid = pack_id.strip().lower()
+        low = word.strip().lower()
+        if not pid or not low:
+            return
+        now = time.time()
+        with self._connect() as conn:
+            if is_builtin:
+                conn.execute(
+                    """
+                    INSERT INTO domain_pack_words (pack_id, word_lower, display_word, action, updated_at)
+                    VALUES (?, ?, ?, 'remove', ?)
+                    ON CONFLICT(pack_id, word_lower) DO UPDATE SET
+                        action = 'remove',
+                        updated_at = excluded.updated_at
+                    """,
+                    (pid, low, word.strip(), now),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM domain_pack_words WHERE pack_id = ? AND word_lower = ?",
+                    (pid, low),
+                )
+        self._note_db_mtime()
+
+    def edit_domain_pack_word(
+        self,
+        pack_id: str,
+        old_word: str,
+        new_word: str,
+        *,
+        old_is_builtin: bool = False,
+    ) -> None:
+        """Rename or change casing of an existing domain vocabulary word."""
+        old_clean = old_word.strip()
+        new_clean = new_word.strip()
+        if not old_clean or not new_clean:
+            return
+        if old_clean.lower() != new_clean.lower():
+            self.remove_domain_pack_word(pack_id, old_clean, is_builtin=old_is_builtin)
+        self.upsert_domain_pack_word(pack_id, new_clean)
+
+    def upsert_domain_pack_typo(self, pack_id: str, typo: str, target: str) -> None:
+        """Add or edit a direct typo mapping (`typo -> target`) in `pack_id`."""
+        pid = pack_id.strip().lower()
+        t_low = typo.strip().lower()
+        tgt = target.strip()
+        if not pid or not t_low or not tgt or t_low == tgt.lower():
+            return
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO domain_pack_typos (pack_id, typo_lower, target_word, action, updated_at)
+                VALUES (?, ?, ?, 'add', ?)
+                ON CONFLICT(pack_id, typo_lower) DO UPDATE SET
+                    target_word = excluded.target_word,
+                    action = 'add',
+                    updated_at = excluded.updated_at
+                """,
+                (pid, t_low, tgt, time.time()),
+            )
+        self._note_db_mtime()
+
+    def remove_domain_pack_typo(
+        self, pack_id: str, typo: str, *, is_builtin: bool = True
+    ) -> None:
+        """Remove a direct typo mapping from `pack_id`."""
+        pid = pack_id.strip().lower()
+        t_low = typo.strip().lower()
+        if not pid or not t_low:
+            return
+        with self._connect() as conn:
+            if is_builtin:
+                conn.execute(
+                    """
+                    INSERT INTO domain_pack_typos (pack_id, typo_lower, target_word, action, updated_at)
+                    VALUES (?, ?, '', 'remove', ?)
+                    ON CONFLICT(pack_id, typo_lower) DO UPDATE SET
+                        action = 'remove',
+                        updated_at = excluded.updated_at
+                    """,
+                    (pid, t_low, time.time()),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM domain_pack_typos WHERE pack_id = ? AND typo_lower = ?",
+                    (pid, t_low),
+                )
+        self._note_db_mtime()
+
+    def reset_domain_pack_overrides(self, pack_id: str) -> None:
+        """Revert all local user edits for `pack_id` back to built-in defaults."""
+        pid = pack_id.strip().lower()
+        if not pid:
+            return
+        with self._connect() as conn:
+            conn.execute("DELETE FROM domain_pack_words WHERE pack_id = ?", (pid,))
+            conn.execute("DELETE FROM domain_pack_typos WHERE pack_id = ?", (pid,))
+        self._note_db_mtime()

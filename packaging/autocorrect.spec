@@ -52,6 +52,7 @@ hidden = [
     "autocorrect.preferences.settings_schema",
     "autocorrect.preferences.system_locale",
     "autocorrect.intelligence.adaptive_lm",
+    "autocorrect.intelligence.neural_context",
     "autocorrect.logging_setup",
     "autocorrect.platform_paths",
     "tkinter",

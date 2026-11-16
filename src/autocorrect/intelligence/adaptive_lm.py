@@ -97,10 +97,11 @@ SEED_NEXT_WORD_TRIGRAMS: Final[dict[tuple[str, str], tuple[tuple[str, float], ..
 class PredictionCandidate:
     """An inline placeholder prediction ready to display and accept on Tab."""
 
-    mode: str  # "SUFFIX" | "NEXT_WORD"
-    display_text: str  # Exact suffix or next word to render as ghost text
-    full_word: str  # Full target word
+    mode: str  # "SUFFIX" | "NEXT_WORD" | "AI_REWRITE"
+    display_text: str  # Exact suffix, next word, or AI rewrite tail to render
+    full_word: str  # Full target word or target rewrite string (with trailing space if needed)
     confidence: float
+    original_tail: str = ""  # Exact screen suffix replaced when mode == "AI_REWRITE"
 
 
 class AdaptivePersonalLM:
@@ -146,6 +147,8 @@ class AdaptivePersonalLM:
         self,
         bundle: ResourceBundle,
         custom_words: dict[str, str] | None = None,
+        *,
+        custom_revision: int | None = None,
     ) -> None:
         """
         Seed the fast prefix index from active domain packs, user custom dictionary,
@@ -153,8 +156,15 @@ class AdaptivePersonalLM:
         binary search in `MmapLexicon.find_word_ids_by_prefix` and cached on demand).
         """
         with self._lock:
-            custom_sig = len(custom_words) if custom_words else 0
-            pack_sig = ",".join(sorted(bundle.domain_packs.keys()))
+            custom_sig = (
+                custom_revision
+                if custom_revision is not None
+                else (len(custom_words) if custom_words else 0)
+            )
+            pack_sig = ",".join(
+                f"{pid}:{len(bundle.domain_packs[pid].words)}"
+                for pid in sorted(bundle.domain_packs.keys())
+            )
             sig = f"{bundle.version}:{pack_sig}:{custom_sig}"
             if self._seeded_bundle_version == sig:
                 return
@@ -279,6 +289,8 @@ class AdaptivePersonalLM:
         prev1_lower: str | None = None,
         prev2_lower: str | None = None,
         is_sentence_start: bool = False,
+        *,
+        custom_revision: int | None = None,
     ) -> PredictionCandidate | None:
         """
         Predict the remaining suffix of an in-progress word (`len >= 2`, suffix `len >= 2`).
@@ -287,7 +299,7 @@ class AdaptivePersonalLM:
         if len(partial_token) < 2 or not partial_token.isalpha():
             return None
         low_pref = partial_token.lower()
-        self.ensure_seeded_from_bundle(bundle, custom_words)
+        self.ensure_seeded_from_bundle(bundle, custom_words, custom_revision=custom_revision)
 
         lookup_key = low_pref[: min(6, len(low_pref))]
         p1 = prev1_lower.lower() if prev1_lower else ""
@@ -295,16 +307,19 @@ class AdaptivePersonalLM:
 
         with self._lock:
             raw_candidates = list(self._prefix_index.get(lookup_key, ()))
-            # Also check custom words and personal unigrams directly for longer prefixes
-            if custom_words:
+            # Prefixes of length 2..6 are already indexed in `_prefix_index`;
+            # only scan custom words / unigrams directly for prefixes > 6 chars
+            # or short custom words (< 4 chars).
+            if custom_words and len(low_pref) > 6:
                 for c_low, c_disp in custom_words.items():
                     if c_low.startswith(low_pref) and len(c_low) >= len(low_pref) + 2:
                         raw_candidates.append((c_low, c_disp, -3.2))
-            for u_low, (u_cnt, u_disp, _) in self._unigrams.items():
-                if u_low.startswith(low_pref) and len(u_low) >= len(low_pref) + 2:
-                    raw_candidates.append(
-                        (u_low, u_disp, -4.2 + min(2.2, 0.40 * math.log1p(u_cnt)))
-                    )
+            if len(low_pref) > 6:
+                for u_low, (u_cnt, u_disp, _) in self._unigrams.items():
+                    if u_low.startswith(low_pref) and len(u_low) >= len(low_pref) + 2:
+                        raw_candidates.append(
+                            (u_low, u_disp, -4.2 + min(2.2, 0.40 * math.log1p(u_cnt)))
+                        )
 
         # Query the mmap lexicon via O(log N) binary search for words starting with low_pref >= 3 chars
         if len(low_pref) >= 3:

@@ -1,10 +1,10 @@
 """
 Embedded Ed25519 *public* root key.
 
-Every licence certificate (`entitlement.lic`), language-resource manifest,
-model manifest and application-release descriptor is verified against this
-key. The matching private key never ships: it lives only on the signing
-machine (see `pipeline/issue_licence.py`) and is never committed.
+Every language-resource manifest, model manifest and application-release
+descriptor is verified against this key. The matching private key never ships:
+it lives only on the release-signing machine (see `pipeline/sign_release.py`)
+and is never committed.
 
 Rotating the key means changing `ROOT_PUBLIC_KEY_HEX` here *and*
 `ED25519_PUBLIC_KEY_HEX` in `site/src/data/releases.ts`; every certificate

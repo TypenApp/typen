@@ -2,15 +2,16 @@
   "version": "2.0.0",
   "schema_version": 2,
   "released_at": "2026-11-14T00:00:00Z",
-  "word_count": 464269,
+  "word_count": 460805,
   "artifacts": {
-    "lexicon.bin": "c1ded92d57c9f0e1f546b8fb1e01752e1ff9e52b793d758ee0bcd912b0bd48c4",
-    "lexicon_meta.bin": "03ef0831c4c2f5c3f4341376605d2e8f173d8cf40dd8fe5f72de4901b3af4f29",
-    "symspell_idx.bin": "ee1c38d5af42c54efe8c7697b262f7a5b7a71754577540dda6d056bbfa9514f4",
-    "direct_typos.bin": "7607141b14b2c08d0d82f382a16a4fcb5b451a15247e867344673c74115c9ac6",
-    "context_ngram.bin": "a2fb2ad75ed9c3b13f8b4902fbc7551b808d0c763642019989e6b9019c398b4c",
+    "lexicon.bin": "1acdeaf82a8a43b83da944511ad37aae4331b907e39bbaff3ea5a6a03b357658",
+    "lexicon_meta.bin": "40809210d4a6a846c9426f60c84571ec33a6ea639dfbe07d4361a36f5e8b223f",
+    "symspell_idx.bin": "b5b13f4f91b25960f98ffc12df38deb8c43528ec0fbb34138f9e21b741129b2d",
+    "direct_typos.bin": "4ca7401911ff13c000f09f30d1696f060d1cd2bf61073f8d3a4ac85bd263902b",
+    "context_ngram.bin": "ae2e2033c511eecaeca05d6ef5364647a3f640b935d7b35927f14628e9625aad",
+    "neural_ctx_int8.bin": "bb06b6e60ddd1ff108f3f809c9a6fc7a17b7b7da21b36c6d8346b2bb262a270a",
     "abbreviations.bin": "2c5b366b2427a4a0d11439d72aba1b4b5d39c2d2b4ed96d010a4109087182a35",
-    "exact_casing.json": "c8e0eee2cb70fa52289e275ca4ec223e4fc038a147fa4da29c8eb429207b5a85",
+    "exact_casing.json": "d6a5f7589fafad50825ccbdeb43341104935794897af986c9850cf7358c38b08",
     "confusion_sets.json": "c2cb06c0be0e8a709131ba554b91e8bbca20797a7369b66eee0ccd639f74b9c4"
   }
 }

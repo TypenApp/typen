@@ -19,6 +19,11 @@ import struct
 from pathlib import Path
 
 from autocorrect.intelligence.mmap_symspell import generate_delete_hashes
+from autocorrect.intelligence.neural_context import (
+    DEFAULT_EMBED_DIM,
+    MAGIC_NEURAL_CTX,
+    NEURAL_HEADER_STRUCT,
+)
 from autocorrect.intelligence.schema import (
     BINARY_SCHEMA_VERSION,
     DIRECT_TYPO_STRUCT,
@@ -217,7 +222,14 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
             f.write(chunk)
         f.write(abbrev_blob)
 
-    # 8. Write Pro domain packs
+    # 8. Build and write quantized Int8 neural bilinear context embeddings (`neural_ctx_int8.bin`)
+    _compile_neural_context_binary(
+        dataset=dataset,
+        word_to_id=word_to_id,
+        output_path=output_dir / "neural_ctx_int8.bin",
+    )
+
+    # 8b. Write Pro domain packs
     packs_dir = output_dir / "packs"
     packs_dir.mkdir(parents=True, exist_ok=True)
     for pack_id, pack_payload in dataset.domain_packs.items():
@@ -230,6 +242,7 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
         "symspell_idx.bin",
         "direct_typos.bin",
         "context_ngram.bin",
+        "neural_ctx_int8.bin",
         "abbreviations.bin",
         "exact_casing.json",
         "confusion_sets.json",
@@ -249,3 +262,125 @@ def compile_dataset_to_directory(dataset: RawCorpusDataset, output_dir: Path) ->
     manifest_path = output_dir / "manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest_path
+
+
+def _compile_neural_context_binary(
+    dataset: RawCorpusDataset,
+    word_to_id: dict[str, int],
+    output_path: Path,
+    dim: int = DEFAULT_EMBED_DIM,
+) -> None:
+    """
+    Factorize the Shifted Positive PMI transition matrix M(context, target) via
+    rank-`dim` truncated SVD and symmetric-quantize both factor matrices to signed int8.
+    """
+    import math
+
+    active_words: set[str] = set()
+    for w1, w2, _lp in dataset.bigrams:
+        w1_l, w2_l = w1.lower(), w2.lower()
+        if w1_l in word_to_id and w2_l in word_to_id:
+            active_words.add(w1_l)
+            active_words.add(w2_l)
+    for w1, w2, w3, _lp in dataset.trigrams:
+        w1_l, w2_l, w3_l = w1.lower(), w2.lower(), w3.lower()
+        if w1_l in word_to_id and w2_l in word_to_id and w3_l in word_to_id:
+            active_words.update((w1_l, w2_l, w3_l))
+
+    sorted_pairs = sorted((word_to_id[w], w) for w in active_words)
+    vocab_count = len(sorted_pairs)
+    if vocab_count == 0:
+        with open(output_path, "wb") as f:
+            f.write(NEURAL_HEADER_STRUCT.pack(MAGIC_NEURAL_CTX, BINARY_SCHEMA_VERSION, dim, 0, 0, 0.001))
+        return
+
+    wid_to_row = {wid: idx for idx, (wid, _w) in enumerate(sorted_pairs)}
+    unigram_lp: dict[str, float] = {w: dataset.words[w].log_freq for _wid, w in sorted_pairs if w in dataset.words}
+
+    edges: dict[tuple[int, int], float] = {}
+    for w1, w2, lp in dataset.bigrams:
+        w1_l, w2_l = w1.lower(), w2.lower()
+        id1, id2 = word_to_id.get(w1_l), word_to_id.get(w2_l)
+        if id1 is None or id2 is None or id1 not in wid_to_row or id2 not in wid_to_row:
+            continue
+        r, c = wid_to_row[id1], wid_to_row[id2]
+        pmi = max(0.0, min(8.0, lp - unigram_lp.get(w2_l, -6.0)))
+        if pmi > 0.05:
+            edges[(r, c)] = max(edges.get((r, c), 0.0), pmi)
+
+    for w1, w2, w3, lp in dataset.trigrams:
+        w1_l, w2_l, w3_l = w1.lower(), w2.lower(), w3.lower()
+        id1, id2, id3 = word_to_id.get(w1_l), word_to_id.get(w2_l), word_to_id.get(w3_l)
+        if id1 is None or id2 is None or id3 is None:
+            continue
+        if id1 not in wid_to_row or id2 not in wid_to_row or id3 not in wid_to_row:
+            continue
+        r1, r2, c3 = wid_to_row[id1], wid_to_row[id2], wid_to_row[id3]
+        pmi3 = max(0.0, min(8.0, lp - unigram_lp.get(w3_l, -6.0)))
+        if pmi3 > 0.05:
+            edges[(r2, c3)] = max(edges.get((r2, c3), 0.0), pmi3 * 0.85)
+            edges[(r1, c3)] = max(edges.get((r1, c3), 0.0), pmi3 * 0.45)
+
+    ctx_bytes = bytearray(vocab_count * dim)
+    tgt_bytes = bytearray(vocab_count * dim)
+    logit_scale = 0.001
+
+    try:
+        import numpy as np  # type: ignore[import-not-found]
+
+        mat = np.zeros((vocab_count, vocab_count), dtype=np.float32)
+        for (r, c), val in edges.items():
+            mat[r, c] = val
+        u, s, vt = np.linalg.svd(mat, full_matrices=False)
+        k = min(dim, len(s))
+        sqrt_s = np.sqrt(np.maximum(s[:k], 0.0))
+        c_emb = np.zeros((vocab_count, dim), dtype=np.float32)
+        t_emb = np.zeros((vocab_count, dim), dtype=np.float32)
+        c_emb[:, :k] = u[:, :k] * sqrt_s[None, :]
+        t_emb[:, :k] = vt[:k, :].T * sqrt_s[None, :]
+
+        max_c = float(np.max(np.abs(c_emb)))
+        max_t = float(np.max(np.abs(t_emb)))
+        scale_c = (max_c / 127.0) if max_c > 1e-6 else 0.01
+        scale_t = (max_t / 127.0) if max_t > 1e-6 else 0.01
+        logit_scale = float(scale_c * scale_t)
+
+        c_q = np.clip(np.round(c_emb / scale_c), -127, 127).astype(np.int8)
+        t_q = np.clip(np.round(t_emb / scale_t), -127, 127).astype(np.int8)
+        ctx_bytes[:] = c_q.tobytes()
+        tgt_bytes[:] = t_q.tobytes()
+    except ImportError:
+        # Pure-Python deterministic hashed random-projection fallback when numpy is absent
+        c_floats = [[0.0] * dim for _ in range(vocab_count)]
+        t_floats = [[0.0] * dim for _ in range(vocab_count)]
+        for (r, c), val in edges.items():
+            d_idx = ((r * 2654435761) ^ (c * 40503)) % dim
+            sign = 1.0 if (((r + c) * 17) & 1) == 0 else -1.0
+            root_v = math.sqrt(val)
+            c_floats[r][d_idx] += sign * root_v
+            t_floats[c][d_idx] += sign * root_v
+        max_c = max((abs(x) for row in c_floats for x in row), default=0.0)
+        max_t = max((abs(x) for row in t_floats for x in row), default=0.0)
+        scale_c = (max_c / 127.0) if max_c > 1e-6 else 0.01
+        scale_t = (max_t / 127.0) if max_t > 1e-6 else 0.01
+        logit_scale = float(scale_c * scale_t)
+        ctx_q = [max(-127, min(127, int(round(x / scale_c)))) for row in c_floats for x in row]
+        tgt_q = [max(-127, min(127, int(round(x / scale_t)))) for row in t_floats for x in row]
+        ctx_bytes[:] = struct.pack(f"<{len(ctx_q)}b", *ctx_q)
+        tgt_bytes[:] = struct.pack(f"<{len(tgt_q)}b", *tgt_q)
+
+    sorted_wids = [wid for wid, _w in sorted_pairs]
+    with open(output_path, "wb") as f:
+        f.write(
+            NEURAL_HEADER_STRUCT.pack(
+                MAGIC_NEURAL_CTX,
+                BINARY_SCHEMA_VERSION,
+                dim,
+                vocab_count,
+                0,
+                logit_scale,
+            )
+        )
+        f.write(struct.pack(f"<{vocab_count}I", *sorted_wids))
+        f.write(ctx_bytes)
+        f.write(tgt_bytes)

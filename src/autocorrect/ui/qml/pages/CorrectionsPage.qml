@@ -18,16 +18,31 @@ Page {
 
     Card {
         SectionTitle { title: "Predictive typing" }
-        ToggleRow { key: "enable_predictive_tab"; label: "Inline placeholder suggestions"; description: "Show muted inline completions and next-word predictions at the caret." }
+        ToggleRow { key: "enable_predictive_tab"; label: "Inline placeholder suggestions"; description: "Show muted completions and next-word predictions right on the typing line." }
+        ChoiceRow {
+            key: "predictive_display_style"; label: "Display style"; indent: true
+            enabled: s.enable_predictive_tab === true
+            description: "In-line draws frameless ghost text directly at the cursor (and falls back to a word pill ahead of the cursor when an app hides caret geometry)."
+            options: [
+                { value: "inline", label: "In-line ghost" },
+                { value: "pill", label: "Word pill ahead" }
+            ]
+        }
         ChoiceRow {
             key: "predictive_accept_key"; label: "Accept suggestion with"; indent: true
             enabled: s.enable_predictive_tab === true
-            description: "Which key inserts the inline suggestion when one is visible."
+            description: "Which key inserts the active suggestion."
             options: [
                 { value: "both", label: "Tab or Right →" },
                 { value: "tab", label: "Tab only" },
                 { value: "right", label: "Right → only" }
             ]
+        }
+        SliderRow {
+            key: "predictive_font_scale"; label: "Suggestion text size"; from: 0.80; to: 1.40; step: 0.05; indent: true
+            enabled: s.enable_predictive_tab === true
+            description: "100% follows the Windows system and input field font size."
+            formatter: function (v) { return Math.round(v * 100) + "%" }
         }
     }
 

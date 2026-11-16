@@ -132,6 +132,12 @@ class AutoCorrectDaemon:
 
         # 2. Load local preferences & custom vocabulary + Adaptive Personal LM
         self.preference_store = SQLitePreferenceStore(self._data_dir / "preferences.sqlite3")
+        try:
+            self.resource_manager.set_domain_pack_overrides(
+                self.preference_store.load_domain_pack_overrides()
+            )
+        except Exception:
+            log.debug("could not load domain_pack_overrides", exc_info=True)
         self.adaptive_lm = AdaptivePersonalLM()
         try:
             u_rows, n_rows = self.preference_store.load_adaptive_lm()
@@ -175,7 +181,10 @@ class AutoCorrectDaemon:
         self.local_ai = LocalModelManager(
             is_pro_entitled=True,
             models_dir=self._data_dir / "models",
+            resource_manager=self.resource_manager,
         )
+        if hasattr(self.engine, "set_local_ai"):
+            self.engine.set_local_ai(self.local_ai)
         self.api_key_manager = ApiKeyManager(use_memory_backend=dry_run_hooks)
         self.usage_tracker = UsageTracker(self._data_dir / "ai_usage.sqlite3")
         self.spending_controller = SpendingController(usage_tracker=self.usage_tracker)
@@ -231,6 +240,23 @@ class AutoCorrectDaemon:
         # 8b. Caret-context probe (Windows UI Automation) and inline ghost overlay.
         self.caret_probe = create_caret_probe() if not dry_run_hooks else None
         self.ghost_overlay = create_inline_ghost_overlay() if not dry_run_hooks else None
+        if self.ghost_overlay is not None and self.caret_probe is not None:
+            self.ghost_overlay.set_anchor_probe(self.caret_probe.read_overlay_anchor)
+
+        # Dedicated background worker for UIA caret-text resync so focus/mouse/Tab
+        # events NEVER block `autocorrect-input-dispatcher` (even if an external
+        # app like Chrome takes multiple seconds to build its UIA tree).
+        self._caret_req_lock = threading.Lock()
+        self._caret_req_event = threading.Event()
+        self._caret_req_seq: int = 0
+        self._caret_req_settle_s: float = 0.0
+        self._caret_worker: threading.Thread | None = None
+        self._caret_worker_running: bool = False
+
+        # Background 450ms idle timer for Layer-2 On-Device AI Pause Pill suggestions
+        self._pause_pill_lock = threading.Lock()
+        self._pause_pill_timer: threading.Timer | None = None
+        self._pause_pill_seq: int = 0
 
         # 9. Single worker thread that owns the session: hooks, mouse and focus all post to it.
         self.dispatcher = InputDispatcher(
@@ -315,11 +341,13 @@ class AutoCorrectDaemon:
         # Restore persisted correction preferences and (Pro) domain packs.
         self.apply_log_level()
         self.apply_global_correction_settings()
+        self.sync_domain_pack_overrides()
         self.set_user_domain_packs(set(self.preference_store.get_typed("enabled_domain_packs")))
         if start_ipc:
             self.ipc_server.start()
         if self.ghost_overlay is not None:
             self.ghost_overlay.start()
+        self._start_caret_worker()
         self.dispatcher.start()
         if self.preference_store.get_typed("panic_hotkey_enabled"):
             self.kill_switch.start()
@@ -499,7 +527,9 @@ class AutoCorrectDaemon:
 
     def stop(self) -> None:
         """Release all OS keyboard/mouse hooks, stop Local IPC server, and close mmap files."""
+        self._cancel_pause_pill_timer()
         self.kill_switch.stop()
+        self._stop_caret_worker()
         if self.ghost_overlay is not None:
             self.ghost_overlay.stop()
         self._release_os_hooks()
@@ -507,6 +537,91 @@ class AutoCorrectDaemon:
         self._flush_adaptive_lm()
         self.ipc_server.stop()
         self.resource_manager.close()
+
+    def _start_caret_worker(self) -> None:
+        if self.caret_probe is None or self._dry_run_hooks or self._caret_worker_running:
+            return
+        self._caret_worker_running = True
+        self._caret_worker = threading.Thread(
+            target=self._run_caret_worker_loop,
+            name="typen-caret-probe-worker",
+            daemon=True,
+        )
+        self._caret_worker.start()
+
+    def _stop_caret_worker(self) -> None:
+        if not self._caret_worker_running:
+            return
+        self._caret_worker_running = False
+        self._caret_req_event.set()
+        if self._caret_worker is not None and self._caret_worker.is_alive():
+            self._caret_worker.join(timeout=0.5)
+        self._caret_worker = None
+
+    def _invalidate_pending_caret_resync(self) -> None:
+        with self._caret_req_lock:
+            self._caret_req_seq += 1
+
+    def _request_async_caret_resync(self, *, settle_s: float = 0.0) -> None:
+        """Schedule a non-blocking UIA caret-context read on `typen-caret-probe-worker`."""
+        if self.caret_probe is None or self._dry_run_hooks or not self._caret_worker_running:
+            return
+        with self._caret_req_lock:
+            self._caret_req_seq += 1
+            self._caret_req_settle_s = max(0.0, settle_s)
+        self._caret_req_event.set()
+
+    def _run_caret_worker_loop(self) -> None:  # pragma: no cover - Win32 background thread
+        handled_seq = 0
+        while self._caret_worker_running:
+            self._caret_req_event.wait(timeout=0.5)
+            self._caret_req_event.clear()
+            if not self._caret_worker_running:
+                break
+            while self._caret_worker_running:
+                with self._caret_req_lock:
+                    seq = self._caret_req_seq
+                    settle_s = self._caret_req_settle_s
+                if seq == handled_seq:
+                    break
+                handled_seq = seq
+                if settle_s > 0.0:
+                    time.sleep(settle_s)
+                    with self._caret_req_lock:
+                        if self._caret_req_seq != seq or not self._caret_worker_running:
+                            continue
+                probe = self.caret_probe
+                if probe is None:
+                    break
+                ctx = None
+                try:
+                    ctx = probe.read()
+                    if ctx is None and settle_s > 0.0:
+                        with self._caret_req_lock:
+                            still_current = self._caret_req_seq == seq
+                        if still_current:
+                            time.sleep(0.015)
+                            ctx = probe.read()
+                except Exception:
+                    log.debug("async caret probe raised", exc_info=True)
+                    ctx = None
+                if ctx is None or ctx.is_password:
+                    continue
+                text_before = "" if ctx.is_empty_field else ctx.text_before
+                with self._caret_req_lock:
+                    if self._caret_req_seq != seq or not self._caret_worker_running:
+                        continue
+
+                def _apply(expected_seq: int = seq, resolved_text: str = text_before) -> None:
+                    with self._caret_req_lock:
+                        if self._caret_req_seq != expected_seq:
+                            return
+                    if self.session.is_paused:
+                        return
+                    self.session.apply_async_caret_context(resolved_text)
+                    self._sync_ghost_overlay()
+
+                self.dispatcher.post_call(_apply)
 
     def _flush_adaptive_lm(self) -> None:
         try:
@@ -525,12 +640,14 @@ class AutoCorrectDaemon:
         watchdog, so one tray action always brings the daemon back.
         """
         if paused:
+            self._cancel_pause_pill_timer()
             if self.ghost_overlay is not None:
                 self.ghost_overlay.hide()
             self.dispatcher.run_sync(lambda: self.session.set_paused(True))
         else:
             if self.in_safe_mode:
                 self.leave_safe_mode()
+            self.dispatcher.reset_overload()
             self.dispatcher.run_sync(lambda: self.session.set_paused(False))
             if not self._hooks_active and self.hook_status.state in (
                 HookState.DISABLED,
@@ -638,6 +755,15 @@ class AutoCorrectDaemon:
         return out
 
     # ------------------------------------------------------------------ focus
+    def sync_domain_pack_overrides(self) -> None:
+        """Reload persisted local domain-pack word & typo edits into `ResourceManager`."""
+        try:
+            self.resource_manager.set_domain_pack_overrides(
+                self.preference_store.load_domain_pack_overrides()
+            )
+        except Exception:
+            log.debug("sync_domain_pack_overrides failed", exc_info=True)
+
     def set_user_domain_packs(self, pack_ids: set[str]) -> None:
         """Record the user's globally enabled packs and apply them (plus any app-profile packs)."""
         self._user_domain_packs = {p.strip().lower() for p in pack_ids if p.strip()}
@@ -675,23 +801,31 @@ class AutoCorrectDaemon:
                 is_excluded_app=True,
                 control_id=focus.control_id,
             )
+        self._cancel_pause_pill_timer()
         if self.ghost_overlay is not None:
             self.ghost_overlay.hide()
         self._flush_adaptive_lm()
+        # Transient empty focus notifications during window transitions (Win+R, Alt+Tab)
+        # must never overwrite the previous valid focus or reset session state.
+        if not focus.process_name and not self._dry_run_hooks:
+            return
         was_initial_focus = (
             not self.session._focus_context.process_name
             and not self.session._focus_context.control_id
             and not self.session.word_buffer.current_word
             and not self.session._last_completed_word
         )
-        caret_before = None
-        probe_attempted = False
-        if not (effective.is_password_or_secure or effective.is_excluded_app):
-            probe_attempted = self.caret_probe is not None and not self._dry_run_hooks
-            caret_before = self._read_caret_context(with_settle=probe_attempted)
+        probe_attempted = (
+            not (effective.is_password_or_secure or effective.is_excluded_app)
+            and self.caret_probe is not None
+            and not self._dry_run_hooks
+        )
+        # Immediately transition session state in < 0.1ms (leaving `_word_buffer` CLEAN)
+        # and resolve the OS caret text asynchronously so UIA never blocks input.
+        self._invalidate_pending_caret_resync()
         self.session.on_focus_changed(
             effective,
-            caret_text_before=caret_before,
+            caret_text_before=None,
             caret_probe_attempted=(probe_attempted and not was_initial_focus),
         )
 
@@ -701,51 +835,38 @@ class AutoCorrectDaemon:
         else:
             self.apply_global_correction_settings()
         self._apply_effective_domain_packs(focus)
-
-    def _read_caret_context(self, *, with_settle: bool = False) -> str | None:
-        """Text before the caret in the focused control, or None when unknown. Worker thread only."""
-        probe = self.caret_probe
-        if probe is None:
-            return None
-        has_pending_keys = self.dispatcher.queue_depth > 0
-        if with_settle and not has_pending_keys:
-            time.sleep(0.015)
-        try:
-            ctx = probe.read()
-            if ctx is None and with_settle and not has_pending_keys:
-                time.sleep(0.015)
-                ctx = probe.read()
-        except Exception:
-            log.debug("caret probe raised", exc_info=True)
-            return None
-        if ctx is None or ctx.is_password:
-            return None
-        return "" if ctx.is_empty_field else ctx.text_before
+        if probe_attempted:
+            self._request_async_caret_resync(settle_s=0.015)
 
     def _on_mouse_click_on_worker(self) -> None:
         """
-        A mouse button went down. The click lands *before* this runs, so by
-        now the caret is where the user put it; read what precedes it and
-        rebuild the sentence state. Also refreshes focus right away rather
-        than waiting for the next monitor tick.
+        A mouse button went down. Refresh focus right away and schedule a
+        non-blocking background caret probe so the input worker never stalls.
         """
+        self._cancel_pause_pill_timer()
         if self.ghost_overlay is not None:
             self.ghost_overlay.hide()
         if self.session.is_paused:
             return
-        if self.caret_probe is not None and self.dispatcher.queue_depth == 0:
-            # Give the target application a moment to place its caret before asking,
-            # unless the user is already typing keys behind the click in the queue.
-            time.sleep(CLICK_SETTLE_S)
         focus = self.focus_monitor.poll_once()
         if focus is not None:
             # poll_once already queued `_on_focus_changed`, which resyncs from the caret.
             return
-        probe_attempted = self.caret_probe is not None and not self._dry_run_hooks
+        probe_attempted = (
+            not (
+                self.session._focus_context.is_password_or_secure
+                or self.session._focus_context.is_excluded_app
+            )
+            and self.caret_probe is not None
+            and not self._dry_run_hooks
+        )
+        self._invalidate_pending_caret_resync()
         self.session.on_mouse_click_or_caret_move(
-            caret_text_before=self._read_caret_context(),
+            caret_text_before=None,
             caret_probe_attempted=probe_attempted,
         )
+        if probe_attempted:
+            self._request_async_caret_resync(settle_s=CLICK_SETTLE_S)
 
     def global_features(self) -> CorrectionFeatures:
         """The user's global correction behaviour, straight from the (validated) settings store."""
@@ -828,33 +949,57 @@ class AutoCorrectDaemon:
                 target=self.on_open_settings_requested, name="autocorrect-hotkey-settings", daemon=True
             ).start()
         elif hotkey_id == HOTKEY_ID_REWRITE:
-            self.dispatcher.post_call(self._trigger_sentence_rewrite_on_worker)
+            threading.Thread(
+                target=self._trigger_sentence_rewrite_bg,
+                name="autocorrect-hotkey-rewrite",
+                daemon=True,
+            ).start()
 
-    def _trigger_sentence_rewrite_on_worker(self) -> None:
-        """Evaluate and rewrite the most recently completed or active sentence via LocalModelManager."""
+    def _trigger_sentence_rewrite_bg(self) -> None:
+        """Evaluate and rewrite the active clause or last sentence via LocalModelManager off-thread."""
         if self.session.is_paused:
             return
-        sentence = self._last_completed_sentence
-        if not sentence and self.caret_probe is not None:
-            caret_text = self._read_caret_context()
-            if caret_text:
-                sentence = caret_text.strip().splitlines()[-1] if caret_text.strip() else ""
+        trailing_space = False
+        active_clause = self.session.active_clause_for_ai()
+        if active_clause:
+            sentence = active_clause
+            trailing_space = True
+        else:
+            sentence = self._last_completed_sentence
+        if not sentence and self.caret_probe is not None and not self._dry_run_hooks:
+            try:
+                ctx = self.caret_probe.read()
+                if ctx is not None and not ctx.is_password and not ctx.is_empty_field:
+                    raw = ctx.text_before
+                    trailing_space = raw.endswith(" ")
+                    stripped = raw.strip()
+                    sentence = stripped.splitlines()[-1] if stripped else ""
+            except Exception:
+                sentence = ""
         if not sentence:
             return
         sugg = self.local_ai.evaluate_sentence(sentence, triggered_by_hotkey=True)
         if sugg is None or sugg.suggested_sentence == sugg.original_sentence:
             return
-        plan = SuffixDiffPlanner.plan(
-            original_full=sugg.original_sentence,
-            target_full=sugg.suggested_sentence,
-            delimiter_was_suppressed=True,
-        )
-        if not plan.is_noop:
-            try:
-                self.injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
-                self._last_completed_sentence = sugg.suggested_sentence
-            except Exception:
-                log.debug("sentence rewrite injection failed", exc_info=True)
+
+        def _inject_rewrite() -> None:
+            if self.session.is_paused:
+                return
+            orig_s = f"{sugg.original_sentence} " if trailing_space else sugg.original_sentence
+            targ_s = f"{sugg.suggested_sentence} " if trailing_space else sugg.suggested_sentence
+            plan = SuffixDiffPlanner.plan(
+                original_full=orig_s,
+                target_full=targ_s,
+                delimiter_was_suppressed=False,
+            )
+            if not plan.is_noop:
+                try:
+                    self.injector.execute_replacement(plan.backspaces_to_send, plan.text_to_inject)
+                    self._last_completed_sentence = sugg.suggested_sentence
+                except Exception:
+                    log.debug("sentence rewrite injection failed", exc_info=True)
+
+        self.dispatcher.post_call(_inject_rewrite)
 
     def reload_hotkeys(self) -> None:
         """Re-register hotkeys after Settings changed them (Windows re-creates the hook thread)."""
@@ -870,6 +1015,7 @@ class AutoCorrectDaemon:
         with self._hook_lock:
             if self._hooks_active:
                 return
+            self.dispatcher.reset_overload()
             self._hooks_active = True
             if self._dry_run_hooks:
                 self.hook_status = HookStatus(HookState.DRY_RUN, backend="dry-run")
@@ -1070,29 +1216,93 @@ class AutoCorrectDaemon:
         if pred is None or self.dispatcher.queue_depth > 0:
             self.ghost_overlay.hide()
             return
-        rect, dpi = self.caret_probe.read_geometry_fast()
-        if rect is not None:
-            self.ghost_overlay.show_at(pred.display_text, rect, dpi=dpi)
-        else:
-            self.ghost_overlay.hide()
+        f = self.session.features
+        prefix = self.session.word_buffer.current_word if pred.mode == "SUFFIX" else ""
+        self.ghost_overlay.request_prediction(
+            prefix,
+            pred.display_text,
+            accept_key=f.predictive_accept_key,
+            display_style=f.predictive_display_style,
+            font_scale=f.predictive_font_scale,
+            ai_tag=(pred.mode == "AI_REWRITE"),
+        )
+
+    def _cancel_pause_pill_timer(self) -> None:
+        with self._pause_pill_lock:
+            self._pause_pill_seq += 1
+            if self._pause_pill_timer is not None:
+                self._pause_pill_timer.cancel()
+                self._pause_pill_timer = None
+
+    def _schedule_pause_pill_check(self) -> None:
+        """
+        Schedule a non-blocking 450ms pause-pill evaluation via Layer-2 `LocalModelManager`
+        when the user pauses right after a word boundary in prose.
+        """
+        if (
+            self._dry_run_hooks
+            or self.ghost_overlay is None
+            or self.session.is_paused
+            or not self.local_ai.is_model_loaded
+            or self.preference_store.get_setting("pause_pill_enabled", "true") != "true"
+        ):
+            return
+        clause = self.session.active_clause_for_ai()
+        if not clause:
+            return
+        with self._pause_pill_lock:
+            self._pause_pill_seq += 1
+            seq = self._pause_pill_seq
+            if self._pause_pill_timer is not None:
+                self._pause_pill_timer.cancel()
+            timer = threading.Timer(0.45, self._run_pause_pill_eval, args=(seq, clause))
+            timer.daemon = True
+            self._pause_pill_timer = timer
+            timer.start()
+
+    def _run_pause_pill_eval(self, seq: int, clause: str) -> None:
+        with self._pause_pill_lock:
+            if seq != self._pause_pill_seq:
+                return
+        try:
+            sugg = self.local_ai.evaluate_sentence(clause, pause_elapsed_ms=450.0)
+        except Exception:
+            return
+        if sugg is None or sugg.suggested_sentence == clause:
+            return
+
+        def _apply_pill() -> None:
+            with self._pause_pill_lock:
+                if seq != self._pause_pill_seq:
+                    return
+            if self.session.arm_ai_clause_suggestion(clause, sugg.suggested_sentence):
+                self._sync_ghost_overlay()
+
+        self.dispatcher.post_call(_apply_pill)
 
     def _handle_key_on_worker(self, event: KeyEvent) -> None:
+        self._cancel_pause_pill_timer()
         outcome = self.session.handle_key_event(event, suppress_delimiter_on_replace=False)
+        if outcome.decision is not None or event.key_name in ("Space", "Return", "Enter"):
+            # Once a word boundary completes, any older focus/click caret probe is obsolete.
+            self._invalidate_pending_caret_resync()
         if outcome.sentence_completed_text:
             self._last_completed_sentence = outcome.sentence_completed_text
         self._apply_outcome(outcome)
         self._sync_ghost_overlay()
+        self._schedule_pause_pill_check()
         now_m = time.monotonic()
         if now_m - self._last_adaptive_flush_ts >= 30.0:
             self._last_adaptive_flush_ts = now_m
             self._flush_adaptive_lm()
-        # If the user passed through Tab or Backspace-into-tainted-buffer on a live hook,
-        # resync from the OS caret so sentence-start capitalisation matches the field.
+        # If the user passed through Tab or Backspace-into-tainted-buffer (only when
+        # no keys are waiting behind it) on a live hook, schedule an async caret resync.
         if (
             not self._dry_run_hooks
             and self.caret_probe is not None
             and not self.session.is_paused
-            and outcome.reason_tag != "PREDICTIVE_TAB"
+            and self.dispatcher.queue_depth == 0
+            and outcome.reason_tag not in ("PREDICTIVE_TAB", "SELECT_ALL_CLEARED")
             and (
                 event.key_name == "Tab"
                 or (
@@ -1101,9 +1311,9 @@ class AutoCorrectDaemon:
                 )
             )
         ):
-            caret_text = self._read_caret_context(with_settle=(event.key_name == "Tab"))
-            if caret_text is not None:
-                self.session.resync_from_caret(caret_text)
+            self._request_async_caret_resync(
+                settle_s=(0.015 if event.key_name == "Tab" else 0.0)
+            )
 
     def _apply_outcome(self, outcome: SessionEventOutcome) -> None:
         """
